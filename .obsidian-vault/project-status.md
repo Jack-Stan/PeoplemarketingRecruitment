@@ -152,6 +152,51 @@ Stan asked to move from design to building. Shipped, in order:
 - Approval queue in `PlanningView` is still a flat day-grouped list, not grouped by `(employee, weekStart)`
   as ticket-03's acceptance criteria describes — functional as-is, just not the ideal admin UX yet.
 
+---
+
+## Continued functional build-out (same third session, live-testing round)
+
+Stan started live-testing against prod via his own local dev server while this was in flight. Landed:
+
+- **Recruitment module built from scratch** (was a static English mock) — `types/recruitmentLead.ts`,
+  `recruitment.service.ts`, `stores/recruitment.ts`, `RecruitmentView.vue` rewritten: real CRUD, stage
+  pipeline (nieuw/gecontacteerd/sollicitatie gepland/opgekomen/niet opgekomen/aangenomen/niet aangenomen —
+  reconciling FRD §13 with the client's own Dutch stage names), weekly-leads counter, funnel stat cards.
+  Route opened to TeamMember as read-only per the transcript (rules already allowed this from Ticket 01,
+  just no client code used it). 40 unit tests now, up from 35.
+- **🔴 Prod incident, caught and fixed live**: Stan's own UI testing demoted **both** Administrator
+  accounts (`admin@peoplemarketing.be` and `stanverbruggen@protonmail.com`) to non-admin roles in the same
+  session, which cascaded into permission-denied everywhere (nothing admin-gated works with zero admins —
+  including fixing it back through the app itself). Fixed from a terminal both times via
+  `FORCE_PROD=true tsx scripts/grantRole.ts <email> Administrator gent`, which bypasses rules via the
+  Admin SDK. **Built the actual guard afterward**: `usersStore.adminCountFor(officeId)` +
+  `UsersView` now blocks (disables Save, shows a warning) any role change that would leave an office with
+  zero Administrators. Client-side only — `firestore.rules` can't cheaply count sibling docs in a
+  single-document rule — so this stops an accidental click, not a determined bypass via the console.
+- **Dutch translation extended**: `EmployeesView.vue` and the `UsersView.vue` role column (was showing the
+  raw English enum value even though the edit dropdown was already Dutch — Stan caught this). Added
+  `ROLE_LABELS` in `types/user.ts` as the single source for role display text, used consistently now.
+- **Password reset started, not finished**: `authService.sendPasswordReset()` added (Firebase's built-in
+  reset email, on by default, no console toggle needed unlike the invite link). **Not yet wired** to the
+  auth store or a "Wachtwoord vergeten" link on `LoginView.vue` — next thing to pick up.
+- **Invite email tested live, failed as predicted**: Stan tried "Uitnodiging versturen" — console showed
+  400s from `identitytoolkit.googleapis.com`. Root cause confirmed: Email link sign-in is still off in the
+  Firebase Console. Stan needs to flip Authentication → Sign-in method → Email link → Enable before this
+  can work. Code side is unaffected/correct.
+- **Stale Netlify build confirmed live**: Stan hit `peoplemarketing.netlify.app/unauthorized` after signing
+  in — that's the old pre-signup/pending-approval bundle, not a new bug. Netlify auto-deploys from
+  `origin/main` (GitHub) on push; nothing from this session (or the prior one) has been pushed yet. A
+  redeploy needs a commit+push, which needs Stan's go-ahead (visible/shared-state action) — not done yet.
+- **Requested, not started**: a weekly agenda/calendar grid for `MyPlanningView` (Stan: "we need to see an
+  agenda here") — FRD §8 territory, still just the flat list. Picking this up is the natural next step.
+- `firestore.rules` changes from 007/008 **still not deployed** — held per Stan's explicit "no" earlier.
+
+### Immediate next steps (in order Stan asked for)
+1. Finish the password-reset UI (store wrapper + LoginView link).
+2. Build the `MyPlanningView` weekly agenda grid.
+3. Get Stan's go-ahead to commit + push (redeploys Netlify automatically) — separate from the still-pending
+   firestore.rules deploy, which is a different action (CLI `firebase deploy --only firestore:rules`).
+
 ## Production Firestore state (2026-08-24)
 
 - Real office already exists in prod: doc `/offices/gent` — `{ isActive: true, name: "Gent", officeId: "Gent", timezone: "Europe/Brussels" }`.
