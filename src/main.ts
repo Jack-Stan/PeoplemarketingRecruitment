@@ -15,11 +15,21 @@ const router = createAppRouter();
 app.use(pinia);
 app.use(router);
 
-// Hydrate auth from any persisted Firebase session, then mount once we've
-// decided where to land. The router guard runs after this resolves.
+// Hydrate auth from any persisted Firebase session before mounting so
+// role-based route checks don't run against an empty claim state.
 const authStore = useAuthStore();
-authService.onAuthStateChanged((fbUser) => {
-  void authStore.hydrate(fbUser);
+const authReady = new Promise<void>((resolve) => {
+  let initialized = false;
+  authService.onAuthStateChanged((fbUser) => {
+    void authStore.hydrate(fbUser).finally(() => {
+      if (!initialized) {
+        initialized = true;
+        resolve();
+      }
+    });
+  });
 });
 
-router.isReady().then(() => app.mount('#app'));
+void authReady.then(() => {
+  void router.isReady().then(() => app.mount('#app'));
+});

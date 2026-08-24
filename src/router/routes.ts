@@ -34,31 +34,51 @@ export const routes: RouteRecordRaw[] = [
     path: '/dashboard',
     name: 'dashboard',
     component: () => import('@/views/DashboardView.vue'),
-    meta: { requiresAuth: true, title: 'Dashboard' },
+    meta: {
+      requiresAuth: true,
+      roles: [Roles.Administrator, Roles.TeamManager, Roles.TeamMember],
+      title: 'Dashboard',
+    },
   },
   {
     path: '/planning',
     name: 'planning',
     component: () => import('@/views/PlanningView.vue'),
-    meta: { requiresAuth: true, title: 'Planning' },
+    meta: {
+      requiresAuth: true,
+      roles: [Roles.Administrator, Roles.TeamManager],
+      title: 'Planning',
+    },
   },
   {
     path: '/employees',
     name: 'employees',
     component: () => import('@/views/EmployeesView.vue'),
-    meta: { requiresAuth: true, title: 'Employees' },
+    meta: {
+      requiresAuth: true,
+      roles: [Roles.Administrator, Roles.TeamManager],
+      title: 'Employees',
+    },
   },
   {
     path: '/recruitment',
     name: 'recruitment',
     component: () => import('@/views/RecruitmentView.vue'),
-    meta: { requiresAuth: true, title: 'Recruitment' },
+    meta: {
+      requiresAuth: true,
+      roles: [Roles.Administrator, Roles.TeamManager],
+      title: 'Recruitment',
+    },
   },
   {
     path: '/history',
     name: 'history',
     component: () => import('@/views/HistoryView.vue'),
-    meta: { requiresAuth: true, title: 'History' },
+    meta: {
+      requiresAuth: true,
+      roles: [Roles.Administrator, Roles.TeamManager, Roles.TeamMember],
+      title: 'History',
+    },
   },
   {
     path: '/unauthorized',

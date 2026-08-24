@@ -19,12 +19,20 @@ export function createAppRouter() {
     const auth = useAuthStore();
     const requiresAuth = to.matched.some((r) => r.meta.requiresAuth);
     const isLoggedIn = auth.isAuthenticated;
+    const allowedRoles = to.matched
+      .flatMap((r) => r.meta.roles ?? [])
+      .filter((role, index, all) => all.indexOf(role) === index);
 
     if (requiresAuth && !isLoggedIn) {
       return { name: 'login', query: { redirect: to.fullPath } };
     }
     if (to.name === 'login' && isLoggedIn) {
       return { name: 'dashboard' };
+    }
+    if (requiresAuth && allowedRoles.length > 0) {
+      if (auth.role === null || !allowedRoles.includes(auth.role)) {
+        return { name: 'unauthorized' };
+      }
     }
     return true;
   });
