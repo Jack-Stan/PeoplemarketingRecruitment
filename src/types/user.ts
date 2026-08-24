@@ -14,6 +14,13 @@ export const Roles = {
   TeamMember: 'TeamMember',
 } as const satisfies Record<Role, Role>;
 
+/** On-screen Dutch labels — role VALUES stay English (DB/rules identifiers), only display text is Dutch. */
+export const ROLE_LABELS: Record<Role, string> = {
+  Administrator: 'Beheerder',
+  TeamManager: 'Teammanager',
+  TeamMember: 'Teamlid',
+};
+
 export interface AppUser {
   uid: string;
   email: string | null;

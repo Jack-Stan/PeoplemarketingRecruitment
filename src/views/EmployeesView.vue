@@ -6,6 +6,7 @@ import { useAuth } from '@/composables/useAuth';
 import { useEmployeesStore } from '@/stores/employees';
 import { useUiStore } from '@/stores/ui';
 import { useUsersStore } from '@/stores/users';
+import { ROLE_LABELS, Roles } from '@/types/user';
 import { isValidEmail, isValidName } from '@/utils/validators';
 import type { Employee, EmployeeCreatePayload } from '@/types/employee';
 
@@ -128,15 +129,15 @@ function closeForm(): void {
 
 async function submitForm(): Promise<void> {
   if (!editingId.value && !selectedUid.value) {
-    formError.value = 'Pick the account this employee signs in with.';
+    formError.value = 'Kies het account waarmee deze medewerker aanmeldt.';
     return;
   }
   if (!isValidName(form.value.firstName) || !isValidName(form.value.lastName)) {
-    formError.value = 'First and last name are required.';
+    formError.value = 'Voor- en achternaam zijn verplicht.';
     return;
   }
   if (!isValidEmail(form.value.email)) {
-    formError.value = 'Enter a valid email address.';
+    formError.value = 'Geef een geldig e-mailadres op.';
     return;
   }
   formError.value = null;
@@ -146,7 +147,7 @@ async function submitForm(): Promise<void> {
     : await store.create(officeId.value, selectedUid.value, form.value);
 
   if (ok) {
-    ui.push(editingId.value ? 'Employee updated.' : 'Employee added.', 'success');
+    ui.push(editingId.value ? 'Medewerker bijgewerkt.' : 'Medewerker toegevoegd.', 'success');
     isFormOpen.value = false;
   } else {
     formError.value = store.error;
@@ -156,7 +157,7 @@ async function submitForm(): Promise<void> {
 async function toggleActive(e: Employee): Promise<void> {
   const ok = await store.setActive(officeId.value, e.employeeId, !e.isActive);
   ui.push(
-    ok ? `${e.firstName} is now ${!e.isActive ? 'active' : 'inactive'}.` : (store.error ?? 'Something went wrong.'),
+    ok ? `${e.firstName} is nu ${!e.isActive ? 'actief' : 'inactief'}.` : (store.error ?? 'Er ging iets mis.'),
     ok ? 'success' : 'error',
   );
 }
@@ -178,15 +179,15 @@ onUnmounted(() => {
   <div class="mx-auto max-w-7xl space-y-6">
     <section class="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
       <div>
-        <p class="text-sm text-neutral-mute">Main office · {{ store.activeEmployees.length }} active employees</p>
-        <h2 class="mt-1 text-3xl font-bold tracking-tight">Employees</h2>
+        <p class="text-sm text-neutral-mute">Kantoor · {{ store.activeEmployees.length }} actieve medewerkers</p>
+        <h2 class="mt-1 text-3xl font-bold tracking-tight">Medewerkers</h2>
       </div>
       <button
         v-if="isAdmin"
         class="bg-primary-pink px-4 py-2.5 text-sm font-bold text-white"
         @click="openCreate"
       >
-        + Add employee
+        + Medewerker toevoegen
       </button>
     </section>
 
@@ -194,12 +195,12 @@ onUnmounted(() => {
       <input
         v-model="search"
         class="min-w-0 flex-1 border-black/10 bg-[#faf9f7] text-sm focus:border-primary-pink focus:ring-primary-pink"
-        placeholder="Search employees by name or email"
+        placeholder="Zoek medewerkers op naam of e-mail"
         type="search"
       />
       <label class="flex items-center gap-2 px-2 text-xs font-semibold">
         <input v-model="showInactive" type="checkbox" class="border-black/20 text-primary-pink focus:ring-primary-pink" />
-        Show inactive
+        Toon inactieve
       </label>
     </div>
 
@@ -207,8 +208,8 @@ onUnmounted(() => {
       <table class="w-full min-w-[700px] text-left text-sm">
         <thead class="border-b border-black/5 bg-[#faf9f7] text-[10px] uppercase tracking-[0.16em] text-neutral-mute">
           <tr>
-            <th class="px-5 py-4">Employee</th>
-            <th class="px-5 py-4">Role</th>
+            <th class="px-5 py-4">Medewerker</th>
+            <th class="px-5 py-4">Rol</th>
             <th class="px-5 py-4">Status</th>
             <th class="px-5 py-4">Contract</th>
             <th v-if="isAdmin" class="px-5 py-4"></th>
@@ -232,36 +233,36 @@ onUnmounted(() => {
             </td>
             <td class="px-5 py-4">
               <span class="text-xs font-semibold" :class="e.isTeamLeader ? 'text-primary-pink' : 'text-neutral-mute'">
-                {{ e.isTeamLeader ? 'Team Leader' : 'Team Member' }}
+                {{ e.isTeamLeader ? 'Teamleider' : 'Teamlid' }}
               </span>
             </td>
             <td class="px-5 py-4">
               <span class="inline-flex items-center gap-2 text-xs">
                 <i class="h-2 w-2 rounded-full" :class="e.isActive ? 'bg-emerald-500' : 'bg-neutral-300'"></i>
-                {{ e.isActive ? 'Active' : 'Inactive' }}
+                {{ e.isActive ? 'Actief' : 'Inactief' }}
               </span>
             </td>
             <td class="px-5 py-4 text-xs text-neutral-mute">
-              {{ e.weeklyContractHours ? `${e.weeklyContractHours}h / wk` : '—' }}
+              {{ e.weeklyContractHours ? `${e.weeklyContractHours}u / week` : '—' }}
             </td>
             <td v-if="isAdmin" class="px-5 py-4 text-right">
               <button class="mr-3 text-xs font-semibold text-neutral-ink hover:text-primary-pink" @click="openEdit(e)">
-                Edit
+                Bewerken
               </button>
               <button class="text-xs font-semibold text-neutral-mute hover:text-semantic-danger" @click="toggleActive(e)">
-                {{ e.isActive ? 'Disable' : 'Reactivate' }}
+                {{ e.isActive ? 'Deactiveren' : 'Heractiveren' }}
               </button>
             </td>
           </tr>
         </tbody>
       </table>
-      <p v-if="store.isLoading" class="p-8 text-center text-sm text-neutral-mute">Loading…</p>
-      <p v-else-if="!filtered.length" class="p-8 text-center text-sm text-neutral-mute">No employees found.</p>
+      <p v-if="store.isLoading" class="p-8 text-center text-sm text-neutral-mute">Laden…</p>
+      <p v-else-if="!filtered.length" class="p-8 text-center text-sm text-neutral-mute">Geen medewerkers gevonden.</p>
     </section>
 
     <div v-if="isFormOpen" class="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4">
       <div class="w-full max-w-md border border-black/10 bg-white p-6">
-        <h3 class="text-lg font-bold">{{ editingId ? 'Edit employee' : 'Add employee' }}</h3>
+        <h3 class="text-lg font-bold">{{ editingId ? 'Medewerker bewerken' : 'Medewerker toevoegen' }}</h3>
         <!--
           Create mode picks an existing account: the employee doc ID is the
           Auth uid (decisions/007), so there is nothing to add here for a
@@ -275,46 +276,46 @@ onUnmounted(() => {
               class="mt-1 w-full border-black/10 bg-[#faf9f7] text-sm"
               @change="onAccountPicked(($event.target as HTMLSelectElement).value)"
             >
-              <option value="" disabled>Select an approved account…</option>
+              <option value="" disabled>Kies een goedgekeurd account…</option>
               <option v-for="u in eligibleAccounts" :key="u.uid" :value="u.uid">
                 {{ accountLabel(u.uid) }}
               </option>
             </select>
             <p v-if="!eligibleAccounts.length" class="mt-1 text-xs text-neutral-mute">
-              No unassigned accounts for this office. Approve someone on the
-              <RouterLink to="/users" class="font-semibold underline">Users</RouterLink> page first.
+              Geen niet-toegewezen accounts voor dit kantoor. Keur eerst iemand goed op de
+              <RouterLink to="/users" class="font-semibold underline">Gebruikers</RouterLink>-pagina.
             </p>
           </div>
           <div class="grid grid-cols-2 gap-3">
-            <input v-model="form.firstName" placeholder="First name" class="border-black/10 bg-[#faf9f7] text-sm" />
-            <input v-model="form.lastName" placeholder="Last name" class="border-black/10 bg-[#faf9f7] text-sm" />
+            <input v-model="form.firstName" placeholder="Voornaam" class="border-black/10 bg-[#faf9f7] text-sm" />
+            <input v-model="form.lastName" placeholder="Achternaam" class="border-black/10 bg-[#faf9f7] text-sm" />
           </div>
           <input
             v-model="form.email"
             type="email"
-            placeholder="Email"
+            placeholder="E-mail"
             :disabled="!editingId"
             class="w-full border-black/10 bg-[#faf9f7] text-sm disabled:opacity-60"
           />
-          <input v-model="form.phone" placeholder="Phone (optional)" class="w-full border-black/10 bg-[#faf9f7] text-sm" />
+          <input v-model="form.phone" placeholder="Telefoon (optioneel)" class="w-full border-black/10 bg-[#faf9f7] text-sm" />
           <div class="grid grid-cols-2 gap-3">
             <select v-model="form.role" class="border-black/10 bg-[#faf9f7] text-sm">
-              <option value="TeamMember">Team Member</option>
-              <option value="TeamManager">Team Manager</option>
-              <option value="Administrator">Administrator</option>
+              <option :value="Roles.TeamMember">{{ ROLE_LABELS.TeamMember }}</option>
+              <option :value="Roles.TeamManager">{{ ROLE_LABELS.TeamManager }}</option>
+              <option :value="Roles.Administrator">{{ ROLE_LABELS.Administrator }}</option>
             </select>
             <label class="flex items-center gap-2 text-xs font-semibold">
               <input v-model="form.isTeamLeader" type="checkbox" class="border-black/20 text-primary-pink focus:ring-primary-pink" />
-              Team Leader
+              Teamleider
             </label>
           </div>
           <p v-if="formError" class="text-xs font-semibold text-semantic-danger">{{ formError }}</p>
           <div class="flex justify-end gap-2 pt-2">
             <button type="button" class="px-4 py-2 text-sm font-semibold text-neutral-mute" @click="closeForm">
-              Cancel
+              Annuleren
             </button>
             <button type="submit" class="bg-primary-pink px-4 py-2 text-sm font-bold text-white">
-              {{ editingId ? 'Save' : 'Add' }}
+              {{ editingId ? 'Opslaan' : 'Toevoegen' }}
             </button>
           </div>
         </form>

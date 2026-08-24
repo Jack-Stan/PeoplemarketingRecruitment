@@ -2,6 +2,7 @@ import {
   createUserWithEmailAndPassword,
   isSignInWithEmailLink,
   onAuthStateChanged,
+  sendPasswordResetEmail,
   sendSignInLinkToEmail,
   signInWithEmailAndPassword,
   signInWithEmailLink,
@@ -38,6 +39,11 @@ export const authService = {
 
   signOut(): Promise<void> {
     return signOut(auth);
+  },
+
+  /** Firebase Auth's built-in reset email — same free mail relay as sendInvite, no console toggle needed (unlike email-link sign-in, password reset is on by default). */
+  sendPasswordReset(email: string): Promise<void> {
+    return sendPasswordResetEmail(auth, email);
   },
 
   /**

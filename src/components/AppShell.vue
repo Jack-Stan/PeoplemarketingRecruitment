@@ -13,7 +13,7 @@ const links = computed(() => [
   ...(auth.hasRole('TeamMember') ? [{ label: 'Mijn planning', to: '/mijn-planning', icon: '▣' }] : []),
   ...(auth.hasRole('Administrator', 'TeamManager') ? [{ label: 'Planning', to: '/planning', icon: '▣' }] : []),
   ...(auth.hasRole('Administrator', 'TeamManager') ? [{ label: 'Medewerkers', to: '/employees', icon: '♙' }] : []),
-  ...(auth.hasRole('Administrator', 'TeamManager') ? [{ label: 'Rekrutering', to: '/recruitment', icon: '◎' }] : []),
+  { label: 'Rekrutering', to: '/recruitment', icon: '◎' },
   { label: 'Geschiedenis', to: '/history', icon: '◷' },
   ...(auth.hasRole('Administrator') ? [{ label: 'Gebruikers', to: '/users', icon: '☺' }] : []),
 ]);

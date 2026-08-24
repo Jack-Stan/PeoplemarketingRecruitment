@@ -99,7 +99,9 @@ export const routes: RouteRecordRaw[] = [
     component: () => import('@/views/RecruitmentView.vue'),
     meta: {
       requiresAuth: true,
-      roles: [Roles.Administrator, Roles.TeamManager],
+      // TeamMember gets read-only visibility per the client transcript —
+      // `firestore.rules` already only allows a member to read, not write.
+      roles: [Roles.Administrator, Roles.TeamManager, Roles.TeamMember],
       title: 'Recruitment',
     },
   },

@@ -6,7 +6,7 @@ import { useAuth } from '@/composables/useAuth';
 import { isValidEmail } from '@/utils/validators';
 import { useUsersStore } from '@/stores/users';
 import { useUiStore } from '@/stores/ui';
-import { Roles, type Role, type UserProfile } from '@/types/user';
+import { ROLE_LABELS, Roles, type Role, type UserProfile } from '@/types/user';
 
 const auth = useAuth();
 const store = useUsersStore();
@@ -25,6 +25,11 @@ const form = ref<{ role: Role; isTeamLeader: boolean }>({
   isTeamLeader: false,
 });
 const saving = ref(false);
+
+const editingUser = computed(() => store.users.find((u) => u.uid === editingUid.value) ?? null);
+const willRemoveLastAdmin = computed(
+  () => !!editingUser.value && wouldRemoveLastAdmin(editingUser.value, form.value.role),
+);
 
 const inviteEmail = ref('');
 const inviting = ref(false);
@@ -53,12 +58,30 @@ function openEdit(u: UserProfile): void {
   };
 }
 
+/**
+ * Guard against demoting the last Administrator — this exact thing locked
+ * the whole app out of every admin-gated action same session (had to be
+ * fixed from a terminal via grantRole.ts + FORCE_PROD). Client-side only:
+ * firestore.rules can't cheaply count "how many other admins exist" inside
+ * a single-document rule, so this is a UI guardrail, not a security
+ * boundary — a determined admin could still do it via the console. Good
+ * enough to stop an accidental click, which is what actually happened.
+ */
+function wouldRemoveLastAdmin(u: UserProfile, nextRole: Role): boolean {
+  return u.role === 'Administrator' && nextRole !== 'Administrator' && store.adminCountFor(ownOfficeId.value) <= 1;
+}
+
 function closeEdit(): void {
   editingUid.value = null;
 }
 
 async function submit(): Promise<void> {
   if (!editingUid.value || !ownOfficeId.value) return;
+  const editingUser = store.users.find((u) => u.uid === editingUid.value);
+  if (editingUser && wouldRemoveLastAdmin(editingUser, form.value.role)) {
+    ui.push(`${editingUser.displayName || editingUser.email} is de laatste beheerder van ${officeLabel(ownOfficeId.value)} — wijs eerst iemand anders als beheerder toe.`, 'error');
+    return;
+  }
   saving.value = true;
   const ok = await store.assignRole(editingUid.value, form.value.role, ownOfficeId.value, form.value.isTeamLeader);
   saving.value = false;
@@ -156,7 +179,7 @@ onUnmounted(() => store.unsubscribe());
               >
                 In afwachting
               </span>
-              <span v-else class="text-xs font-semibold">{{ u.role }}</span>
+              <span v-else class="text-xs font-semibold">{{ ROLE_LABELS[u.role] }}</span>
             </td>
             <td class="px-5 py-4 text-xs text-neutral-mute">
               <span v-if="u.role === null">
@@ -194,11 +217,15 @@ onUnmounted(() => store.unsubscribe());
             <input v-model="form.isTeamLeader" type="checkbox" class="border-black/20 text-primary-pink focus:ring-primary-pink" />
             Teamleider
           </label>
+          <p v-if="willRemoveLastAdmin" class="text-xs font-semibold text-semantic-danger">
+            {{ editingUser?.displayName || editingUser?.email }} is de laatste beheerder van {{ officeLabel(ownOfficeId) }}
+            — wijs eerst iemand anders als beheerder toe.
+          </p>
           <div class="flex justify-end gap-2 pt-2">
             <button type="button" class="px-4 py-2 text-sm font-semibold text-neutral-mute" @click="closeEdit">
               Annuleren
             </button>
-            <button type="submit" class="bg-primary-pink px-4 py-2 text-sm font-bold text-white" :disabled="saving">
+            <button type="submit" class="bg-primary-pink px-4 py-2 text-sm font-bold text-white disabled:opacity-50" :disabled="saving || willRemoveLastAdmin">
               Opslaan
             </button>
           </div>

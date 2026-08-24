@@ -19,6 +19,10 @@ export const useUsersStore = defineStore('users', () => {
   let unsub: Unsubscribe | null = null;
 
   const pendingUsers = computed(() => users.value.filter((u) => u.role === null));
+  /** Office-scoped — used by UsersView to block demoting the last Administrator. */
+  function adminCountFor(officeId: string): number {
+    return users.value.filter((u) => u.role === 'Administrator' && u.primaryOfficeId === officeId).length;
+  }
 
   function subscribe(): void {
     unsubscribe();
@@ -57,5 +61,5 @@ export const useUsersStore = defineStore('users', () => {
     }
   }
 
-  return { users, isLoading, error, pendingUsers, subscribe, unsubscribe, assignRole };
+  return { users, isLoading, error, pendingUsers, adminCountFor, subscribe, unsubscribe, assignRole };
 });
