@@ -6,7 +6,7 @@ import AppShell from '@/components/AppShell.vue';
 
 <template>
   <RouterView v-slot="{ Component, route }">
-    <AppShell v-if="route.meta.requiresAuth">
+    <AppShell v-if="route.meta.requiresAuth && !route.meta.noShell">
       <component :is="Component" />
     </AppShell>
     <component :is="Component" v-else />

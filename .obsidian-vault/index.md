@@ -19,7 +19,12 @@ Location: `C:\RFT\Projects\CRM\.obsidian-vault\` (in-repo so it's version-contro
 ├── decisions/
 │   ├── 001-three-roles-not-two.md ← why admin / team_manager / team_member
 │   ├── 002-firebase-not-supabase.md
-│   └── 003-pink-placeholder-hex.md
+│   ├── 003-pink-placeholder-hex.md
+│   ├── 004-shift-types.md         ← D2D / Straat / Event
+│   ├── 005-users-employees-datamodel.md
+│   ├── 006-firestore-roles-no-claims.md
+│   ├── 007-employee-doc-id-must-be-uid.md ← 🔴 latent prod bug
+│   └── 008-self-service-shift-signup.md   ← employee-authored, not open slots
 ├── tickets/
 │   ├── ticket-00-scaffold.md
 │   ├── ticket-01-rbac.md
@@ -29,7 +34,9 @@ Location: `C:\RFT\Projects\CRM\.obsidian-vault\` (in-repo so it's version-contro
 │   ├── mcp-recommendations.md     ← Firebase + GitHub MCPs for Claude Desktop
 │   └── pink-hex-investigation.md
 └── meetings/
-    └── 2026-08-24-stan-discovery.md
+    ├── 2026-08-24-stan-discovery.md
+    ├── 2026-08-24-client-transcript-shifts-recruitment.md
+    └── 2026-08-24-whatsapp-michiel-preview-feedback.md
 ```
 
 ## How to use it

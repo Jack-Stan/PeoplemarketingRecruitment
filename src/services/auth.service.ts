@@ -1,7 +1,9 @@
 import {
+  createUserWithEmailAndPassword,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signOut,
+  updateProfile,
   type Auth,
   type User,
 } from 'firebase/auth';
@@ -17,20 +19,26 @@ export const authService = {
     return signInWithEmailAndPassword(auth, email, password).then((cred) => cred.user);
   },
 
+  /**
+   * Self-signup. The resulting account has no `/users/{uid}` doc yet at this
+   * point — the auth store's `hydrate()` reads a missing doc as role: null,
+   * the "authenticated but pending admin approval" state (see router guard +
+   * PendingApprovalView).
+   */
+  async signUp(email: string, password: string, displayName: string): Promise<User> {
+    const cred = await createUserWithEmailAndPassword(auth, email, password);
+    if (displayName) {
+      await updateProfile(cred.user, { displayName });
+    }
+    return cred.user;
+  },
+
   signOut(): Promise<void> {
     return signOut(auth);
   },
 
   onAuthStateChanged(callback: (user: User | null) => void): () => void {
     return onAuthStateChanged(auth as Auth, callback);
-  },
-
-  /** Firebase ID-token result with custom claims. Throws when signed out. */
-  async getClaims(): Promise<Record<string, unknown> | null> {
-    const user = auth.currentUser;
-    if (!user) return null;
-    const result = await user.getIdTokenResult(true);
-    return result.claims;
   },
 };
 

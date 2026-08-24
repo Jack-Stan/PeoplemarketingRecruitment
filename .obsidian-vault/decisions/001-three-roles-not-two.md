@@ -24,11 +24,13 @@ Use **three** roles:
 | `TeamManager` | `Roles.TeamManager` | Draft + submit shifts for their squad. View squad planning. Manage recruitment leads. |
 | `TeamMember` | `Roles.TeamMember` | Read-only view of own shifts. View history. |
 
-Custom claim shape:
+Original storage shape (custom claims — **superseded 2026-08-24, see `decisions/006-firestore-roles-no-claims.md`**: role/officeId/isTeamLeader now live only on `/users/{uid}` in Firestore, no custom claims, because Cloud Functions require the Blaze plan and Stan is keeping this project on Spark):
 
 ```
 { role: 'Administrator' | 'TeamManager' | 'TeamMember', officeId: string, isTeamLeader: boolean }
 ```
+
+The three-role model itself (this decision) is unaffected — only the storage/lookup mechanism changed.
 
 ## Consequences
 

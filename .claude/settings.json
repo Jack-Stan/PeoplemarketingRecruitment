@@ -1,0 +1,62 @@
+{
+  "env": {
+    "BASH_MAX_OUTPUT_LENGTH": "150000"
+  },
+  "autoCompactEnabled": true,
+  "autoCompactWindow": 600000,
+  "permissions": {
+    "allow": [
+      "Bash(code-review-graph *)",
+      "Bash(git *)",
+      "Bash(npm *)",
+      "Read(*)",
+      "Glob(*)",
+      "Grep(*)"
+    ],
+    "deny": [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/coverage/**",
+      "**/.nuxt/**",
+      "**/.next/**"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "code-review-graph update --skip-flows",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "code-review-graph status",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'Context window filling up. Consider a fresh session.'",
+            "statusMessage": "Checking if new session recommended"
+          }
+        ]
+      }
+    ]
+  }
+}

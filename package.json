@@ -7,15 +7,16 @@
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "vitest run tests/unit",
+    "test:watch": "vitest tests/unit",
     "test:e2e": "playwright test",
     "lint": "eslint \"src/**/*.{ts,vue}\" --fix",
     "format": "prettier --write \"src/**/*.{ts,vue,css,json,md}\"",
     "emulators": "firebase emulators:start --only auth,firestore",
     "emulators:export": "firebase emulators:export ./emulator-data",
-    "rules:test": "firebase emulators:exec --only firestore \"vitest run\"",
-    "seed": "firebase emulators:exec --project peoplemarketing-c5bfd --only auth,firestore \"tsx scripts/seed.ts\""
+    "rules:test": "firebase emulators:exec --only firestore \"vitest run tests/rules\"",
+    "seed": "firebase emulators:exec --project peoplemarketing-c5bfd --only auth,firestore \"tsx scripts/seed.ts\"",
+    "grant-role": "firebase emulators:exec --project peoplemarketing-c5bfd --only auth,firestore \"tsx scripts/grantRole.ts\""
   },
   "dependencies": {
     "date-fns": "~3.6.0",
@@ -25,6 +26,7 @@
     "vue-router": "~4.3.0"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "~3.0.4",
     "@playwright/test": "~1.44.0",
     "@tailwindcss/forms": "~0.5.7",
     "@tailwindcss/typography": "~0.5.13",

@@ -6,9 +6,19 @@ import { vi } from 'vitest';
 vi.mock('@/services/auth.service', () => ({
   authService: {
     signIn: vi.fn(),
+    signUp: vi.fn(),
     signOut: vi.fn(),
     onAuthStateChanged: vi.fn(() => () => {}),
-    getClaims: vi.fn().mockResolvedValue(null),
+  },
+}));
+
+vi.mock('@/services/users.service', () => ({
+  usersService: {
+    createProfile: vi.fn(),
+    getOnce: vi.fn().mockResolvedValue(null),
+    subscribeOwn: vi.fn(() => () => {}),
+    subscribeAll: vi.fn(() => () => {}),
+    assignRole: vi.fn(),
   },
 }));
 

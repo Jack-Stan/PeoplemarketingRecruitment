@@ -1,6 +1,6 @@
 # Ticket 02 — Employee CRUD
 
-**Status:** 📋 Planned
+**Status:** 🟡 Core built — `employees.service.ts`, Pinia store (6 unit tests, all passing), `EmployeesView.vue` wired to live data with add/edit form + soft-disable. Typecheck clean, login screen verified in browser. **Not yet verified end-to-end**: no working local emulator (see Ticket 01) and no `.env.local` with real credentials in this session, so the authenticated Employees page itself hasn't been clicked through live — only inspected via code review + unit tests. Separate detail views (`EmployeeDetailView.vue`, dedicated edit route) not built — the list view's inline modal covers create/edit for now, split out later if the client wants a dedicated profile page.
 **Goal:** Admin can list, create, edit, and (soft-)disable employees. Team managers can view their squad.
 
 ## Scope

@@ -1,0 +1,216 @@
+{
+  "main": {
+    "id": "b8a8a59fe5db44c3",
+    "type": "split",
+    "children": [
+      {
+        "id": "63aaa540a38ddee1",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "4b61ecf07469fa3d",
+            "type": "leaf",
+            "state": {
+              "type": "graph",
+              "state": {},
+              "icon": "lucide-git-fork",
+              "title": "Graph view"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "4487a4115b1c82f7",
+    "type": "split",
+    "children": [
+      {
+        "id": "07471458d4abfb46",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "2d351ba2fc3779d0",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "7de04b84adb3698e",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "8626f61ec56e3432",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "5b57520974585cfc",
+    "type": "split",
+    "children": [
+      {
+        "id": "6f2a271160966508",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "992dc670e4c70640",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks"
+            }
+          },
+          {
+            "id": "2d3a64dae8c000e4",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links"
+            }
+          },
+          {
+            "id": "c9fadeb3ebdf61c5",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "e77585f8f0efaca6",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "975fb87971960318",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "4b61ecf07469fa3d",
+  "lastOpenFiles": [
+    "decisions/008-self-service-shift-signup.md",
+    "decisions/007-employee-doc-id-must-be-uid.md",
+    "dev-plan.md.tmp.1456.7ab5360ecbf9",
+    "session-prompts/2026-08-24-firestore-data-model-shifts.md",
+    "links-to-FRD.md.tmp.1456.0465a7cae2e9",
+    "decisions/006-firestore-roles-no-claims.md",
+    "project-status.md.tmp.1456.6aba6c2978c8",
+    "tickets/ticket-01-rbac.md.tmp.1456.26e65735f1ce",
+    "decisions/005-users-employees-datamodel.md",
+    "session-prompts/2026-08-24-auth-rights-firestore.md",
+    "session-prompts",
+    "index.md.tmp.32844.ad4d8c1f883b",
+    "project-status.md.tmp.32844.a7cdd94dadd5",
+    "meetings/2026-08-24-whatsapp-michiel-preview-feedback.md",
+    "meetings/2026-08-24-whatsapp-michiel-preview-feedback.md.tmp.32844.0ca61d1dc895",
+    "project-status.md.tmp.32844.ec01b53f6b2c",
+    "project-status.md.tmp.32844.389957ea6522",
+    "dev-plan.md",
+    "tickets/ticket-06-dashboards-history.md",
+    "tickets/ticket-05-recruitment-automation.md",
+    "tickets/ticket-04-recruitment-crud.md",
+    "decisions/004-shift-types.md",
+    "meetings/2026-08-24-client-transcript-shifts-recruitment.md",
+    "research/pink-hex-investigation.md",
+    "research/mcp-recommendations.md",
+    "tickets/ticket-03-shift-create.md",
+    "tickets/ticket-02-employee-crud.md",
+    "tickets/ticket-01-rbac.md",
+    "tickets/ticket-00-scaffold.md"
+  ]
+}

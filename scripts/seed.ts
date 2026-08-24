@@ -6,9 +6,8 @@
  * What it does:
  *   1. Creates a Firebase Auth user (admin@peoplemarketing.nl / admin123)
  *      using the Admin SDK talking to the Auth emulator.
- *   2. Sets custom claims on the user: { role: 'Administrator',
- *      officeId: 'office-main', isTeamLeader: true }.
- *   3. Creates the matching Firestore docs:
+ *   2. Creates the matching Firestore docs (role/office live only in
+ *      Firestore, not custom claims — see decisions/006):
  *        - /users/{uid}
  *        - /offices/office-main
  *        - /offices/office-main/employees/{uid}  (mirrors the Auth account)
@@ -60,15 +59,6 @@ async function ensureAuthUser(): Promise<string> {
   }
 }
 
-async function setClaims(uid: string): Promise<void> {
-  await auth.setCustomUserClaims(uid, {
-    role: 'Administrator',
-    officeId: OFFICE_ID,
-    isTeamLeader: true,
-  });
-  console.log(`✔ Set custom claims on ${uid}`);
-}
-
 async function seedOffice(): Promise<void> {
   const ref = db.collection('offices').doc(OFFICE_ID);
   await ref.set(
@@ -93,8 +83,11 @@ async function seedUserDoc(uid: string): Promise<void> {
       {
         uid,
         email: ADMIN_EMAIL,
+        displayName: 'Big Boss',
         primaryOfficeId: OFFICE_ID,
+        desiredOfficeId: null,
         role: 'Administrator',
+        isTeamLeader: true,
         isActive: true,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
@@ -134,7 +127,6 @@ async function seedEmployeeDoc(uid: string): Promise<void> {
 
 async function main(): Promise<void> {
   const uid = await ensureAuthUser();
-  await setClaims(uid);
   await seedOffice();
   await seedUserDoc(uid);
   await seedEmployeeDoc(uid);

@@ -19,6 +19,10 @@ export function createAppRouter() {
     const auth = useAuthStore();
     const requiresAuth = to.matched.some((r) => r.meta.requiresAuth);
     const isLoggedIn = auth.isAuthenticated;
+    // Signed in but no role claim yet — self-signed-up, waiting on an admin
+    // to grant access via the Users page. Distinct from /unauthorized, which
+    // means "signed in, has a role, but not one allowed on this route."
+    const isPending = isLoggedIn && auth.role === null;
     const allowedRoles = to.matched
       .flatMap((r) => r.meta.roles ?? [])
       .filter((role, index, all) => all.indexOf(role) === index);
@@ -26,8 +30,14 @@ export function createAppRouter() {
     if (requiresAuth && !isLoggedIn) {
       return { name: 'login', query: { redirect: to.fullPath } };
     }
-    if (to.name === 'login' && isLoggedIn) {
-      return { name: 'dashboard' };
+    if ((to.name === 'login' || to.name === 'signup') && isLoggedIn) {
+      return { name: isPending ? 'pending-approval' : 'dashboard' };
+    }
+    if (to.name === 'pending-approval') {
+      return isPending ? true : { name: 'dashboard' };
+    }
+    if (requiresAuth && isPending) {
+      return { name: 'pending-approval' };
     }
     if (requiresAuth && allowedRoles.length > 0) {
       if (auth.role === null || !allowedRoles.includes(auth.role)) {

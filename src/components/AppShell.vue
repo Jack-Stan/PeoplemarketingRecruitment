@@ -6,13 +6,14 @@ import { useAuth } from '@/composables/useAuth';
 const route = useRoute();
 const router = useRouter();
 const auth = useAuth();
-const links = [
+const links = computed(() => [
   { label: 'Overview', to: '/dashboard', icon: '▦' },
   { label: 'Planning', to: '/planning', icon: '▣' },
   { label: 'Employees', to: '/employees', icon: '♙' },
   { label: 'Recruitment', to: '/recruitment', icon: '◎' },
   { label: 'History', to: '/history', icon: '◷' },
-];
+  ...(auth.hasRole('Administrator') ? [{ label: 'Users', to: '/users', icon: '☺' }] : []),
+]);
 const initials = computed(() => (auth.user.value?.email?.slice(0, 2) ?? 'PM').toUpperCase());
 async function signOut(): Promise<void> {
   await auth.signOut();

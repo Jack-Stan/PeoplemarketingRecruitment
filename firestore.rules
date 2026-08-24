@@ -1,11 +1,129 @@
 rules_version = '2';
 
-// Minimal rules for the Phase 1 scaffold (Ticket 0). Tightened in Ticket 1
-// once Employee/Shift/Recruitment collections land and RBAC plumbing is wired.
+// Ticket 01 — full RBAC. Three roles: Administrator / TeamManager / TeamMember.
+//
+// Role source: Firestore, NOT custom claims. Originally this used
+// request.auth.token.{role,officeId,isTeamLeader} set via a Cloud Function,
+// but that requires the Blaze billing plan — Stan opted to stay on the free
+// Spark plan instead. So role/office/isTeamLeader live ONLY on
+// /users/{uid} and every rule below reads that doc with get(). See
+// decisions/006-firestore-roles-no-claims.md for the full reasoning
+// (supersedes the claims-based approach in decisions/001 and 005).
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // One read of the caller's own /users/{uid} doc. get() does not
+    // re-run security rules — it's a direct data fetch — so this can't
+    // recurse into the /users/{userId} match block below.
+    function myProfile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function myRole() {
+      return isSignedIn() ? myProfile().role : null;
+    }
+
+    function myOfficeId() {
+      return isSignedIn() ? myProfile().primaryOfficeId : null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && myRole() == 'Administrator';
+    }
+
+    function isManager() {
+      return isSignedIn() && myRole() == 'TeamManager';
+    }
+
+    function isMember() {
+      return isSignedIn() && myRole() == 'TeamMember';
+    }
+
+    function sameOffice(officeId) {
+      return isSignedIn() && myOfficeId() == officeId;
+    }
+
+    // Admin or manager, scoped to their own office.
+    function isStaffOf(officeId) {
+      return sameOffice(officeId) && (isAdmin() || isManager());
+    }
+
+    match /users/{userId} {
+      // Own doc always readable; admin can read any user (needed to see
+      // pending signups before they have an office at all).
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      // Self-signup: a user may create their OWN pending profile doc, but only
+      // with role/primaryOfficeId left null — granting either is a privilege
+      // escalation. `desiredOfficeId` is just a hint for the approving admin
+      // (which office they applied to) — it carries no authorization weight.
+      allow create: if isAdmin()
+        || (isSignedIn() && request.auth.uid == userId
+          && request.resource.data.role == null
+          && request.resource.data.primaryOfficeId == null
+          && request.resource.data.desiredOfficeId is string
+          && request.resource.data.desiredOfficeId.size() > 0);
+      // Role assignment: admin can grant role/office/isTeamLeader directly —
+      // no Cloud Function needed now that role lives in Firestore. Checked
+      // against the INCOMING office (request.resource.data), not the
+      // existing one, because a pending user's existing primaryOfficeId is
+      // null — this is exactly the write that approves them.
+      allow update: if isAdmin()
+        && sameOffice(request.resource.data.primaryOfficeId)
+        && request.resource.data.role in ['Administrator', 'TeamManager', 'TeamMember'];
+      allow delete: if isAdmin();
+    }
+
+    match /offices/{officeId} {
+      // Public read: the office directory (name/timezone/isActive — nothing
+      // sensitive) has to be browsable from SignupView by a visitor who
+      // doesn't have an account yet, so they can say which office they're
+      // applying to (see decisions/005). Sub-collections below stay fully
+      // locked down regardless of this.
+      allow read: if true;
+      allow write: if isAdmin() && sameOffice(officeId);
+
+      match /employees/{employeeId} {
+        // Admin + manager see the full roster; a member only sees their own doc.
+        allow read: if isStaffOf(officeId) || (isMember() && sameOffice(officeId) && request.auth.uid == employeeId);
+        // The employee doc ID MUST be the Auth uid of a real account already
+        // assigned to THIS office (decisions/007). The read rule above compares
+        // request.auth.uid to employeeId, and the shifts rules compare it to
+        // assignedEmployeeId — so a doc keyed by an auto-generated ID is
+        // permanently invisible to the person it represents. Enforcing it here
+        // means no client can ever recreate that bug, not just the one that
+        // used to call addDoc().
+        allow create: if isAdmin() && sameOffice(officeId)
+          && exists(/databases/$(database)/documents/users/$(employeeId))
+          && get(/databases/$(database)/documents/users/$(employeeId)).data.primaryOfficeId == officeId;
+        allow update, delete: if isAdmin() && sameOffice(officeId);
+      }
+
+      match /shifts/{shiftId} {
+        // Admin + manager read all shifts in the office; a member reads only their own.
+        allow read: if isStaffOf(officeId) || (isMember() && sameOffice(officeId) && resource.data.assignedEmployeeId == request.auth.uid);
+        // Draft + submit-for-approval: admin or manager.
+        allow create, update: if isStaffOf(officeId)
+          && (isAdmin() || request.resource.data.status in ['draft', 'pending']);
+        // Approve/reject: admin only.
+        allow delete: if isAdmin() && sameOffice(officeId);
+      }
+
+      match /recruitmentLeads/{leadId} {
+        // Members get read-only visibility per the client transcript; admin/manager write.
+        allow read: if isStaffOf(officeId) || (isMember() && sameOffice(officeId));
+        allow write: if isStaffOf(officeId);
+      }
+
+      match /periods/{periodId} {
+        // Historical snapshots are written server-side only (Cloud Function via Admin SDK,
+        // which bypasses these rules entirely) — no client writes, ever.
+        allow read: if sameOffice(officeId);
+        allow write: if false;
+      }
     }
   }
 }

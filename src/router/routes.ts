@@ -7,6 +7,10 @@ declare module 'vue-router' {
     requiresAuth?: boolean;
     roles?: Role[];
     title?: string;
+    /** Skip the AppShell nav chrome even though requiresAuth is true — for
+     * screens like /pending-approval where the user is signed in but has no
+     * role yet, so the Planning/Employees/etc. nav would just be dead links. */
+    noShell?: boolean;
   }
 }
 
@@ -15,6 +19,7 @@ declare module 'vue-router' {
  *   - requiresAuth: requires a signed-in user
  *   - roles:       allowlist of roles permitted on the route
  *   - title:       document title suffix
+ *   - noShell:     requiresAuth but renders without AppShell (see above)
  *
  * Full role-based gating arrives in Ticket 1; for Ticket 0 we only need the
  * `requiresAuth` flag so the guard can bounce unauthenticated users to /login.
@@ -25,6 +30,18 @@ export const routes: RouteRecordRaw[] = [
     name: 'login',
     component: () => import('@/views/auth/LoginView.vue'),
     meta: { title: 'Login' },
+  },
+  {
+    path: '/signup',
+    name: 'signup',
+    component: () => import('@/views/auth/SignupView.vue'),
+    meta: { title: 'Create account' },
+  },
+  {
+    path: '/pending-approval',
+    name: 'pending-approval',
+    component: () => import('@/views/auth/PendingApprovalView.vue'),
+    meta: { requiresAuth: true, noShell: true, title: 'Pending approval' },
   },
   {
     path: '/',
@@ -78,6 +95,16 @@ export const routes: RouteRecordRaw[] = [
       requiresAuth: true,
       roles: [Roles.Administrator, Roles.TeamManager, Roles.TeamMember],
       title: 'History',
+    },
+  },
+  {
+    path: '/users',
+    name: 'users',
+    component: () => import('@/views/UsersView.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: [Roles.Administrator],
+      title: 'Users',
     },
   },
   {

@@ -1,5 +1,24 @@
 <script setup lang="ts">
+import { computed, onMounted, onUnmounted } from 'vue';
 import { RouterLink } from 'vue-router';
+
+import { useAuth } from '@/composables/useAuth';
+import { useShiftsStore } from '@/stores/shifts';
+
+const auth = useAuth();
+const shiftsStore = useShiftsStore();
+const isMember = computed(() => auth.role.value === 'TeamMember');
+
+const today = new Date().toISOString().slice(0, 10);
+const upcoming = computed(() =>
+  shiftsStore.shifts
+    .filter((s) => s.date >= today && s.status === 'approved')
+    .sort((a, b) => a.date.localeCompare(b.date)),
+);
+const completedCount = computed(
+  () => shiftsStore.shifts.filter((s) => s.status === 'approved' && s.date < today).length,
+);
+const pendingCount = computed(() => shiftsStore.shifts.filter((s) => s.status === 'pending').length);
 
 const staffing = [
   { day: 'Mon 24', total: 18, leaders: 5, fill: 90 },
@@ -8,10 +27,52 @@ const staffing = [
   { day: 'Thu 27', total: 20, leaders: 5, fill: 95 },
   { day: 'Fri 28', total: 23, leaders: 6, fill: 100 },
 ];
+
+onMounted(() => {
+  if (isMember.value && auth.officeId.value && auth.user.value) {
+    shiftsStore.subscribeMine(auth.officeId.value, auth.user.value.uid);
+  }
+});
+onUnmounted(() => {
+  if (isMember.value) shiftsStore.unsubscribe();
+});
 </script>
 
 <template>
-  <div class="mx-auto max-w-7xl space-y-8">
+  <div v-if="isMember" class="mx-auto max-w-3xl space-y-8">
+    <section>
+      <p class="text-sm text-neutral-mute">Your shifts</p>
+      <h2 class="mt-1 text-3xl font-bold tracking-tight">
+        Good to see you, {{ auth.user.value?.displayName || auth.user.value?.email }}.
+      </h2>
+    </section>
+    <section class="grid gap-4 sm:grid-cols-2">
+      <article class="border border-black/5 bg-white p-5">
+        <p class="text-xs font-bold uppercase tracking-[0.16em] text-neutral-mute">Shifts completed</p>
+        <p class="mt-4 text-3xl font-bold">{{ completedCount }}</p>
+      </article>
+      <article class="border border-black/5 bg-white p-5">
+        <p class="text-xs font-bold uppercase tracking-[0.16em] text-neutral-mute">Awaiting approval</p>
+        <p class="mt-4 text-3xl font-bold">{{ pendingCount }}</p>
+      </article>
+    </section>
+    <section class="border border-black/5 bg-white p-6">
+      <h3 class="text-lg font-bold">Upcoming shifts</h3>
+      <ul v-if="upcoming.length" class="mt-4 divide-y divide-black/5">
+        <li v-for="s in upcoming" :key="s.shiftId" class="flex items-center justify-between py-3 text-sm">
+          <span class="font-semibold">{{ s.date }}</span>
+          <span class="text-neutral-mute">{{ s.type }} · {{ s.startTime }}–{{ s.endTime }}</span>
+        </li>
+      </ul>
+      <p v-else class="mt-4 text-sm text-neutral-mute">No upcoming shifts scheduled yet.</p>
+    </section>
+    <p class="text-xs text-neutral-mute">
+      Signing up for open shifts isn't live yet — for now, submit availability through
+      <RouterLink to="/planning" class="font-semibold text-primary-pink">Planning</RouterLink> as before.
+    </p>
+  </div>
+
+  <div v-else class="mx-auto max-w-7xl space-y-8">
     <section class="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
       <div>
         <p class="text-sm text-neutral-mute">Monday, 24 August 2026</p>

@@ -60,8 +60,8 @@ async function onSubmit(): Promise<void> {
       </form>
 
       <p class="mt-6 text-center text-xs text-neutral-mute">
-        Local development: create a user in the
-        <a href="http://127.0.0.1:4000" target="_blank" rel="noopener">Firebase Emulator UI</a>.
+        No account yet?
+        <RouterLink to="/signup" class="font-semibold text-primary-pink">Create one</RouterLink>
       </p>
     </section>
   </main>
