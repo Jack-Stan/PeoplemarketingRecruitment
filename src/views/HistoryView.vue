@@ -1,0 +1,15 @@
+<script setup lang="ts">
+import { ref } from 'vue';
+
+const report = ref('Planning history');
+const rows = [
+  { period: 'August 2026', staffing: '18.4', leaders: '5.2', shifts: 92, change: '+12%' },
+  { period: 'July 2026', staffing: '16.8', leaders: '4.7', shifts: 84, change: '+7%' },
+  { period: 'June 2026', staffing: '15.6', leaders: '4.1', shifts: 78, change: '+3%' },
+  { period: 'May 2026', staffing: '15.2', leaders: '4.0', shifts: 75, change: '—' },
+];
+</script>
+
+<template>
+  <div class="mx-auto max-w-7xl space-y-6"><section class="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p class="text-sm text-neutral-mute">Trends and audit trail</p><h2 class="mt-1 text-3xl font-bold tracking-tight">History & reports</h2></div><button class="border border-black/10 bg-white px-4 py-2.5 text-sm font-bold">Export report ↓</button></section><div class="flex gap-1 border-b border-black/10"><button v-for="option in ['Planning history','Recruitment history']" :key="option" class="border-b-2 px-4 py-3 text-xs font-bold" :class="report === option ? 'border-primary-pink text-primary-pink' : 'border-transparent text-neutral-mute'" @click="report = option">{{ option }}</button></div><section class="grid gap-4 sm:grid-cols-3"><article class="border border-black/5 bg-white p-5"><p class="text-xs uppercase tracking-[0.16em] text-neutral-mute">Average staffing</p><p class="mt-3 text-3xl font-bold">18.4</p><p class="mt-1 text-xs text-emerald-600">↑ 9% this quarter</p></article><article class="border border-black/5 bg-white p-5"><p class="text-xs uppercase tracking-[0.16em] text-neutral-mute">Leader coverage</p><p class="mt-3 text-3xl font-bold">96%</p><p class="mt-1 text-xs text-emerald-600">↑ 4% this quarter</p></article><article class="border border-black/5 bg-white p-5"><p class="text-xs uppercase tracking-[0.16em] text-neutral-mute">Records retained</p><p class="mt-3 text-3xl font-bold">12 mo</p><p class="mt-1 text-xs text-neutral-mute">Last updated today</p></article></section><section class="overflow-x-auto border border-black/5 bg-white"><div class="border-b border-black/5 p-5"><h3 class="font-bold">{{ report }}</h3><p class="mt-1 text-xs text-neutral-mute">Compare completed periods and understand operational change over time.</p></div><table class="w-full min-w-[650px] text-left text-sm"><thead class="border-b border-black/5 bg-[#faf9f7] text-[10px] uppercase tracking-[0.16em] text-neutral-mute"><tr><th class="px-5 py-4">Period</th><th class="px-5 py-4">Avg. staffing</th><th class="px-5 py-4">Team Leaders</th><th class="px-5 py-4">Shifts</th><th class="px-5 py-4">Change</th></tr></thead><tbody class="divide-y divide-black/5"><tr v-for="row in rows" :key="row.period" class="hover:bg-[#faf9f7]"><td class="px-5 py-4 font-bold">{{ row.period }}</td><td class="px-5 py-4">{{ row.staffing }}</td><td class="px-5 py-4">{{ row.leaders }}</td><td class="px-5 py-4">{{ row.shifts }}</td><td class="px-5 py-4 font-bold text-emerald-600">{{ row.change }}</td></tr></tbody></table></section></div>
+</template>
