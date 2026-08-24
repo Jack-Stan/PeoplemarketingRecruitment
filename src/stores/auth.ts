@@ -92,6 +92,52 @@ export const useAuthStore = defineStore('auth', () => {
     clear();
   }
 
+  /**
+   * Admin-only: send a passwordless invite email. See authService.sendInvite
+   * for why this doesn't need a Cloud Function.
+   */
+  async function sendInvite(email: string, desiredOfficeId: string): Promise<boolean> {
+    error.value = null;
+    try {
+      await authService.sendInvite(email, desiredOfficeId);
+      return true;
+    } catch (err) {
+      error.value = friendlyError(err);
+      return false;
+    }
+  }
+
+  /**
+   * Second half of the invite flow — CompleteInviteView calls this once the
+   * user has clicked the emailed link and (re-)confirmed their email. Signs
+   * them in passwordlessly, then creates the same pending `/users/{uid}`
+   * doc self-signup would have, so the rest of the approval flow (Users
+   * page, /pending-approval) is identical either way.
+   */
+  async function completeInvite(
+    email: string,
+    url: string,
+    displayName: string,
+    desiredOfficeId: string,
+  ): Promise<boolean> {
+    isLoading.value = true;
+    error.value = null;
+    try {
+      const fbUser = await authService.completeInvite(email, url);
+      const existing = await usersService.getOnce(fbUser.uid);
+      if (!existing) {
+        await usersService.createProfile(fbUser.uid, fbUser.email ?? email, displayName || null, desiredOfficeId);
+      }
+      await hydrate(fbUser);
+      return true;
+    } catch (err) {
+      error.value = friendlyError(err);
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   function clear(): void {
     unsubProfile?.();
     unsubProfile = null;
@@ -153,6 +199,8 @@ export const useAuthStore = defineStore('auth', () => {
     signIn,
     signUp,
     signOut,
+    sendInvite,
+    completeInvite,
     hydrate,
     clear,
     _constants: { Roles },

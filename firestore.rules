@@ -105,11 +105,40 @@ service cloud.firestore {
       match /shifts/{shiftId} {
         // Admin + manager read all shifts in the office; a member reads only their own.
         allow read: if isStaffOf(officeId) || (isMember() && sameOffice(officeId) && resource.data.assignedEmployeeId == request.auth.uid);
-        // Draft + submit-for-approval: admin or manager.
-        allow create, update: if isStaffOf(officeId)
-          && (isAdmin() || request.resource.data.status in ['draft', 'pending']);
-        // Approve/reject: admin only.
-        allow delete: if isAdmin() && sameOffice(officeId);
+
+        // Create: admin/manager may draft a shift for anyone in the office; a
+        // member may draft/submit only their OWN shift — decision 008,
+        // employee-authored planning ("employees plan themselves in, admin
+        // approves"), not admin-published open slots.
+        function ownsShift() {
+          return request.resource.data.assignedEmployeeId == request.auth.uid;
+        }
+        allow create: if (isStaffOf(officeId) && request.resource.data.status in ['draft', 'pending'])
+          || (isMember() && sameOffice(officeId) && ownsShift() && request.resource.data.status in ['draft', 'pending']);
+
+        // Update: admin can do anything in their office, including walking a
+        // shift backwards (approved -> pending). A manager or member may only
+        // touch a shift that IS CURRENTLY draft/pending and may not move it
+        // past pending themselves — checking only the incoming status here
+        // (ticket-03 defect) let a manager silently un-approve a shift by
+        // writing status: 'pending' over an already-approved doc. A member is
+        // further restricted to their own shift, and can't reassign it.
+        allow update: if (isAdmin() && sameOffice(officeId))
+          || (isManager() && sameOffice(officeId)
+              && resource.data.status in ['draft', 'pending']
+              && request.resource.data.status in ['draft', 'pending'])
+          || (isMember() && sameOffice(officeId)
+              && resource.data.assignedEmployeeId == request.auth.uid
+              && resource.data.status in ['draft', 'pending']
+              && ownsShift()
+              && request.resource.data.status in ['draft', 'pending']);
+
+        // Delete: admin, office-scoped. A member may also delete their own
+        // draft before ever submitting it (undo an accidental add).
+        allow delete: if (isAdmin() && sameOffice(officeId))
+          || (isMember() && sameOffice(officeId)
+              && resource.data.assignedEmployeeId == request.auth.uid
+              && resource.data.status == 'draft');
       }
 
       match /recruitmentLeads/{leadId} {

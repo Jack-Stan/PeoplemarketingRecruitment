@@ -8,6 +8,9 @@ vi.mock('@/services/auth.service', () => ({
     signIn: vi.fn(),
     signUp: vi.fn(),
     signOut: vi.fn(),
+    sendInvite: vi.fn(),
+    isInviteLink: vi.fn(() => true),
+    completeInvite: vi.fn(),
     onAuthStateChanged: vi.fn(() => () => {}),
   },
 }));

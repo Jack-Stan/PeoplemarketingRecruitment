@@ -128,6 +128,51 @@ describe('auth store', () => {
     expect(store.hasRole(Roles.TeamManager, Roles.TeamMember)).toBe(false);
   });
 
+  it('sendInvite delegates to authService and surfaces a friendly error on failure', async () => {
+    vi.mocked(authService.sendInvite).mockRejectedValueOnce(
+      Object.assign(new Error('auth/operation-not-allowed'), { code: 'auth/operation-not-allowed' }),
+    );
+
+    const store = useAuthStore();
+    const ok = await store.sendInvite('new@peoplemarketing.be', 'gent');
+    expect(ok).toBe(false);
+    expect(authService.sendInvite).toHaveBeenCalledWith('new@peoplemarketing.be', 'gent');
+  });
+
+  it('completeInvite signs in, creates a pending profile if none exists, and hydrates', async () => {
+    vi.mocked(authService.completeInvite).mockResolvedValueOnce({ uid: 'u4', email: 'invited@peoplemarketing.be' } as never);
+    vi.mocked(usersService.getOnce).mockResolvedValueOnce(null);
+    vi.mocked(usersService.createProfile).mockResolvedValueOnce(undefined);
+
+    const store = useAuthStore();
+    const ok = await store.completeInvite('invited@peoplemarketing.be', 'https://x/complete-invite', 'Invited Person', 'gent');
+
+    expect(ok).toBe(true);
+    expect(usersService.createProfile).toHaveBeenCalledWith('u4', 'invited@peoplemarketing.be', 'Invited Person', 'gent');
+    expect(store.isAuthenticated).toBe(true);
+    expect(store.role).toBeNull();
+  });
+
+  it('completeInvite does not overwrite an existing profile (re-clicking the link)', async () => {
+    vi.mocked(authService.completeInvite).mockResolvedValueOnce({ uid: 'u4', email: 'invited@peoplemarketing.be' } as never);
+    vi.mocked(usersService.getOnce).mockResolvedValueOnce({
+      uid: 'u4',
+      email: 'invited@peoplemarketing.be',
+      displayName: 'Invited Person',
+      role: null,
+      primaryOfficeId: null,
+      desiredOfficeId: 'gent',
+      isTeamLeader: false,
+      isActive: true,
+    });
+
+    const store = useAuthStore();
+    const ok = await store.completeInvite('invited@peoplemarketing.be', 'https://x/complete-invite', 'Invited Person', 'gent');
+
+    expect(ok).toBe(true);
+    expect(usersService.createProfile).not.toHaveBeenCalled();
+  });
+
   it('signOut clears user, role and office', async () => {
     vi.mocked(usersService.getOnce).mockResolvedValueOnce({
       uid: 'u1',

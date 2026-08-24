@@ -66,10 +66,12 @@ onUnmounted(() => {
       </ul>
       <p v-else class="mt-4 text-sm text-neutral-mute">No upcoming shifts scheduled yet.</p>
     </section>
-    <p class="text-xs text-neutral-mute">
-      Signing up for open shifts isn't live yet — for now, submit availability through
-      <RouterLink to="/planning" class="font-semibold text-primary-pink">Planning</RouterLink> as before.
-    </p>
+    <RouterLink
+      to="/mijn-planning"
+      class="inline-flex items-center justify-center bg-primary-pink px-4 py-2.5 text-sm font-bold text-white hover:bg-primary-pink-alt"
+    >
+      Mijn planning openen <span class="ml-3">→</span>
+    </RouterLink>
   </div>
 
   <div v-else class="mx-auto max-w-7xl space-y-8">

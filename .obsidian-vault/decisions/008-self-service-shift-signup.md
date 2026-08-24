@@ -1,7 +1,7 @@
 # Decision 008 — Self-service shift signup: employees create their own shifts, not "claim open slots"
 
 **Date:** 2026-08-24 (third session, data-model pass)
-**Status:** Proposed — needs Stan's call before rules/UI change
+**Status:** ✅ Accepted (Stan, 2026-08-24) and implemented — option A.
 **Blocked on:** `decisions/007` (a member can't self-assign until `employeeId == uid` holds)
 
 ## Context
@@ -68,6 +68,25 @@ option A does not block it, and B/C would have pre-paid for a feature nobody ask
 
 **Ask the client (via Stan) to confirm** before building: *"does the admin ever post open shifts that
 staff sign up for, or do staff always propose their own?"* If it's the former, this decision flips.
+
+## What shipped
+
+- `Shift` type extended: `weekStart`, `employeeName`/`employeeIsTeamLeader` (denormalised, point-in-time),
+  `eventTitle`, `location`, `notes`, `createdBy`, `submittedAt`, `decidedAt`/`decidedBy`, `calendarEventId`
+  (reserved). See `tickets/ticket-03-shift-create.md` for the field-by-field rationale.
+- `firestore.rules` — shift `create`/`update`/`delete` split three ways (admin / manager / member-owns-shift),
+  matching this decision's option A rules sketch. Also fixed ticket-03 defect #3 in passing: a manager could
+  previously walk an `approved` shift back to `pending` because only the *incoming* status was checked —
+  `update` now also requires `resource.data.status in ['draft','pending']` for non-admins.
+- `shiftsService.submitWeek` — `writeBatch` flipping every current `draft` to `pending` in one call, per the
+  "weekly submit gesture" sketch below. `subscribeMineForWeek` scopes a member's live view to one week.
+- `MyPlanningView.vue` (new, route `/mijn-planning`, TeamMember-only) — add/remove own draft shifts for the
+  current week, "Week indienen" batch-submits. `PlanningView.vue`'s admin/manager quick-add form gained the
+  Event title / location fields and now stamps `employeeName`/`employeeIsTeamLeader` at create time.
+- `AppShell.vue` nav made role-aware (previously showed links a TeamMember's route guard would immediately
+  bounce them out of) and translated to Dutch alongside every new/touched view — see the Dutch-translation
+  note in `project-status.md`.
+- 31 → 34 unit tests, typecheck clean. **`firestore.rules` change not yet deployed to prod** — same as 007.
 
 ## The one thing A does need: a weekly submit gesture
 

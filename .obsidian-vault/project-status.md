@@ -1,6 +1,6 @@
 # Project Status — CRM
 
-**Updated:** 2026-08-24 (third session — Firestore data-model pass)
+**Updated:** 2026-08-24 (third session — data-model pass + functional build-out)
 **Repo:** `C:\RFT\Projects\CRM`
 **Stack:** Vue 3 + TypeScript + Vite + Pinia + Tailwind + Firebase (Auth + Firestore + Emulator Suite — **no Cloud Functions**, see below)
 
@@ -101,6 +101,56 @@ vault docs:
 - Six client questions listed at the bottom of `tickets/ticket-03-shift-create.md` — open-shifts yes/no,
   Sunday hard cutoff, self-approval, editing approved shifts, shift location, and whether a roster entry
   may exist for someone with no login account.
+
+---
+
+## Functional build-out (same third session, after the data-model pass)
+
+Stan asked to move from design to building. Shipped, in order:
+
+- **007 implemented** — `employeesService.create` now `setDoc`s under the account's own uid; prod audited
+  first (empty roster, no migration needed); `EmployeesView` add-flow is an account picker. `firestore.rules`
+  enforces it server-side too. **Not yet deployed to prod** (Stan's call — held off pending more functional work).
+- **008 implemented — self-service shift signup.** `Shift` type extended (weekStart, denormalised
+  employeeName/employeeIsTeamLeader, eventTitle/location/notes, createdBy/submittedAt/decidedAt/decidedBy,
+  reserved calendarEventId). New `/mijn-planning` route + `MyPlanningView.vue` (TeamMember-only): add/remove
+  own draft shifts for the current week, "Week indienen" batch-submits every draft via `writeBatch`.
+  `firestore.rules` shifts split three ways (admin/manager/member-owns-shift); fixed a real bug in passing —
+  a TeamManager could previously walk an `approved` shift back to `pending` because only the incoming status
+  was checked. **Rules not yet deployed.**
+- **Overlap validation** (ticket-03 defect #4, was completely missing) — `shiftsStore.hasOverlap()`, wired
+  into both PlanningView and MyPlanningView's submit handlers. Client-side only, by necessity — Firestore
+  rules can't query sibling documents to enforce this server-side.
+- **Real Firestore-backed History view** — `HistoryView.vue` no longer shows the old static mock; it groups
+  live `/shifts` data by month (total, approved, TL headcount) with a member/admin split matching the read
+  rules. The full "TL trend over time" report from the client transcript is still out of scope — that needs
+  the `/periods` snapshot question resolved first (see the recruitment/periods note below).
+- **Admin-triggered email invites (new ask, mid-session)** — Stan wants "admin just sends a sign-up mail."
+  Built on Firebase Auth's free passwordless **email-link** sign-in (Firebase's own mail relay, zero Cloud
+  Functions, fits Spark). `authService.sendInvite/isInviteLink/completeInvite`, new public route
+  `/complete-invite` + `CompleteInviteView.vue`, and a "Nieuwe medewerker uitnodigen" panel on `UsersView`.
+  The invited person still lands as a normal pending `/users/{uid}` doc — no rules changes needed, no
+  privilege shortcut. **⚠️ Needs Stan to enable "Email link" under Authentication → Sign-in method in the
+  Firebase Console before this can be tested live** — that's a security-provider setting Claude can't flip.
+- **Nav made role-aware** — `AppShell.vue` previously showed every logged-in user the same links regardless
+  of role, including ones a TeamMember's route guard would immediately bounce them out of. Fixed.
+- **Dutch translation, partial** — every view touched this session (Planning, MyPlanning, History, Users,
+  AppShell nav, CompleteInvite) is now in Dutch per the client's explicit ask ("alles in t nederlands").
+  Login/Signup/PendingApproval/Unauthorized/NotFound/Recruitment/Employees/admin-Dashboard are **still
+  English** — flagged as a background task (see task chip) rather than half-done inline.
+- Unit tests: 27 → 35, all green. Typecheck clean throughout.
+
+### Still open
+
+- **Two rules changes queued, neither deployed**: 007 (employee uid-keying) and 008 (self-service shifts +
+  backwards-transition fix). Both audited as low-risk (empty prod roster) but need Stan's go-ahead.
+- **Email-link sign-in not yet enabled in Firebase Console** — invite feature is code-complete but untestable
+  until Stan flips that toggle.
+- **Recruitment (`recruitmentLeads`) and `/periods`** — still untouched this session beyond the earlier
+  audit note that `/periods`' "written server-side only" comment refers to a Cloud Function that no longer
+  exists. No write path currently exists for historical snapshots.
+- Approval queue in `PlanningView` is still a flat day-grouped list, not grouped by `(employee, weekStart)`
+  as ticket-03's acceptance criteria describes — functional as-is, just not the ideal admin UX yet.
 
 ## Production Firestore state (2026-08-24)
 

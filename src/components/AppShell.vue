@@ -6,13 +6,16 @@ import { useAuth } from '@/composables/useAuth';
 const route = useRoute();
 const router = useRouter();
 const auth = useAuth();
+// Route table gates by role too — this list additionally keeps a TeamMember
+// from ever seeing a nav link to a page the guard would bounce them out of.
 const links = computed(() => [
-  { label: 'Overview', to: '/dashboard', icon: '▦' },
-  { label: 'Planning', to: '/planning', icon: '▣' },
-  { label: 'Employees', to: '/employees', icon: '♙' },
-  { label: 'Recruitment', to: '/recruitment', icon: '◎' },
-  { label: 'History', to: '/history', icon: '◷' },
-  ...(auth.hasRole('Administrator') ? [{ label: 'Users', to: '/users', icon: '☺' }] : []),
+  { label: 'Overzicht', to: '/dashboard', icon: '▦' },
+  ...(auth.hasRole('TeamMember') ? [{ label: 'Mijn planning', to: '/mijn-planning', icon: '▣' }] : []),
+  ...(auth.hasRole('Administrator', 'TeamManager') ? [{ label: 'Planning', to: '/planning', icon: '▣' }] : []),
+  ...(auth.hasRole('Administrator', 'TeamManager') ? [{ label: 'Medewerkers', to: '/employees', icon: '♙' }] : []),
+  ...(auth.hasRole('Administrator', 'TeamManager') ? [{ label: 'Rekrutering', to: '/recruitment', icon: '◎' }] : []),
+  { label: 'Geschiedenis', to: '/history', icon: '◷' },
+  ...(auth.hasRole('Administrator') ? [{ label: 'Gebruikers', to: '/users', icon: '☺' }] : []),
 ]);
 const initials = computed(() => (auth.user.value?.email?.slice(0, 2) ?? 'PM').toUpperCase());
 async function signOut(): Promise<void> {

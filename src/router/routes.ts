@@ -38,6 +38,12 @@ export const routes: RouteRecordRaw[] = [
     meta: { title: 'Create account' },
   },
   {
+    path: '/complete-invite',
+    name: 'complete-invite',
+    component: () => import('@/views/auth/CompleteInviteView.vue'),
+    meta: { title: 'Uitnodiging voltooien' },
+  },
+  {
     path: '/pending-approval',
     name: 'pending-approval',
     component: () => import('@/views/auth/PendingApprovalView.vue'),
@@ -65,6 +71,16 @@ export const routes: RouteRecordRaw[] = [
       requiresAuth: true,
       roles: [Roles.Administrator, Roles.TeamManager],
       title: 'Planning',
+    },
+  },
+  {
+    path: '/mijn-planning',
+    name: 'my-planning',
+    component: () => import('@/views/MyPlanningView.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: [Roles.TeamMember],
+      title: 'Mijn planning',
     },
   },
   {

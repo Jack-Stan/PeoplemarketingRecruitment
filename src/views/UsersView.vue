@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 
 import { officesService } from '@/services/offices.service';
 import { useAuth } from '@/composables/useAuth';
+import { isValidEmail } from '@/utils/validators';
 import { useUsersStore } from '@/stores/users';
 import { useUiStore } from '@/stores/ui';
 import { Roles, type Role, type UserProfile } from '@/types/user';
@@ -24,6 +25,9 @@ const form = ref<{ role: Role; isTeamLeader: boolean }>({
   isTeamLeader: false,
 });
 const saving = ref(false);
+
+const inviteEmail = ref('');
+const inviting = ref(false);
 
 const sorted = computed(() =>
   [...store.users].sort((a, b) => {
@@ -58,8 +62,23 @@ async function submit(): Promise<void> {
   saving.value = true;
   const ok = await store.assignRole(editingUid.value, form.value.role, ownOfficeId.value, form.value.isTeamLeader);
   saving.value = false;
-  ui.push(ok ? 'Role assigned.' : (store.error ?? 'Something went wrong.'), ok ? 'success' : 'error');
+  ui.push(ok ? 'Rol toegewezen.' : (store.error ?? 'Er ging iets mis.'), ok ? 'success' : 'error');
   if (ok) closeEdit();
+}
+
+async function sendInvite(): Promise<void> {
+  if (!isValidEmail(inviteEmail.value) || !ownOfficeId.value) {
+    ui.push('Geef een geldig e-mailadres op.', 'error');
+    return;
+  }
+  inviting.value = true;
+  const ok = await auth.sendInvite(inviteEmail.value.trim(), ownOfficeId.value);
+  inviting.value = false;
+  ui.push(
+    ok ? `Uitnodiging verstuurd naar ${inviteEmail.value.trim()}.` : (auth.error.value ?? 'Kon de uitnodiging niet versturen.'),
+    ok ? 'success' : 'error',
+  );
+  if (ok) inviteEmail.value = '';
 }
 
 onMounted(async () => {
@@ -68,7 +87,7 @@ onMounted(async () => {
     const offices = await officesService.listActive();
     officeNames.value = Object.fromEntries(offices.map((o) => [o.officeId, o.name]));
   } catch {
-    ui.push('Could not load office names.', 'error');
+    ui.push('Kon de lijst met kantoren niet laden.', 'error');
   }
 });
 onUnmounted(() => store.unsubscribe());
@@ -78,20 +97,49 @@ onUnmounted(() => store.unsubscribe());
   <div class="mx-auto max-w-5xl space-y-6">
     <section>
       <p class="text-sm text-neutral-mute">
-        {{ store.pendingUsers.length }} pending approval · you can assign into
+        {{ store.pendingUsers.length }} wachten op goedkeuring · je kan toewijzen aan
         {{ officeLabel(ownOfficeId) }}
       </p>
-      <h2 class="mt-1 text-3xl font-bold tracking-tight">Users</h2>
+      <h2 class="mt-1 text-3xl font-bold tracking-tight">Gebruikers</h2>
+    </section>
+
+    <!--
+      "Admin just sends a sign-up mail to a new employee" — passwordless
+      email-link invite via Firebase Auth's own mail relay (see
+      authService.sendInvite). The invited person still lands as a pending
+      account below; nothing here bypasses approval.
+    -->
+    <section class="border border-black/5 bg-white p-5">
+      <h3 class="text-sm font-bold">Nieuwe medewerker uitnodigen</h3>
+      <p class="mt-1 text-xs text-neutral-mute">
+        Stuurt een e-mail met een aanmeldlink naar {{ officeLabel(ownOfficeId) }} — geen wachtwoord nodig.
+      </p>
+      <form class="mt-3 flex flex-col gap-2 sm:flex-row" @submit.prevent="sendInvite">
+        <input
+          v-model="inviteEmail"
+          type="email"
+          required
+          placeholder="naam@voorbeeld.be"
+          class="min-w-0 flex-1 border-black/10 bg-[#faf9f7] text-sm"
+        />
+        <button
+          type="submit"
+          class="whitespace-nowrap bg-primary-pink px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+          :disabled="inviting"
+        >
+          Uitnodiging versturen
+        </button>
+      </form>
     </section>
 
     <section class="overflow-x-auto border border-black/5 bg-white">
       <table class="w-full min-w-[800px] text-left text-sm">
         <thead class="border-b border-black/5 bg-[#faf9f7] text-[10px] uppercase tracking-[0.16em] text-neutral-mute">
           <tr>
-            <th class="px-5 py-4">User</th>
-            <th class="px-5 py-4">Role</th>
-            <th class="px-5 py-4">Office</th>
-            <th class="px-5 py-4">Team Leader</th>
+            <th class="px-5 py-4">Gebruiker</th>
+            <th class="px-5 py-4">Rol</th>
+            <th class="px-5 py-4">Kantoor</th>
+            <th class="px-5 py-4">Teamleider</th>
             <th class="px-5 py-4"></th>
           </tr>
         </thead>
@@ -106,52 +154,52 @@ onUnmounted(() => store.unsubscribe());
                 v-if="u.role === null"
                 class="rounded-full bg-primary-pink/10 px-2 py-1 text-xs font-semibold text-primary-pink"
               >
-                Pending
+                In afwachting
               </span>
               <span v-else class="text-xs font-semibold">{{ u.role }}</span>
             </td>
             <td class="px-5 py-4 text-xs text-neutral-mute">
               <span v-if="u.role === null">
-                Applied to {{ officeLabel(u.desiredOfficeId) }}
-                <span v-if="wantsOtherOffice(u)" class="ml-1 font-semibold text-semantic-danger" title="Not your office — you can only approve them into your own.">
-                  ⚠ not yours
+                Aangevraagd voor {{ officeLabel(u.desiredOfficeId) }}
+                <span v-if="wantsOtherOffice(u)" class="ml-1 font-semibold text-semantic-danger" title="Niet jouw kantoor — je kan enkel goedkeuren voor je eigen kantoor.">
+                  ⚠ niet van jou
                 </span>
               </span>
               <span v-else>{{ officeLabel(u.primaryOfficeId) }}</span>
             </td>
-            <td class="px-5 py-4 text-xs text-neutral-mute">{{ u.isTeamLeader ? 'Yes' : 'No' }}</td>
+            <td class="px-5 py-4 text-xs text-neutral-mute">{{ u.isTeamLeader ? 'Ja' : 'Nee' }}</td>
             <td class="px-5 py-4 text-right">
               <button class="text-xs font-semibold text-neutral-ink hover:text-primary-pink" @click="openEdit(u)">
-                {{ u.role === null ? 'Assign role' : 'Edit' }}
+                {{ u.role === null ? 'Rol toewijzen' : 'Bewerken' }}
               </button>
             </td>
           </tr>
         </tbody>
       </table>
-      <p v-if="store.isLoading" class="p-8 text-center text-sm text-neutral-mute">Loading…</p>
-      <p v-else-if="!sorted.length" class="p-8 text-center text-sm text-neutral-mute">No users yet.</p>
+      <p v-if="store.isLoading" class="p-8 text-center text-sm text-neutral-mute">Laden…</p>
+      <p v-else-if="!sorted.length" class="p-8 text-center text-sm text-neutral-mute">Nog geen gebruikers.</p>
     </section>
 
     <div v-if="editingUid" class="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4">
       <div class="w-full max-w-md border border-black/10 bg-white p-6">
-        <h3 class="text-lg font-bold">Assign role</h3>
-        <p class="mt-1 text-xs text-neutral-mute">Office: {{ officeLabel(ownOfficeId) }}</p>
+        <h3 class="text-lg font-bold">Rol toewijzen</h3>
+        <p class="mt-1 text-xs text-neutral-mute">Kantoor: {{ officeLabel(ownOfficeId) }}</p>
         <form class="mt-4 space-y-3" @submit.prevent="submit">
           <select v-model="form.role" class="w-full border-black/10 bg-[#faf9f7] text-sm">
-            <option :value="Roles.TeamMember">Team Member</option>
-            <option :value="Roles.TeamManager">Team Manager</option>
-            <option :value="Roles.Administrator">Administrator</option>
+            <option :value="Roles.TeamMember">Teamlid</option>
+            <option :value="Roles.TeamManager">Teammanager</option>
+            <option :value="Roles.Administrator">Beheerder</option>
           </select>
           <label class="flex items-center gap-2 text-xs font-semibold">
             <input v-model="form.isTeamLeader" type="checkbox" class="border-black/20 text-primary-pink focus:ring-primary-pink" />
-            Team Leader
+            Teamleider
           </label>
           <div class="flex justify-end gap-2 pt-2">
             <button type="button" class="px-4 py-2 text-sm font-semibold text-neutral-mute" @click="closeEdit">
-              Cancel
+              Annuleren
             </button>
             <button type="submit" class="bg-primary-pink px-4 py-2 text-sm font-bold text-white" :disabled="saving">
-              Save
+              Opslaan
             </button>
           </div>
         </form>
