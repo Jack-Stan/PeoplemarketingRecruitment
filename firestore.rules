@@ -73,8 +73,32 @@ service cloud.firestore {
       // no Cloud Function needed now that role lives in Firestore. Multi-office:
       // an Administrator may assign into ANY office (not just their own) — the
       // office switcher is how they pick which one, same as isStaffOf below.
-      allow update: if isAdmin()
-        && request.resource.data.role in ['Administrator', 'TeamManager', 'TeamMember'];
+      //
+      // Self-service (Settings page): a non-admin may update ONLY their own
+      // doc's phone/phoneVerified/emailVerified — every other field (role,
+      // office, isActive, email, displayName…) must come out unchanged, so
+      // this can never be used as a privilege-escalation path. `phoneVerified`
+      // is a self-attestation ("I confirm this number is correct"), done by
+      // the user themselves as a todo on Settings — not an admin sign-off,
+      // since there's no Firebase Phone Auth here to check it automatically
+      // (SMS needs Blaze) either way, so an admin confirming it wasn't any
+      // more trustworthy than the user doing it themselves. `emailVerified`
+      // must match the caller's own ID token claim — it can't be
+      // self-attested to an arbitrary value the same way.
+      function selfProfileUpdateOnly() {
+        return isSignedIn() && request.auth.uid == userId
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.primaryOfficeId == resource.data.primaryOfficeId
+          && request.resource.data.desiredOfficeId == resource.data.desiredOfficeId
+          && request.resource.data.isTeamLeader == resource.data.isTeamLeader
+          && request.resource.data.isActive == resource.data.isActive
+          && request.resource.data.email == resource.data.email
+          && request.resource.data.displayName == resource.data.displayName
+          && request.resource.data.emailVerified == request.auth.token.email_verified
+          && request.resource.data.phoneVerified is bool;
+      }
+      allow update: if (isAdmin() && request.resource.data.role in ['Administrator', 'TeamManager', 'TeamMember'])
+        || selfProfileUpdateOnly();
       allow delete: if isAdmin();
     }
 
@@ -161,6 +185,43 @@ service cloud.firestore {
         allow read: if isStaffOf(officeId);
         allow create: if isStaffOf(officeId);
         allow update, delete: if false;
+      }
+
+      match /locations/{locationId} {
+        // Location Manager (client asked for a briggsandwalker-style
+        // canvassing map+list, meetings/2026-08-25-client-callback-new-asks
+        // item 7). Members need read access to see where to go; only staff
+        // (admin/manager) manage the location list itself.
+        allow read: if isStaffOf(officeId) || (isMember() && sameOffice(officeId));
+        allow create, delete: if isStaffOf(officeId);
+        // Update: staff may edit anything. A member never touches the
+        // location's own fields (name/address/status/etc) — the ONLY write
+        // they're allowed here is the visit-counter bump that
+        // locationsService.logVisit batches alongside a visits/{visitId}
+        // create, so their write must be exactly "timesVisited +1,
+        // lastVisitedAt set" with everything else unchanged.
+        function onlyVisitCounterChanged() {
+          return request.resource.data.name == resource.data.name
+            && request.resource.data.address == resource.data.address
+            && request.resource.data.neighbourhood == resource.data.neighbourhood
+            && request.resource.data.lat == resource.data.lat
+            && request.resource.data.lng == resource.data.lng
+            && request.resource.data.status == resource.data.status
+            && request.resource.data.timesVisited == resource.data.timesVisited + 1;
+        }
+        allow update: if isStaffOf(officeId)
+          || (isMember() && sameOffice(officeId) && onlyVisitCounterChanged());
+
+        match /visits/{visitId} {
+          // Visit log: any signed-in office member can log that THEY visited
+          // a location (self-attested, matches the employee-authored shift
+          // model in decisions/008) — a team leader/admin needs to see who
+          // covered a neighbourhood, not just staff-logged visits.
+          allow read: if isStaffOf(officeId) || (isMember() && sameOffice(officeId));
+          allow create: if (isStaffOf(officeId) || (isMember() && sameOffice(officeId)))
+            && request.resource.data.employeeId == request.auth.uid;
+          allow update, delete: if false;
+        }
       }
 
       match /periods/{periodId} {

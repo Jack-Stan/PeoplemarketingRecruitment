@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import logoUrl from '@/assets/logo.svg';
 import { useAuth } from '@/composables/useAuth';
 import { useUiStore } from '@/stores/ui';
 
@@ -12,8 +13,19 @@ const route = useRoute();
 const auth = useAuth();
 const ui = useUiStore();
 
+// Body's global background is white (tailwind.css) — pin it black just while
+// this page is mounted so overscroll/pre-paint edges don't show white behind
+// the black login screen.
+onMounted(() => {
+  document.body.style.backgroundColor = '#000000';
+});
+onUnmounted(() => {
+  document.body.style.backgroundColor = '';
+});
+
 const email = ref('');
 const password = ref('');
+const rememberMe = ref(false);
 const submitting = ref(false);
 
 const isResetMode = ref(false);
@@ -22,7 +34,7 @@ const resetting = ref(false);
 
 async function onSubmit(): Promise<void> {
   submitting.value = true;
-  const ok = await auth.signIn(email.value.trim(), password.value);
+  const ok = await auth.signIn(email.value.trim(), password.value, rememberMe.value);
   submitting.value = false;
   if (ok) {
     ui.push('Aangemeld', 'success');
@@ -50,21 +62,23 @@ async function onSendReset(): Promise<void> {
 </script>
 
 <template>
-  <main class="flex min-h-screen items-center justify-center bg-neutral-surface px-4">
-    <section class="w-full max-w-sm rounded-lg bg-neutral-white p-8 shadow-md">
-      <header class="mb-6 text-center">
-        <h1 class="text-2xl font-bold text-neutral-ink">People Marketing</h1>
-        <p class="mt-1 text-sm text-neutral-mute">Meld je aan om verder te gaan</p>
+  <main
+    class="relative flex min-h-screen items-center justify-center bg-neutral-black px-4"
+    style="background-image: radial-gradient(circle at 100% 0%, rgba(230,0,126,0.3), transparent 45%), radial-gradient(circle at 0% 100%, rgba(255,61,138,0.2), transparent 45%)"
+  >
+    <section class="relative w-full max-w-sm overflow-hidden rounded-lg bg-neutral-white shadow-md">
+      <header class="flex flex-col items-center rounded-t-lg bg-neutral-black px-8 py-8 text-center">
+        <img :src="logoUrl" alt="People Marketing" class="h-12 w-auto" />
       </header>
 
+      <div class="border-t-2 border-primary-pink p-8">
       <form v-if="!isResetMode" class="space-y-4" @submit.prevent="onSubmit">
         <BaseInput
           v-model="email"
           label="E-mail"
           type="email"
-          autocomplete="email"
+          autocomplete="username"
           required
-          placeholder="jij@peoplemarketing.nl"
         />
         <BaseInput
           v-model="password"
@@ -73,6 +87,17 @@ async function onSendReset(): Promise<void> {
           autocomplete="current-password"
           required
         />
+        <label
+          v-if="email && password"
+          class="flex cursor-pointer items-center gap-2 text-sm text-neutral-ink select-none"
+        >
+          <input
+            v-model="rememberMe"
+            type="checkbox"
+            class="h-5 w-5 rounded border-2 border-neutral-ink text-primary-pink focus:ring-primary-pink"
+          />
+          Aangemeld blijven
+        </label>
         <BaseButton type="submit" block :loading="submitting" :disabled="!email || !password">
           Aanmelden
         </BaseButton>
@@ -93,7 +118,6 @@ async function onSendReset(): Promise<void> {
           type="email"
           autocomplete="email"
           required
-          placeholder="jij@peoplemarketing.nl"
         />
         <BaseButton type="submit" block :loading="resetting" :disabled="!resetEmail">
           Reset-link versturen
@@ -104,11 +128,7 @@ async function onSendReset(): Promise<void> {
           </button>
         </p>
       </form>
-
-      <p v-if="!isResetMode" class="mt-6 text-center text-xs text-neutral-mute">
-        Nog geen account?
-        <RouterLink to="/signup" class="font-semibold text-primary-pink">Account aanmaken</RouterLink>
-      </p>
+      </div>
     </section>
   </main>
 </template>

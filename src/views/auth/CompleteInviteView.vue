@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import { useAuth } from '@/composables/useAuth';
 import { authService } from '@/services/auth.service';
+import { isValidName } from '@/utils/validators';
 import { useUiStore } from '@/stores/ui';
 
 /**
@@ -13,6 +14,9 @@ import { useUiStore } from '@/stores/ui';
  * UsersView's "Uitnodigen" tab). Firebase's email-link sign-in can be opened
  * on a different device than it was requested on, so the email itself isn't
  * fully trusted from the URL alone — it's prefilled but always confirmable.
+ * The link click proves email ownership; this form then collects a real
+ * password (so the link isn't needed for every future login) plus name and
+ * phone, same fields UserDetailView shows an admin later.
  */
 const route = useRoute();
 const router = useRouter();
@@ -21,9 +25,23 @@ const ui = useUiStore();
 
 const email = ref(String(route.query.email ?? ''));
 const desiredOfficeId = ref(String(route.query.office ?? ''));
-const displayName = ref('');
+const firstName = ref('');
+const lastName = ref('');
+const phone = ref('');
+const password = ref('');
+const confirmPassword = ref('');
 const isValidLink = ref(false);
 const submitting = ref(false);
+
+const passwordsMatch = computed(() => password.value === confirmPassword.value);
+const canSubmit = computed(
+  () =>
+    !!email.value &&
+    isValidName(firstName.value) &&
+    isValidName(lastName.value) &&
+    password.value.length >= 6 &&
+    passwordsMatch.value,
+);
 
 onMounted(() => {
   isValidLink.value = authService.isInviteLink(window.location.href);
@@ -33,11 +51,18 @@ onMounted(() => {
 });
 
 async function onSubmit(): Promise<void> {
+  if (!canSubmit.value) {
+    if (!passwordsMatch.value) ui.push('Wachtwoorden komen niet overeen.', 'error');
+    return;
+  }
   submitting.value = true;
+  const displayName = `${firstName.value.trim()} ${lastName.value.trim()}`.trim();
   const ok = await auth.completeInvite(
     email.value.trim(),
     window.location.href,
-    displayName.value.trim(),
+    password.value,
+    displayName,
+    phone.value.trim(),
     desiredOfficeId.value,
   );
   submitting.value = false;
@@ -51,38 +76,41 @@ async function onSubmit(): Promise<void> {
 </script>
 
 <template>
-  <main class="flex min-h-screen items-center justify-center bg-neutral-surface px-4">
+  <main class="flex min-h-screen items-center justify-center bg-neutral-surface px-4 py-10">
     <section class="w-full max-w-sm rounded-lg bg-neutral-white p-8 shadow-md">
       <header class="mb-6 text-center">
         <h1 class="text-2xl font-bold text-neutral-ink">PeopleMarketing</h1>
-        <p class="mt-1 text-sm text-neutral-mute">Rond je uitnodiging af</p>
+        <p class="mt-1 text-sm text-neutral-mute">Welkom bij het team — rond je account af</p>
       </header>
 
       <template v-if="isValidLink">
         <form class="space-y-4" @submit.prevent="onSubmit">
+          <BaseInput v-model="email" label="E-mailadres" type="email" autocomplete="email" required />
+          <div class="grid grid-cols-2 gap-3">
+            <BaseInput v-model="firstName" label="Voornaam" type="text" autocomplete="given-name" required />
+            <BaseInput v-model="lastName" label="Achternaam" type="text" autocomplete="family-name" required />
+          </div>
+          <BaseInput v-model="phone" label="Telefoon" type="tel" autocomplete="tel" placeholder="+32 4xx xx xx xx" />
           <BaseInput
-            v-model="email"
-            label="E-mailadres"
-            type="email"
-            autocomplete="email"
+            v-model="password"
+            label="Wachtwoord"
+            type="password"
+            autocomplete="new-password"
             required
-            placeholder="jij@peoplemarketing.be"
+            placeholder="Minstens 6 tekens"
           />
           <BaseInput
-            v-model="displayName"
-            label="Naam"
-            type="text"
-            autocomplete="name"
+            v-model="confirmPassword"
+            label="Bevestig wachtwoord"
+            type="password"
+            autocomplete="new-password"
             required
-            placeholder="Voor- en achternaam"
+            :error="confirmPassword && !passwordsMatch ? 'Komt niet overeen' : ''"
           />
-          <BaseButton type="submit" block :loading="submitting" :disabled="!email || !displayName">
+          <BaseButton type="submit" block :loading="submitting" :disabled="!canSubmit">
             Account aanmaken
           </BaseButton>
         </form>
-        <p class="mt-4 text-center text-xs text-neutral-mute">
-          Geen wachtwoord nodig — deze link logt je meteen in.
-        </p>
       </template>
       <p v-else class="text-center text-sm text-neutral-mute">
         Vraag de beheerder om een nieuwe uitnodiging te versturen.

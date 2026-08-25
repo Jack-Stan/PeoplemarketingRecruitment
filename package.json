@@ -16,11 +16,14 @@
     "emulators:export": "firebase emulators:export ./emulator-data",
     "rules:test": "firebase emulators:exec --only firestore \"vitest run tests/rules\"",
     "seed": "firebase emulators:exec --project peoplemarketing-c5bfd --only auth,firestore \"tsx scripts/seed.ts\"",
-    "grant-role": "firebase emulators:exec --project peoplemarketing-c5bfd --only auth,firestore \"tsx scripts/grantRole.ts\""
+    "grant-role": "firebase emulators:exec --project peoplemarketing-c5bfd --only auth,firestore \"tsx scripts/grantRole.ts\"",
+    "delete-user": "firebase emulators:exec --project peoplemarketing-c5bfd --only auth,firestore \"tsx scripts/deleteUser.ts\""
   },
   "dependencies": {
+    "@types/leaflet": "^1.9.22",
     "date-fns": "~3.6.0",
     "firebase": "~10.12.0",
+    "leaflet": "^1.9.4",
     "pinia": "~2.1.7",
     "vue": "~3.4.21",
     "vue-router": "~4.3.0"

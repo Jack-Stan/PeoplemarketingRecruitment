@@ -51,6 +51,9 @@ describe('auth store', () => {
       desiredOfficeId: null,
       isTeamLeader: true,
       isActive: true,
+      phone: null,
+      emailVerified: false,
+      phoneVerified: false,
     });
 
     const store = useAuthStore();
@@ -145,10 +148,24 @@ describe('auth store', () => {
     vi.mocked(usersService.createProfile).mockResolvedValueOnce(undefined);
 
     const store = useAuthStore();
-    const ok = await store.completeInvite('invited@peoplemarketing.be', 'https://x/complete-invite', 'Invited Person', 'gent');
+    const ok = await store.completeInvite(
+      'invited@peoplemarketing.be',
+      'https://x/complete-invite',
+      'password123',
+      'Invited Person',
+      '+32499123456',
+      'gent',
+    );
 
     expect(ok).toBe(true);
-    expect(usersService.createProfile).toHaveBeenCalledWith('u4', 'invited@peoplemarketing.be', 'Invited Person', 'gent');
+    expect(authService.setPassword).toHaveBeenCalledWith({ uid: 'u4', email: 'invited@peoplemarketing.be' }, 'password123');
+    expect(usersService.createProfile).toHaveBeenCalledWith(
+      'u4',
+      'invited@peoplemarketing.be',
+      'Invited Person',
+      'gent',
+      '+32499123456',
+    );
     expect(store.isAuthenticated).toBe(true);
     expect(store.role).toBeNull();
   });
@@ -164,10 +181,20 @@ describe('auth store', () => {
       desiredOfficeId: 'gent',
       isTeamLeader: false,
       isActive: true,
+      phone: null,
+      emailVerified: false,
+      phoneVerified: false,
     });
 
     const store = useAuthStore();
-    const ok = await store.completeInvite('invited@peoplemarketing.be', 'https://x/complete-invite', 'Invited Person', 'gent');
+    const ok = await store.completeInvite(
+      'invited@peoplemarketing.be',
+      'https://x/complete-invite',
+      'password123',
+      'Invited Person',
+      '+32499123456',
+      'gent',
+    );
 
     expect(ok).toBe(true);
     expect(usersService.createProfile).not.toHaveBeenCalled();
@@ -183,6 +210,9 @@ describe('auth store', () => {
       desiredOfficeId: null,
       isTeamLeader: false,
       isActive: true,
+      phone: null,
+      emailVerified: false,
+      phoneVerified: false,
     });
     vi.mocked(authService.signOut).mockResolvedValueOnce(undefined);
 

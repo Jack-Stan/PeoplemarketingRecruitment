@@ -1,54 +1,136 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 
-import { officesService } from '@/services/offices.service';
 import { useAuth } from '@/composables/useAuth';
 import { useActiveOffice } from '@/composables/useActiveOffice';
+import { useOfficeNames } from '@/composables/useOfficeNames';
+import { useUserActions } from '@/composables/useUserActions';
 import { isValidEmail } from '@/utils/validators';
-import { useAuditLogStore } from '@/stores/auditLog';
 import { useUsersStore } from '@/stores/users';
 import { useUiStore } from '@/stores/ui';
-import { ROLE_LABELS, Roles, type Role, type UserProfile } from '@/types/user';
+import { ROLE_LABELS, type UserProfile } from '@/types/user';
+import UserRoleEditModal from '@/components/UserRoleEditModal.vue';
 
 const auth = useAuth();
+const router = useRouter();
 const store = useUsersStore();
-const auditLog = useAuditLogStore();
 const ui = useUiStore();
 
 // Multi-office: an Administrator assigns into whichever office they've
 // switched to in AppShell's office switcher (see useActiveOffice) — same
-// approve/assign flow as always, just pointed at a different office. We
-// still resolve every office's name (offices are public-readable) so the
-// table can show which office a pending user actually applied to.
+// approve/assign flow as always, just pointed at a different office.
 const { officeId: ownOfficeId } = useActiveOffice();
-const officeNames = ref<Record<string, string>>({});
+const { officeLabel, loadOfficeNames } = useOfficeNames();
+const { isUserActive, toggleActive, removeUser } = useUserActions(officeLabel, ownOfficeId);
 
 const editingUid = ref<string | null>(null);
-const form = ref<{ role: Role; isTeamLeader: boolean }>({
-  role: Roles.TeamMember,
-  isTeamLeader: false,
-});
-const saving = ref(false);
-
 const editingUser = computed(() => store.users.find((u) => u.uid === editingUid.value) ?? null);
-const willRemoveLastAdmin = computed(
-  () => !!editingUser.value && wouldRemoveLastAdmin(editingUser.value, form.value.role),
-);
+
+// Kebab (⋮) menu — only one row's menu open at a time. Teleported to <body>
+// (see template) so it can't get clipped by the table's overflow-x-auto
+// scroll container, which also clips vertically per the CSS overflow spec
+// once one axis is non-visible.
+const openMenuUid = ref<string | null>(null);
+const menuUser = computed(() => store.users.find((u) => u.uid === openMenuUid.value) ?? null);
+const menuPos = ref<{ top: number; left: number }>({ top: 0, left: 0 });
+
+function toggleMenu(uid: string, event: MouseEvent): void {
+  if (openMenuUid.value === uid) {
+    openMenuUid.value = null;
+    return;
+  }
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+  menuPos.value = { top: rect.bottom + 4, left: rect.right - 176 };
+  openMenuUid.value = uid;
+}
+function closeMenu(): void {
+  openMenuUid.value = null;
+}
+function openRow(uid: string): void {
+  router.push(`/users/${uid}`);
+}
 
 const inviteEmail = ref('');
 const inviting = ref(false);
+const search = ref('');
+const filterOffice = ref('');
+const filterRole = ref('');
+const filterStatus = ref('');
+
+type SortKey = 'name' | 'role' | 'office' | 'teamleader' | 'status';
+const sortColumns: { key: SortKey; label: string }[] = [
+  { key: 'name', label: 'Gebruiker' },
+  { key: 'role', label: 'Rol' },
+  { key: 'office', label: 'Kantoor' },
+  { key: 'teamleader', label: 'Teamleider' },
+  { key: 'status', label: 'Status' },
+];
+const sortKey = ref<SortKey>('name');
+const sortDir = ref<'asc' | 'desc'>('asc');
+const ROLE_RANK: Record<string, number> = { Administrator: 0, TeamManager: 1, TeamMember: 2 };
+
+function setSort(key: SortKey): void {
+  if (sortKey.value === key) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortKey.value = key;
+    sortDir.value = 'asc';
+  }
+}
+
+function compareUsers(a: UserProfile, b: UserProfile): number {
+  let cmp = 0;
+  switch (sortKey.value) {
+    case 'name':
+      cmp = (a.displayName || a.email).localeCompare(b.displayName || b.email);
+      break;
+    case 'role': {
+      const ar = a.role === null ? -1 : (ROLE_RANK[a.role] ?? 0);
+      const br = b.role === null ? -1 : (ROLE_RANK[b.role] ?? 0);
+      cmp = ar - br;
+      break;
+    }
+    case 'office':
+      cmp = officeLabel(a.primaryOfficeId ?? a.desiredOfficeId).localeCompare(officeLabel(b.primaryOfficeId ?? b.desiredOfficeId));
+      break;
+    case 'teamleader':
+      cmp = Number(a.isTeamLeader) - Number(b.isTeamLeader);
+      break;
+    case 'status':
+      cmp = Number(isUserActive(a)) - Number(isUserActive(b));
+      break;
+  }
+  return sortDir.value === 'asc' ? cmp : -cmp;
+}
+
+/** Every office any listed user is tied to — not just active ones (loadOfficeNames only covers those). */
+const officeOptions = computed(() => {
+  const ids = new Set(store.users.map((u) => u.primaryOfficeId ?? u.desiredOfficeId).filter((id): id is string => !!id));
+  return [...ids].map((id) => ({ id, name: officeLabel(id) })).sort((a, b) => a.name.localeCompare(b.name));
+});
 
 const sorted = computed(() =>
-  [...store.users].sort((a, b) => {
-    if ((a.role === null) !== (b.role === null)) return a.role === null ? -1 : 1;
-    return a.email.localeCompare(b.email);
-  }),
+  [...store.users]
+    // Never show the signed-in admin their own row — a mis-click on
+    // Bewerken/Deactiveren here demoted or locked out an admin account
+    // twice already this project (see project-status.md near-lockouts).
+    // Manage your own account elsewhere, not from this list.
+    .filter((u) => u.uid !== auth.user.value?.uid)
+    .filter((u) => {
+      const q = search.value.trim().toLowerCase();
+      if (!q) return true;
+      return (
+        (u.displayName ?? '').toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q) ||
+        (u.role ? ROLE_LABELS[u.role].toLowerCase().includes(q) : false)
+      );
+    })
+    .filter((u) => !filterOffice.value || (u.primaryOfficeId ?? u.desiredOfficeId) === filterOffice.value)
+    .filter((u) => !filterRole.value || (filterRole.value === 'pending' ? u.role === null : u.role === filterRole.value))
+    .filter((u) => !filterStatus.value || (filterStatus.value === 'active' ? isUserActive(u) : !isUserActive(u)))
+    .sort(compareUsers),
 );
-
-function officeLabel(officeId: string | null): string {
-  if (!officeId) return '—';
-  return officeNames.value[officeId] ?? officeId;
-}
 
 function wantsOtherOffice(u: UserProfile): boolean {
   return u.role === null && !!u.desiredOfficeId && u.desiredOfficeId !== ownOfficeId.value;
@@ -56,53 +138,10 @@ function wantsOtherOffice(u: UserProfile): boolean {
 
 function openEdit(u: UserProfile): void {
   editingUid.value = u.uid;
-  form.value = {
-    role: u.role ?? Roles.TeamMember,
-    isTeamLeader: u.isTeamLeader,
-  };
-}
-
-/**
- * Guard against demoting the last Administrator — this exact thing locked
- * the whole app out of every admin-gated action same session (had to be
- * fixed from a terminal via grantRole.ts + FORCE_PROD). Client-side only:
- * firestore.rules can't cheaply count "how many other admins exist" inside
- * a single-document rule, so this is a UI guardrail, not a security
- * boundary — a determined admin could still do it via the console. Good
- * enough to stop an accidental click, which is what actually happened.
- */
-function wouldRemoveLastAdmin(u: UserProfile, nextRole: Role): boolean {
-  return u.role === 'Administrator' && nextRole !== 'Administrator' && store.adminCountFor(ownOfficeId.value) <= 1;
 }
 
 function closeEdit(): void {
   editingUid.value = null;
-}
-
-async function submit(): Promise<void> {
-  if (!editingUid.value || !ownOfficeId.value) return;
-  const editingUser = store.users.find((u) => u.uid === editingUid.value);
-  if (editingUser && wouldRemoveLastAdmin(editingUser, form.value.role)) {
-    ui.push(`${editingUser.displayName || editingUser.email} is de laatste beheerder van ${officeLabel(ownOfficeId.value)} — wijs eerst iemand anders als beheerder toe.`, 'error');
-    return;
-  }
-  saving.value = true;
-  const ok = await store.assignRole(editingUid.value, form.value.role, ownOfficeId.value, form.value.isTeamLeader);
-  saving.value = false;
-  ui.push(ok ? 'Rol toegewezen.' : (store.error ?? 'Er ging iets mis.'), ok ? 'success' : 'error');
-  if (ok) {
-    if (auth.user.value) {
-      auditLog.log(ownOfficeId.value, {
-        actorUid: auth.user.value.uid,
-        actorEmail: auth.user.value.email ?? '',
-        action: 'role_assigned',
-        targetLabel: `${editingUser?.displayName || editingUser?.email} → ${ROLE_LABELS[form.value.role]}`,
-        details: form.value.isTeamLeader ? 'Teamleider' : null,
-        createdAtMs: Date.now(),
-      });
-    }
-    closeEdit();
-  }
 }
 
 async function sendInvite(): Promise<void> {
@@ -123,8 +162,7 @@ async function sendInvite(): Promise<void> {
 onMounted(async () => {
   store.subscribe();
   try {
-    const offices = await officesService.listActive();
-    officeNames.value = Object.fromEntries(offices.map((o) => [o.officeId, o.name]));
+    await loadOfficeNames();
   } catch {
     ui.push('Kon de lijst met kantoren niet laden.', 'error');
   }
@@ -134,13 +172,7 @@ onUnmounted(() => store.unsubscribe());
 
 <template>
   <div class="mx-auto max-w-5xl space-y-6">
-    <section>
-      <p class="text-sm text-neutral-mute">
-        {{ store.pendingUsers.length }} wachten op goedkeuring · je kan toewijzen aan
-        {{ officeLabel(ownOfficeId) }}
-      </p>
-      <h2 class="mt-1 text-3xl font-bold tracking-tight">Gebruikers</h2>
-    </section>
+    <h2 class="text-3xl font-bold tracking-tight">Gebruikers</h2>
 
     <!--
       "Admin just sends a sign-up mail to a new employee" — passwordless
@@ -171,19 +203,55 @@ onUnmounted(() => store.unsubscribe());
       </form>
     </section>
 
+    <div class="flex flex-col gap-3 border border-black/5 bg-white p-4 sm:flex-row">
+      <input
+        v-model="search"
+        class="min-w-0 flex-1 border-black/10 bg-[#faf9f7] text-sm focus:border-primary-pink focus:ring-primary-pink"
+        placeholder="Zoek gebruikers op naam, e-mail of rol"
+        type="search"
+      />
+      <select v-model="filterOffice" class="border-black/10 bg-[#faf9f7] text-sm focus:border-primary-pink focus:ring-primary-pink">
+        <option value="">Alle kantoren</option>
+        <option v-for="o in officeOptions" :key="o.id" :value="o.id">{{ o.name }}</option>
+      </select>
+      <select v-model="filterRole" class="border-black/10 bg-[#faf9f7] text-sm focus:border-primary-pink focus:ring-primary-pink">
+        <option value="">Alle rollen</option>
+        <option value="pending">In afwachting</option>
+        <option v-for="(label, role) in ROLE_LABELS" :key="role" :value="role">{{ label }}</option>
+      </select>
+      <select v-model="filterStatus" class="border-black/10 bg-[#faf9f7] text-sm focus:border-primary-pink focus:ring-primary-pink">
+        <option value="">Alle statussen</option>
+        <option value="active">Actief</option>
+        <option value="inactive">Inactief</option>
+      </select>
+    </div>
+
     <section class="overflow-x-auto border border-black/5 bg-white">
-      <table class="w-full min-w-[800px] text-left text-sm">
+      <table class="w-full min-w-[900px] text-left text-sm">
         <thead class="border-b border-black/5 bg-[#faf9f7] text-[10px] uppercase tracking-[0.16em] text-neutral-mute">
           <tr>
-            <th class="px-5 py-4">Gebruiker</th>
-            <th class="px-5 py-4">Rol</th>
-            <th class="px-5 py-4">Kantoor</th>
-            <th class="px-5 py-4">Teamleider</th>
+            <th v-for="col in sortColumns" :key="col.key" class="px-5 py-4">
+              <button
+                class="flex items-center gap-1 font-bold uppercase tracking-[0.16em] text-neutral-mute outline-none transition-colors hover:text-neutral-ink focus-visible:text-primary-pink"
+                @click="setSort(col.key)"
+              >
+                {{ col.label }}
+                <span class="text-[9px]" :class="sortKey === col.key ? 'text-primary-pink' : 'text-neutral-mute/50'">
+                  {{ sortKey === col.key ? (sortDir === 'asc' ? '▲' : '▼') : '↕' }}
+                </span>
+              </button>
+            </th>
             <th class="px-5 py-4"></th>
           </tr>
         </thead>
         <tbody class="divide-y divide-black/5">
-          <tr v-for="u in sorted" :key="u.uid" class="hover:bg-[#faf9f7]">
+          <tr
+            v-for="(u, i) in sorted"
+            :key="u.uid"
+            class="cursor-pointer hover:bg-primary-pink/5"
+            :class="[i % 2 === 1 ? 'bg-[#faf9f7]/60' : 'bg-white', { 'opacity-50': !isUserActive(u) }]"
+            @click="openRow(u.uid)"
+          >
             <td class="px-5 py-4">
               <p class="font-bold">{{ u.displayName || u.email }}</p>
               <p class="text-xs text-neutral-mute">{{ u.email }}</p>
@@ -207,46 +275,67 @@ onUnmounted(() => store.unsubscribe());
               <span v-else>{{ officeLabel(u.primaryOfficeId) }}</span>
             </td>
             <td class="px-5 py-4 text-xs text-neutral-mute">{{ u.isTeamLeader ? 'Ja' : 'Nee' }}</td>
-            <td class="px-5 py-4 text-right">
-              <button class="text-xs font-semibold text-neutral-ink hover:text-primary-pink" @click="openEdit(u)">
-                {{ u.role === null ? 'Rol toewijzen' : 'Bewerken' }}
+            <td class="px-5 py-4">
+              <span class="inline-flex items-center gap-2 text-xs">
+                <i class="h-2 w-2 rounded-full" :class="isUserActive(u) ? 'bg-emerald-500' : 'bg-neutral-300'"></i>
+                {{ isUserActive(u) ? 'Actief' : 'Inactief' }}
+              </span>
+            </td>
+            <td class="px-5 py-4 text-right" @click.stop>
+              <button
+                class="grid h-8 w-8 place-items-center rounded-full text-neutral-mute hover:bg-black/5 hover:text-neutral-ink"
+                @click="toggleMenu(u.uid, $event)"
+              >
+                ⋮
               </button>
             </td>
           </tr>
         </tbody>
       </table>
       <p v-if="store.isLoading" class="p-8 text-center text-sm text-neutral-mute">Laden…</p>
-      <p v-else-if="!sorted.length" class="p-8 text-center text-sm text-neutral-mute">Nog geen gebruikers.</p>
+      <p v-else-if="!sorted.length" class="p-8 text-center text-sm text-neutral-mute">Geen gebruikers gevonden.</p>
     </section>
 
-    <div v-if="editingUid" class="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4">
-      <div class="w-full max-w-md border border-black/10 bg-white p-6">
-        <h3 class="text-lg font-bold">Rol toewijzen</h3>
-        <p class="mt-1 text-xs text-neutral-mute">Kantoor: {{ officeLabel(ownOfficeId) }}</p>
-        <form class="mt-4 space-y-3" @submit.prevent="submit">
-          <select v-model="form.role" class="w-full border-black/10 bg-[#faf9f7] text-sm">
-            <option :value="Roles.TeamMember">Teamlid</option>
-            <option :value="Roles.TeamManager">Teammanager</option>
-            <option :value="Roles.Administrator">Beheerder</option>
-          </select>
-          <label class="flex items-center gap-2 text-xs font-semibold">
-            <input v-model="form.isTeamLeader" type="checkbox" class="border-black/20 text-primary-pink focus:ring-primary-pink" />
-            Teamleider
-          </label>
-          <p v-if="willRemoveLastAdmin" class="text-xs font-semibold text-semantic-danger">
-            {{ editingUser?.displayName || editingUser?.email }} is de laatste beheerder van {{ officeLabel(ownOfficeId) }}
-            — wijs eerst iemand anders als beheerder toe.
-          </p>
-          <div class="flex justify-end gap-2 pt-2">
-            <button type="button" class="px-4 py-2 text-sm font-semibold text-neutral-mute" @click="closeEdit">
-              Annuleren
-            </button>
-            <button type="submit" class="bg-primary-pink px-4 py-2 text-sm font-bold text-white disabled:opacity-50" :disabled="saving || willRemoveLastAdmin">
-              Opslaan
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <!--
+      Teleported to <body> instead of living inside the table cell — the
+      table's overflow-x-auto scroll container also clips vertically (CSS
+      overflow rule: once either axis is non-visible, "visible" on the other
+      computes to auto), which was cutting this menu down to a sliver.
+    -->
+    <Teleport to="body">
+      <template v-if="menuUser">
+        <div class="fixed inset-0 z-40" @click="closeMenu"></div>
+        <div
+          class="fixed z-50 w-44 border border-black/10 bg-white py-1 text-left shadow-lg"
+          :style="{ top: `${menuPos.top}px`, left: `${menuPos.left}px` }"
+        >
+          <button class="block w-full px-4 py-2 text-xs font-semibold hover:bg-[#faf9f7]" @click="closeMenu(); openEdit(menuUser)">
+            {{ menuUser.role === null ? 'Rol toewijzen' : 'Bewerken' }}
+          </button>
+          <button
+            v-if="menuUser.role !== null"
+            class="block w-full px-4 py-2 text-xs font-semibold hover:bg-[#faf9f7]"
+            @click="closeMenu(); toggleActive(menuUser)"
+          >
+            {{ isUserActive(menuUser) ? 'Deactiveren' : 'Heractiveren' }}
+          </button>
+          <button
+            class="block w-full px-4 py-2 text-xs font-semibold text-semantic-danger hover:bg-[#faf9f7]"
+            @click="closeMenu(); removeUser(menuUser)"
+          >
+            Verwijderen
+          </button>
+        </div>
+      </template>
+    </Teleport>
+
+    <UserRoleEditModal
+      v-if="editingUser"
+      :user="editingUser"
+      :own-office-id="ownOfficeId"
+      :office-label="officeLabel"
+      @close="closeEdit"
+      @saved="closeEdit"
+    />
   </div>
 </template>

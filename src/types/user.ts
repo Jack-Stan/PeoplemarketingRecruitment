@@ -54,4 +54,27 @@ export interface UserProfile {
   desiredOfficeId: string | null;
   isTeamLeader: boolean;
   isActive: boolean;
+  /**
+   * Admin-set contact number — nothing collects this at signup/invite time,
+   * so it starts null and is filled in later from the user detail page.
+   * Distinct from an Employee's `phone` (decisions/005 split still applies).
+   */
+  phone: string | null;
+  /**
+   * Mirrors Firebase Auth's own `emailVerified` flag onto the Firestore doc —
+   * the client SDK can only read the Auth record for the SIGNED-IN user, not
+   * other accounts, so this mirror is the only way an admin browsing
+   * `/users` can see whether someone else verified their email. Kept
+   * trustworthy by firestore.rules: a user can only self-write this field to
+   * match `request.auth.token.email_verified`, never an arbitrary value.
+   */
+  emailVerified: boolean;
+  /**
+   * No Firebase Phone Auth here — SMS sign-in requires the Blaze plan (see
+   * project_spark_plan_no_blaze), so there's no automated OTP to verify
+   * against. This is admin-attested only: firestore.rules lets a user reset
+   * it to `false` when they change their own number, but only an
+   * Administrator may ever flip it to `true` (after confirming by phone).
+   */
+  phoneVerified: boolean;
 }

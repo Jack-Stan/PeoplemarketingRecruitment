@@ -36,7 +36,8 @@ Location: `C:\RFT\Projects\CRM\.obsidian-vault\` (in-repo so it's version-contro
 └── meetings/
     ├── 2026-08-24-stan-discovery.md
     ├── 2026-08-24-client-transcript-shifts-recruitment.md
-    └── 2026-08-24-whatsapp-michiel-preview-feedback.md
+    ├── 2026-08-24-whatsapp-michiel-preview-feedback.md
+    └── 2026-08-25-client-callback-new-asks.md ← raw new asks, mostly need client clarification first
 ```
 
 ## How to use it

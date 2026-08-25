@@ -106,6 +106,16 @@ export const routes: RouteRecordRaw[] = [
     },
   },
   {
+    path: '/locations',
+    name: 'locations',
+    component: () => import('@/views/LocationsView.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: [Roles.Administrator, Roles.TeamManager, Roles.TeamMember],
+      title: 'Locaties',
+    },
+  },
+  {
     path: '/history',
     name: 'history',
     component: () => import('@/views/HistoryView.vue'),
@@ -126,6 +136,16 @@ export const routes: RouteRecordRaw[] = [
     },
   },
   {
+    path: '/users/:uid',
+    name: 'user-detail',
+    component: () => import('@/views/UserDetailView.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: [Roles.Administrator],
+      title: 'Gebruiker',
+    },
+  },
+  {
     path: '/audit',
     name: 'audit',
     component: () => import('@/views/AuditLogView.vue'),
@@ -133,6 +153,16 @@ export const routes: RouteRecordRaw[] = [
       requiresAuth: true,
       roles: [Roles.Administrator],
       title: 'Audit trail',
+    },
+  },
+  {
+    path: '/settings',
+    name: 'settings',
+    component: () => import('@/views/SettingsView.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: [Roles.Administrator, Roles.TeamManager, Roles.TeamMember],
+      title: 'Instellingen',
     },
   },
   {

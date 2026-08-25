@@ -71,5 +71,62 @@ export const useUsersStore = defineStore('users', () => {
     }
   }
 
-  return { users, isLoading, error, pendingUsers, adminCountFor, subscribe, unsubscribe, assignRole };
+  async function setActive(uid: string, isActive: boolean): Promise<boolean> {
+    error.value = null;
+    try {
+      await usersService.setActive(uid, isActive);
+      return true;
+    } catch (err) {
+      error.value = friendlyError(err);
+      return false;
+    }
+  }
+
+  async function deleteUser(uid: string): Promise<boolean> {
+    error.value = null;
+    try {
+      await usersService.deleteUser(uid);
+      return true;
+    } catch (err) {
+      error.value = friendlyError(err);
+      return false;
+    }
+  }
+
+  async function setPhone(uid: string, phone: string | null): Promise<boolean> {
+    error.value = null;
+    try {
+      await usersService.setPhone(uid, phone);
+      return true;
+    } catch (err) {
+      error.value = friendlyError(err);
+      return false;
+    }
+  }
+
+  async function setPhoneVerified(uid: string, verified: boolean): Promise<boolean> {
+    error.value = null;
+    try {
+      await usersService.setPhoneVerified(uid, verified);
+      return true;
+    } catch (err) {
+      error.value = friendlyError(err);
+      return false;
+    }
+  }
+
+  return {
+    users,
+    isLoading,
+    error,
+    pendingUsers,
+    adminCountFor,
+    subscribe,
+    unsubscribe,
+    assignRole,
+    setActive,
+    deleteUser,
+    setPhone,
+    setPhoneVerified,
+  };
 });

@@ -14,6 +14,40 @@ import { Roles, type AppUser, type Role } from '@/types/user';
  * (see decisions/006) — `hydrate()` subscribes to it live, so a role
  * assigned mid-session applies immediately without a re-login.
  */
+/**
+ * "Aangemeld blijven" (remember me). Firebase Auth's own persistence is
+ * either indefinite (`browserLocalPersistence`) or tab-session-only
+ * (`browserSessionPersistence`) — neither expires after N days on its own,
+ * so the 7-day rolling expiry is hand-rolled on top for the "remember me"
+ * case. `loginAt` is stamped in localStorage on every sign-in where the box
+ * was checked; `hydrate()` checks it on every app load / auth-state change
+ * and force-signs-out once it's stale. When the box was left unchecked,
+ * `authService.signIn` uses session persistence instead, so the browser
+ * itself drops the session on close — no TTL bookkeeping needed for that case.
+ */
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const LOGIN_AT_KEY = 'pm_login_at';
+const REMEMBER_KEY = 'pm_remember';
+
+function markLoginNow(rememberMe: boolean): void {
+  if (rememberMe) {
+    localStorage.setItem(LOGIN_AT_KEY, String(Date.now()));
+    localStorage.setItem(REMEMBER_KEY, '1');
+  } else {
+    localStorage.removeItem(LOGIN_AT_KEY);
+    localStorage.removeItem(REMEMBER_KEY);
+  }
+}
+
+function isSessionExpired(): boolean {
+  // Not a "remember me" session — Firebase's own session persistence already
+  // drops it on browser close, so no separate TTL to enforce here.
+  if (localStorage.getItem(REMEMBER_KEY) !== '1') return false;
+  const raw = localStorage.getItem(LOGIN_AT_KEY);
+  if (!raw) return false;
+  return Date.now() - Number(raw) > SESSION_TTL_MS;
+}
+
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null);
   const role = ref<Role | null>(null);
@@ -40,11 +74,12 @@ export const useAuthStore = defineStore('auth', () => {
     return role.value !== null && allowed.includes(role.value);
   }
 
-  async function signIn(email: string, password: string): Promise<boolean> {
+  async function signIn(email: string, password: string, rememberMe = false): Promise<boolean> {
     isLoading.value = true;
     error.value = null;
     try {
-      const fbUser = await authService.signIn(email, password);
+      const fbUser = await authService.signIn(email, password, rememberMe);
+      markLoginNow(rememberMe);
       // Hydrate claims here and await it, rather than relying on the
       // separate onAuthStateChanged subscription in main.ts — that listener
       // fires async and races the caller's post-signIn navigation, which was
@@ -89,7 +124,57 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function signOut(): Promise<void> {
     await authService.signOut();
+    localStorage.removeItem(LOGIN_AT_KEY);
+    localStorage.removeItem(REMEMBER_KEY);
     clear();
+  }
+
+  /**
+   * Self-service email change from Settings. Sends a confirmation link to
+   * `newEmail`; the auth email doesn't actually change until that link is
+   * clicked, so `user.value.email` stays the old value here — no local
+   * state to update on success.
+   */
+  async function changeEmail(newEmail: string, currentPassword: string): Promise<boolean> {
+    error.value = null;
+    if (!user.value) return false;
+    try {
+      await authService.changeEmail(user.value, newEmail, currentPassword);
+      return true;
+    } catch (err) {
+      error.value = friendlyError(err);
+      return false;
+    }
+  }
+
+  /** Resend the "Email address verification" mail — Settings' verify-email button. */
+  async function resendVerificationEmail(): Promise<boolean> {
+    error.value = null;
+    if (!user.value) return false;
+    try {
+      await authService.sendVerificationEmail(user.value);
+      return true;
+    } catch (err) {
+      error.value = friendlyError(err);
+      return false;
+    }
+  }
+
+  /**
+   * Re-checks Auth for a verified email (in case the link was clicked in
+   * another tab) and mirrors it onto the Firestore doc so an admin can see
+   * it — see usersService.syncOwnEmailVerified. Best-effort: a failed mirror
+   * write shouldn't block the Settings page from showing the true status.
+   */
+  async function refreshEmailVerified(): Promise<boolean> {
+    if (!user.value) return false;
+    const verified = await authService.refreshEmailVerified(user.value);
+    try {
+      await usersService.syncOwnEmailVerified(user.value.uid, verified);
+    } catch {
+      // Admin's view of this field may lag until the next successful sync — not fatal.
+    }
+    return verified;
   }
 
   /** Firebase's built-in reset email — see authService.sendPasswordReset. */
@@ -121,24 +206,32 @@ export const useAuthStore = defineStore('auth', () => {
 
   /**
    * Second half of the invite flow — CompleteInviteView calls this once the
-   * user has clicked the emailed link and (re-)confirmed their email. Signs
-   * them in passwordlessly, then creates the same pending `/users/{uid}`
-   * doc self-signup would have, so the rest of the approval flow (Users
-   * page, /pending-approval) is identical either way.
+   * user has clicked the emailed link and filled in a password + their
+   * details. The link click itself proves email ownership (that's what
+   * email-link sign-in is for) and signs them in passwordlessly; `password`
+   * is then set on that fresh session via authService.setPassword so they
+   * can log in normally afterward instead of needing the link every time.
+   * Creates the same pending `/users/{uid}` doc self-signup would have, so
+   * the rest of the approval flow (Users page, /pending-approval) is
+   * identical either way.
    */
   async function completeInvite(
     email: string,
     url: string,
+    password: string,
     displayName: string,
+    phone: string,
     desiredOfficeId: string,
   ): Promise<boolean> {
     isLoading.value = true;
     error.value = null;
     try {
       const fbUser = await authService.completeInvite(email, url);
+      await authService.setPassword(fbUser, password);
+      markLoginNow(false);
       const existing = await usersService.getOnce(fbUser.uid);
       if (!existing) {
-        await usersService.createProfile(fbUser.uid, fbUser.email ?? email, displayName || null, desiredOfficeId);
+        await usersService.createProfile(fbUser.uid, fbUser.email ?? email, displayName || null, desiredOfficeId, phone || null);
       }
       await hydrate(fbUser);
       return true;
@@ -177,20 +270,57 @@ export const useAuthStore = defineStore('auth', () => {
   async function hydrate(fbUser: User | null): Promise<void> {
     clear();
     if (!fbUser) return;
+    if (isSessionExpired()) {
+      localStorage.removeItem(LOGIN_AT_KEY);
+      localStorage.removeItem(REMEMBER_KEY);
+      await authService.signOut();
+      return;
+    }
     user.value = fbUser;
     try {
-      applyProfile(await usersService.getOnce(fbUser.uid));
+      const profile = await usersService.getOnce(fbUser.uid);
+      // Explicit `=== false` — a missing isActive field (accounts created
+      // before this field existed, e.g. via scripts/grantRole.ts) must
+      // default to active, not get treated as deactivated.
+      if (profile && profile.isActive === false) {
+        await signOutDeactivated();
+        return;
+      }
+      applyProfile(profile);
+      // Self-heal the emailVerified mirror if it drifted (e.g. verified in a
+      // past session, tab closed before Settings ever synced it) — fire and
+      // forget, must not block navigation on a non-essential write.
+      if (profile && profile.emailVerified !== fbUser.emailVerified) {
+        void usersService.syncOwnEmailVerified(fbUser.uid, fbUser.emailVerified).catch(() => undefined);
+      }
     } catch {
       // Leave role/officeId null; the guard will treat this as pending.
     }
     unsubProfile = usersService.subscribeOwn(
       fbUser.uid,
-      (profile) => applyProfile(profile),
+      (profile) => {
+        // An admin can deactivate someone mid-session — enforce it live,
+        // not just at next sign-in, same as the "last admin" guard on
+        // UsersView is meant to prevent an account nobody can act on again.
+        if (profile && profile.isActive === false) {
+          void signOutDeactivated();
+          return;
+        }
+        applyProfile(profile);
+      },
       () => {
         // A live-update failure shouldn't kick the user out mid-session —
         // keep whatever role/office the initial getOnce() already applied.
       },
     );
+  }
+
+  /** Deactivated mid-session or found deactivated at hydrate — force sign-out. */
+  async function signOutDeactivated(): Promise<void> {
+    localStorage.removeItem(LOGIN_AT_KEY);
+    localStorage.removeItem(REMEMBER_KEY);
+    await authService.signOut();
+    clear();
   }
 
   function hasRoleName(name: Role): boolean {
@@ -211,6 +341,9 @@ export const useAuthStore = defineStore('auth', () => {
     signIn,
     signUp,
     signOut,
+    changeEmail,
+    resendVerificationEmail,
+    refreshEmailVerified,
     sendPasswordReset,
     sendInvite,
     completeInvite,

@@ -10,6 +10,10 @@ export type AuditAction =
   | 'employee_created'
   | 'employee_deactivated'
   | 'employee_reactivated'
+  | 'user_deactivated'
+  | 'user_reactivated'
+  | 'user_deleted'
+  | 'phone_verified_changed'
   | 'recruitment_stage_changed';
 
 export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
@@ -19,6 +23,10 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   employee_created: 'Medewerker toegevoegd',
   employee_deactivated: 'Medewerker gedeactiveerd',
   employee_reactivated: 'Medewerker gereactiveerd',
+  user_deactivated: 'Gebruiker gedeactiveerd',
+  user_reactivated: 'Gebruiker gereactiveerd',
+  user_deleted: 'Gebruiker verwijderd',
+  phone_verified_changed: 'Telefoonnummer verificatie gewijzigd',
   recruitment_stage_changed: 'Rekrutering: fase gewijzigd',
 };
 

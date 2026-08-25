@@ -293,3 +293,25 @@ Independent FRD-vs-app audit (no vault claims trusted blind), then fixes, then p
 - **GDPR review not started and isn't a code task** — needs a human/legal call (retention, lawful basis,
   data-subject rights, any DPA with Firebase). A separate session was kicked off to put together a factual
   data inventory (what personal data lives where) for that conversation — see cross-session coordination.
+
+## Update — new client asks, raw brain-dump (2026-08-25)
+
+Stan relayed a batch of new asks straight from a client callback — captured verbatim plus Claude's
+interpretation in `meetings/2026-08-25-client-callback-new-asks.md`. **Six of ten items need a clarifying
+question back to the client before any code gets touched** — don't build ahead of that note. Highlights:
+
+- Two items are cheap/clear enough to just build: click-to-call `tel:` links, and a `recruitedBy` attribution
+  field on recruitment leads (extends Ticket 04).
+- "Shift planning shows hours, hides shift type" reads as a **possible regression**, not a new ask — worth
+  checking `PlanningView.vue`/`MyPlanningView.vue` against it directly before assuming it needs work.
+- "Hours delete (greyzone)" is a compliance flag, not a feature request — conflicts with the append-only
+  audit trail (§19) if taken literally. Should go back to the client as a question, not get built on request.
+- SMS-via-n8n may be the answer to Ticket 05's blocked "send channel" question (`tickets/ticket-05-recruitment-automation.md`)
+  — and usefully sidesteps the Spark-plan/no-Blaze constraint (`project_spark_plan_no_blaze` memory) since n8n
+  is external, not a Firebase Cloud Function. Needs Stan to confirm scope (recruitment messaging vs. shift
+  notifications vs. both) before scoping as a ticket.
+- "Data after deleting users needs to be saved" is a GDPR/retention policy question, ties into the existing
+  data inventory (`gdpr-data-inventory.md`) — needs the same human/legal review, not a unilateral code decision.
+
+Full detail, including the two genuinely ambiguous one-liners ("auto mail close to plan", "location shift")
+that need a fuller sentence from the client before they're scopeable at all, is in the meeting note.
