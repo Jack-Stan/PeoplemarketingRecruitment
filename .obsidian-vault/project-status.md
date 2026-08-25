@@ -255,3 +255,14 @@ Independent FRD-vs-app audit (no vault claims trusted blind), then fixes, then p
 - **Bash classifier unavailable** in this session — couldn't run `npm install`, `npm run build`, or `npm test`. To verify scaffold locally: run those commands and paste any errors back.
 - **No production deploy target yet** — `firebase.json` exists but no hosting setup. Add in a later ticket.
 - **Firestore rules in Ticket 0 are wide-open** for any signed-in user. Tighten before any non-local use.
+
+## Update — functionality pass (2026-08-25, same day as the audit round above)
+
+- **✅ TL headcount trend chart added to History view** — client transcript asked to see where team-leader
+  headcount rises or falls over time; this was the one open gap not blocked on any external decision. Computed
+  live from `/shifts` (month-over-month count + ▲/▼ delta), no `/periods` snapshot needed.
+- **✅ Dutch translation finished.** Login, Signup, PendingApproval, Unauthorized, NotFound, and the admin
+  Dashboard were the last English views (tracked as a background task above) — all translated. Also caught
+  another mock-data leftover while in there: the admin Dashboard header showed a hardcoded
+  "Monday, 24 August 2026" instead of the real date — fixed.
+- All committed and pushed to `origin/main` (Netlify auto-deploys).
