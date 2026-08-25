@@ -241,7 +241,7 @@ Independent FRD-vs-app audit (no vault claims trusted blind), then fixes, then p
 
 ## Open FRD questions still pending user input
 
-- Exact pink hex from peoplemarketing.nl (placeholder in use) — **now conflicts with client saying "onze kleuren zijn wit" (white)**, see `meetings/2026-08-24-client-transcript-shifts-recruitment.md`
+- ✅ **Pink hex + logo resolved (2026-08-25)** — pulled directly from peoplemarketing.nl's own inline SVG logo markup: `#e6007e` pink, white for the mark/text against a dark ground. That reconciles the "onze kleuren zijn wit" comment (white is the secondary/text colour on their own logo, not a rejection of pink) rather than a real conflict. Logo now at `src/assets/logo.svg`, hex in `brand.ts`. Caveat: sourced from their live public site, not a verbatim client sign-off for app use — worth a one-line confirmation from Stan to the client, but low-risk since it's literally their own current branding.
 - Recruitment lead fields (need current Google Doc from client)
 - Default office timezone — assumed `Europe/Amsterdam`, confirm
 - Invite/admin-creation flow (currently script-only)
