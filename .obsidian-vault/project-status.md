@@ -269,3 +269,7 @@ Independent FRD-vs-app audit (no vault claims trusted blind), then fixes, then p
 - **✅ FRD §15 Recruitment Quality Reporting added** — attendance rate, no-show rate, overall conversion, and
   hired-per-source performance, all computed live from `/recruitmentLeads` (no new infra). Admin/manager only,
   same gate as the rest of pipeline management. Also pushed.
+- **✅ FRD §8 monthly calendar view added to Planning** — `PlanningView.vue` now has a Lijst/Maand toggle; the
+  month grid shows per-day shift count, TL headcount, and pending-approval count, highlights today/weekends,
+  and clicking a day scopes the list view to that date. Client-side only (office shifts already fully loaded),
+  no new query. `MyPlanningView`'s weekly grid was already done — daily/weekly/monthly views are now all covered.
