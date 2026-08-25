@@ -11,6 +11,7 @@ import {
 
 import { db } from '@/services/firebase';
 import type { Employee, EmployeeCreatePayload, EmployeePatch } from '@/types/employee';
+import type { Role } from '@/types/user';
 
 function employeesCollection(officeId: string) {
   return collection(db, 'offices', officeId, 'employees');
@@ -80,6 +81,28 @@ export const employeesService = {
       isActive,
       updatedAt: serverTimestamp(),
     });
+  },
+
+  /**
+   * `/users/{uid}` is the only place role/isTeamLeader are ever assigned
+   * (UsersView, decisions/006) — the roster's copy of those two fields exists
+   * only because `firestore.rules` denies a TeamManager reading other
+   * people's `/users` docs, so shift-stamping and the roster UI need a
+   * same-office-readable copy to work from. Call this right after
+   * `usersService.assignRole` so that copy never drifts from the real
+   * source. Best-effort: a no-op if the person isn't on this office's roster
+   * (yet) — nothing to keep in sync until `employeesService.create` runs.
+   */
+  async syncRoleAndTeamLeader(
+    officeId: string,
+    employeeId: string,
+    role: Role,
+    isTeamLeader: boolean,
+  ): Promise<void> {
+    const ref = doc(db, 'offices', officeId, 'employees', employeeId);
+    const existing = await getDoc(ref);
+    if (!existing.exists()) return;
+    await updateDoc(ref, { role, isTeamLeader, updatedAt: serverTimestamp() });
   },
 };
 

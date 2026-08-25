@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import type { Unsubscribe } from 'firebase/firestore';
 
+import { employeesService } from '@/services/employees.service';
 import { usersService } from '@/services/users.service';
 import { friendlyError } from '@/utils/errors';
 import type { Role, UserProfile } from '@/types/user';
@@ -45,6 +46,14 @@ export const useUsersStore = defineStore('users', () => {
     unsub = null;
   }
 
+  /**
+   * `/users/{uid}` is the single source of truth for role/isTeamLeader
+   * (decisions/006). The office roster (`/offices/{id}/employees/{uid}`)
+   * keeps its own copy only because a TeamManager can't read other people's
+   * `/users` docs under firestore.rules — so every assignment here also
+   * pushes the same values onto the roster doc, best-effort, to stop the two
+   * from drifting apart. See employeesService.syncRoleAndTeamLeader.
+   */
   async function assignRole(
     uid: string,
     role: Role,
@@ -54,6 +63,7 @@ export const useUsersStore = defineStore('users', () => {
     error.value = null;
     try {
       await usersService.assignRole(uid, role, officeId, isTeamLeader);
+      await employeesService.syncRoleAndTeamLeader(officeId, uid, role, isTeamLeader);
       return true;
     } catch (err) {
       error.value = friendlyError(err);

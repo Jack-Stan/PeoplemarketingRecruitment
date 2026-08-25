@@ -3,10 +3,13 @@ import { computed, onMounted, onUnmounted } from 'vue';
 import { RouterLink } from 'vue-router';
 
 import { useAuth } from '@/composables/useAuth';
+import { useRecruitmentStore } from '@/stores/recruitment';
 import { useShiftsStore } from '@/stores/shifts';
+import { weekStartFor } from '@/types/shift';
 
 const auth = useAuth();
 const shiftsStore = useShiftsStore();
+const recruitmentStore = useRecruitmentStore();
 const isMember = computed(() => auth.role.value === 'TeamMember');
 
 const today = new Date().toISOString().slice(0, 10);
@@ -20,21 +23,63 @@ const completedCount = computed(
 );
 const pendingCount = computed(() => shiftsStore.shifts.filter((s) => s.status === 'pending').length);
 
-const staffing = [
-  { day: 'Mon 24', total: 18, leaders: 5, fill: 90 },
-  { day: 'Tue 25', total: 21, leaders: 6, fill: 100 },
-  { day: 'Wed 26', total: 16, leaders: 4, fill: 80 },
-  { day: 'Thu 27', total: 20, leaders: 5, fill: 95 },
-  { day: 'Fri 28', total: 23, leaders: 6, fill: 100 },
-];
+/** Real admin-side numbers — was hardcoded mock data, see the FRD/duplication audit. */
+const currentWeekStart = computed(() => weekStartFor(today));
+const weekShifts = computed(() => {
+  const start = currentWeekStart.value;
+  const endExclusive = new Date(`${start}T00:00:00`);
+  endExclusive.setDate(endExclusive.getDate() + 7);
+  const end = endExclusive.toISOString().slice(0, 10);
+  return shiftsStore.shifts.filter((s) => s.date >= start && s.date < end);
+});
+const todaysShifts = computed(() => shiftsStore.shifts.filter((s) => s.date === today));
+const todaysTeamLeaderCount = computed(
+  () => new Set(todaysShifts.value.filter((s) => s.employeeIsTeamLeader).map((s) => s.assignedEmployeeId)).size,
+);
+const weekApprovedCount = computed(() => weekShifts.value.filter((s) => s.status === 'approved').length);
+
+/** Segmented daily bar for the current week — client transcript's staffing overview, real data. */
+const weeklyStaffing = computed(() => {
+  const byDate = new Map<string, { total: number; leaders: number }>();
+  for (const s of weekShifts.value) {
+    const bucket = byDate.get(s.date) ?? { total: 0, leaders: 0 };
+    bucket.total += 1;
+    if (s.employeeIsTeamLeader) bucket.leaders += 1;
+    byDate.set(s.date, bucket);
+  }
+  const days = [...byDate.entries()].sort(([a], [b]) => a.localeCompare(b));
+  const maxTotal = Math.max(1, ...days.map(([, d]) => d.total));
+  return days.map(([date, d]) => ({
+    day: new Date(date).toLocaleDateString('nl-BE', { weekday: 'short', day: 'numeric' }),
+    total: d.total,
+    leaders: d.leaders,
+    fill: Math.round((d.total / maxTotal) * 100),
+  }));
+});
+
+const recruitmentPulse = computed(() => {
+  const c = recruitmentStore.funnelCounts;
+  const total = Math.max(1, c.new + c.interviewPlanned + c.attended + c.hired);
+  return [
+    { label: 'Nieuwe leads', value: c.new, color: 'bg-[#111]', pct: (c.new / total) * 100 },
+    { label: 'Sollicitatie gepland', value: c.interviewPlanned, color: 'bg-primary-pink', pct: (c.interviewPlanned / total) * 100 },
+    { label: 'Opgekomen', value: c.attended, color: 'bg-emerald-500', pct: (c.attended / total) * 100 },
+    { label: 'Aangenomen', value: c.hired, color: 'bg-amber-400', pct: (c.hired / total) * 100 },
+  ];
+});
 
 onMounted(() => {
-  if (isMember.value && auth.officeId.value && auth.user.value) {
-    shiftsStore.subscribeMine(auth.officeId.value, auth.user.value.uid);
+  if (!auth.officeId.value) return;
+  if (isMember.value) {
+    if (auth.user.value) shiftsStore.subscribeMine(auth.officeId.value, auth.user.value.uid);
+  } else {
+    shiftsStore.subscribe(auth.officeId.value);
+    recruitmentStore.subscribe(auth.officeId.value);
   }
 });
 onUnmounted(() => {
-  if (isMember.value) shiftsStore.unsubscribe();
+  shiftsStore.unsubscribe();
+  if (!isMember.value) recruitmentStore.unsubscribe();
 });
 </script>
 
@@ -85,25 +130,38 @@ onUnmounted(() => {
         Open planning <span class="ml-3">→</span></RouterLink>
     </section>
     <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <article
-        v-for="metric in [{ label: 'Today scheduled', value: '18', note: '5 Team Leaders', tone: 'bg-neutral-ink text-white' }, { label: 'Shifts this week', value: '42', note: '+8% vs last week', tone: 'bg-white' }, { label: 'Open leads', value: '27', note: '9 interviews planned', tone: 'bg-white' }, { label: 'Planning status', value: 'Draft', note: 'Due for approval Friday', tone: 'bg-primary-pink text-white' }]"
-        :key="metric.label" class="min-h-32 border border-black/5 p-5" :class="metric.tone">
-        <p class="text-xs font-bold uppercase tracking-[0.16em] opacity-60">{{ metric.label }}</p>
-        <p class="mt-4 text-3xl font-bold">{{ metric.value }}</p>
-        <p class="mt-1 text-xs opacity-70">{{ metric.note }}</p>
+      <article class="min-h-32 border border-black/5 bg-neutral-ink p-5 text-white">
+        <p class="text-xs font-bold uppercase tracking-[0.16em] opacity-60">Vandaag ingepland</p>
+        <p class="mt-4 text-3xl font-bold">{{ todaysShifts.length }}</p>
+        <p class="mt-1 text-xs opacity-70">{{ todaysTeamLeaderCount }} teamleiders</p>
+      </article>
+      <article class="min-h-32 border border-black/5 bg-white p-5">
+        <p class="text-xs font-bold uppercase tracking-[0.16em] opacity-60">Shifts deze week</p>
+        <p class="mt-4 text-3xl font-bold">{{ weekShifts.length }}</p>
+        <p class="mt-1 text-xs opacity-70">{{ weekApprovedCount }} goedgekeurd</p>
+      </article>
+      <article class="min-h-32 border border-black/5 bg-white p-5">
+        <p class="text-xs font-bold uppercase tracking-[0.16em] opacity-60">Open leads</p>
+        <p class="mt-4 text-3xl font-bold">{{ recruitmentStore.openCount }}</p>
+        <p class="mt-1 text-xs opacity-70">{{ recruitmentStore.funnelCounts.interviewPlanned }} sollicitaties gepland</p>
+      </article>
+      <article class="min-h-32 border border-black/5 bg-primary-pink p-5 text-white">
+        <p class="text-xs font-bold uppercase tracking-[0.16em] opacity-60">Wacht op goedkeuring</p>
+        <p class="mt-4 text-3xl font-bold">{{ pendingCount }}</p>
+        <p class="mt-1 text-xs opacity-70">Nog te beoordelen</p>
       </article>
     </section>
     <section class="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
       <article class="border border-black/5 bg-white p-6">
         <div class="flex items-center justify-between">
           <div>
-            <h3 class="text-lg font-bold">This week at a glance</h3>
-            <p class="mt-1 text-xs text-neutral-mute">Scheduled employees by day</p>
+            <h3 class="text-lg font-bold">Deze week in één oogopslag</h3>
+            <p class="mt-1 text-xs text-neutral-mute">Ingeplande medewerkers per dag</p>
           </div>
-          <RouterLink to="/planning" class="text-xs font-bold text-primary-pink">View calendar →</RouterLink>
+          <RouterLink to="/planning" class="text-xs font-bold text-primary-pink">Naar planning →</RouterLink>
         </div>
-        <div class="mt-8 flex h-48 items-end justify-between gap-3 border-b border-black/10 px-2">
-          <div v-for="day in staffing" :key="day.day" class="flex flex-1 flex-col items-center gap-2"><span
+        <div v-if="weeklyStaffing.length" class="mt-8 flex h-48 items-end justify-between gap-3 border-b border-black/10 px-2">
+          <div v-for="day in weeklyStaffing" :key="day.day" class="flex flex-1 flex-col items-center gap-2"><span
               class="text-xs font-bold">{{ day.total }}</span>
             <div class="flex w-full max-w-12 flex-col justify-end bg-primary-pink/15"
               :style="{ height: `${day.fill}%` }">
@@ -111,23 +169,22 @@ onUnmounted(() => {
             </div><span class="text-[11px] text-neutral-mute">{{ day.day }}</span>
           </div>
         </div>
+        <p v-else class="mt-8 text-sm text-neutral-mute">Nog geen shifts deze week.</p>
       </article>
       <article class="border border-black/5 bg-white p-6">
         <div class="flex items-center justify-between">
           <div>
-            <h3 class="text-lg font-bold">Recruitment pulse</h3>
-            <p class="mt-1 text-xs text-neutral-mute">Current funnel</p>
+            <h3 class="text-lg font-bold">Rekrutering</h3>
+            <p class="mt-1 text-xs text-neutral-mute">Huidige funnel</p>
           </div>
           <RouterLink to="/recruitment" class="text-xs font-bold text-primary-pink">Open pipeline →</RouterLink>
         </div>
         <div class="mt-7 space-y-4">
-          <div
-            v-for="item in [{ label: 'New leads', value: 27, color: 'bg-[#111]' }, { label: 'Interview planned', value: 9, color: 'bg-primary-pink' }, { label: 'Attended', value: 6, color: 'bg-emerald-500' }, { label: 'Hired', value: 3, color: 'bg-amber-400' }]"
-            :key="item.label">
+          <div v-for="item in recruitmentPulse" :key="item.label">
             <div class="mb-1 flex justify-between text-xs"><span>{{ item.label }}</span><strong>{{ item.value
                 }}</strong></div>
             <div class="h-2 bg-neutral-100">
-              <div class="h-full" :class="item.color" :style="{ width: `${item.value / 27 * 100}%` }"></div>
+              <div class="h-full" :class="item.color" :style="{ width: `${item.pct}%` }"></div>
             </div>
           </div>
         </div>

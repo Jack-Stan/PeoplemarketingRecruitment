@@ -6,7 +6,7 @@ import { useAuth } from '@/composables/useAuth';
 import { useEmployeesStore } from '@/stores/employees';
 import { useUiStore } from '@/stores/ui';
 import { useUsersStore } from '@/stores/users';
-import { ROLE_LABELS, Roles } from '@/types/user';
+import { ROLE_LABELS } from '@/types/user';
 import { isValidEmail, isValidName } from '@/utils/validators';
 import type { Employee, EmployeeCreatePayload } from '@/types/employee';
 
@@ -142,8 +142,19 @@ async function submitForm(): Promise<void> {
   }
   formError.value = null;
 
+  // role/isTeamLeader are read-only here (assigned on /users via UsersView,
+  // see stores/users.ts assignRole) — never patched from this form, so an
+  // edit here can't drift the roster's copy away from the real assignment.
   const ok = editingId.value
-    ? await store.update(officeId.value, editingId.value, form.value)
+    ? await store.update(officeId.value, editingId.value, {
+        firstName: form.value.firstName,
+        lastName: form.value.lastName,
+        email: form.value.email,
+        phone: form.value.phone,
+        weeklyContractHours: form.value.weeklyContractHours,
+        employmentType: form.value.employmentType,
+        avatarUrl: form.value.avatarUrl,
+      })
     : await store.create(officeId.value, selectedUid.value, form.value);
 
   if (ok) {
@@ -298,16 +309,12 @@ onUnmounted(() => {
             class="w-full border-black/10 bg-[#faf9f7] text-sm disabled:opacity-60"
           />
           <input v-model="form.phone" placeholder="Telefoon (optioneel)" class="w-full border-black/10 bg-[#faf9f7] text-sm" />
-          <div class="grid grid-cols-2 gap-3">
-            <select v-model="form.role" class="border-black/10 bg-[#faf9f7] text-sm">
-              <option :value="Roles.TeamMember">{{ ROLE_LABELS.TeamMember }}</option>
-              <option :value="Roles.TeamManager">{{ ROLE_LABELS.TeamManager }}</option>
-              <option :value="Roles.Administrator">{{ ROLE_LABELS.Administrator }}</option>
-            </select>
-            <label class="flex items-center gap-2 text-xs font-semibold">
-              <input v-model="form.isTeamLeader" type="checkbox" class="border-black/20 text-primary-pink focus:ring-primary-pink" />
-              Teamleider
-            </label>
+          <div class="border border-black/10 bg-[#faf9f7] px-3 py-2 text-xs text-neutral-mute">
+            Rol: <strong class="text-neutral-ink">{{ ROLE_LABELS[form.role] }}</strong>
+            · Teamleider: <strong class="text-neutral-ink">{{ form.isTeamLeader ? 'Ja' : 'Nee' }}</strong>
+            <span v-if="editingId">
+              — wijzig via <RouterLink to="/users" class="font-semibold underline">Gebruikers</RouterLink>
+            </span>
           </div>
           <p v-if="formError" class="text-xs font-semibold text-semantic-danger">{{ formError }}</p>
           <div class="flex justify-end gap-2 pt-2">
