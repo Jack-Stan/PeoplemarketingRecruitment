@@ -58,11 +58,71 @@ function onEmployeePicked(id: string): void {
   form.value.employeeIsTeamLeader = e?.isTeamLeader ?? false;
 }
 
-const dayGroups = computed(() =>
-  [...shiftsStore.byDate.entries()].sort(([a], [b]) => a.localeCompare(b)),
-);
+/** FRD §8 — daily list view (below), optionally scoped to a date picked from the month view. */
+const dateFilter = ref<string | null>(null);
+const dayGroups = computed(() => {
+  const entries = [...shiftsStore.byDate.entries()];
+  const filtered = dateFilter.value ? entries.filter(([date]) => date === dateFilter.value) : entries;
+  return filtered.sort(([a], [b]) => a.localeCompare(b));
+});
 
 const totals = computed(() => shiftsStore.staffingTotals);
+
+/** FRD §8 — monthly view: coverage, weekend highlighting, TL visibility per day. */
+const viewMode = ref<'lijst' | 'maand'>('lijst');
+const today = new Date().toISOString().slice(0, 10);
+const selectedMonth = ref(today.slice(0, 7));
+
+const monthLabel = computed(() => {
+  const [year, month] = selectedMonth.value.split('-').map(Number);
+  return new Date(year, month - 1, 1).toLocaleDateString('nl-BE', { month: 'long', year: 'numeric' });
+});
+
+function shiftMonth(delta: number): void {
+  const [year, month] = selectedMonth.value.split('-').map(Number);
+  const d = new Date(year, month - 1 + delta, 1);
+  selectedMonth.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+interface MonthCell {
+  iso: string;
+  dayNumber: number;
+  isWeekend: boolean;
+  isToday: boolean;
+  shiftCount: number;
+  pendingCount: number;
+  tlCount: number;
+}
+
+const monthCells = computed<(MonthCell | null)[]>(() => {
+  const [year, month] = selectedMonth.value.split('-').map(Number);
+  const firstOfMonth = new Date(year, month - 1, 1);
+  const startWeekday = (firstOfMonth.getDay() + 6) % 7; // Monday = 0
+  const daysInMonthCount = new Date(year, month, 0).getDate();
+  const cells: (MonthCell | null)[] = Array.from({ length: startWeekday }, () => null);
+  for (let d = 1; d <= daysInMonthCount; d++) {
+    const iso = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const dayShifts = shiftsStore.shifts.filter((s) => s.date === iso);
+    const dayOfWeek = new Date(year, month - 1, d).getDay();
+    cells.push({
+      iso,
+      dayNumber: d,
+      isWeekend: dayOfWeek === 0 || dayOfWeek === 6,
+      isToday: iso === today,
+      shiftCount: dayShifts.length,
+      pendingCount: dayShifts.filter((s) => s.status === 'pending').length,
+      tlCount: new Set(dayShifts.filter((s) => s.employeeIsTeamLeader).map((s) => s.assignedEmployeeId)).size,
+    });
+  }
+  return cells;
+});
+
+const weekdayLabels = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo'];
+
+function openDayFromMonth(iso: string): void {
+  dateFilter.value = iso;
+  viewMode.value = 'lijst';
+}
 
 function statusClasses(status: Shift['status']): string {
   return {
@@ -86,9 +146,10 @@ const typeLabels: Record<ShiftType, string> = {
   Event: 'Event',
 };
 
-function openCreate(): void {
+function openCreate(date?: string): void {
   const firstEmployee = employeesStore.activeEmployees[0];
   form.value = { ...makeEmptyForm() };
+  if (date) form.value.date = date;
   if (firstEmployee) onEmployeePicked(firstEmployee.employeeId);
   formError.value = null;
   isFormOpen.value = true;
@@ -171,9 +232,64 @@ onUnmounted(() => {
         <p class="text-sm text-neutral-mute">Kantoor · {{ officeId }}</p>
         <h2 class="mt-1 text-3xl font-bold tracking-tight">Planning</h2>
       </div>
-      <button v-if="canDraft" class="bg-primary-pink px-4 py-2.5 text-sm font-bold text-white" @click="openCreate">
+      <button v-if="canDraft" class="bg-primary-pink px-4 py-2.5 text-sm font-bold text-white" @click="openCreate()">
         + Nieuwe shift
       </button>
+    </section>
+
+    <!-- FRD §8 — daily/weekly/monthly views toggle. -->
+    <div class="flex gap-1 border-b border-black/10 pb-px">
+      <button
+        class="border-b-2 px-4 py-2 text-xs font-bold"
+        :class="viewMode === 'lijst' ? 'border-primary-pink text-primary-pink' : 'border-transparent text-neutral-mute'"
+        @click="viewMode = 'lijst'"
+      >
+        Lijst
+      </button>
+      <button
+        class="border-b-2 px-4 py-2 text-xs font-bold"
+        :class="viewMode === 'maand' ? 'border-primary-pink text-primary-pink' : 'border-transparent text-neutral-mute'"
+        @click="viewMode = 'maand'"
+      >
+        Maand
+      </button>
+    </div>
+
+    <!-- Monthly calendar — coverage, weekend highlighting, TL visibility per day. -->
+    <section v-if="viewMode === 'maand'" class="border border-black/5 bg-white p-6">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-bold capitalize">{{ monthLabel }}</h3>
+        <div class="flex gap-2">
+          <button class="border border-black/10 px-2.5 py-1 text-sm font-bold hover:bg-[#faf9f7]" @click="shiftMonth(-1)">‹</button>
+          <button class="border border-black/10 px-2.5 py-1 text-sm font-bold hover:bg-[#faf9f7]" @click="shiftMonth(1)">›</button>
+        </div>
+      </div>
+      <div class="mt-5 grid grid-cols-7 gap-1.5 text-center text-[10px] font-bold uppercase tracking-[0.1em] text-neutral-mute">
+        <span v-for="wd in weekdayLabels" :key="wd">{{ wd }}</span>
+      </div>
+      <div class="mt-1.5 grid grid-cols-7 gap-1.5">
+        <div
+          v-for="(cell, i) in monthCells"
+          :key="cell ? cell.iso : `blank-${i}`"
+          class="flex min-h-24 flex-col gap-1 border p-2 text-left"
+          :class="[
+            cell ? 'cursor-pointer hover:border-primary-pink/50' : 'border-transparent',
+            cell?.isToday ? 'border-primary-pink/40 bg-primary-pink/5' : cell?.isWeekend ? 'border-black/10 bg-[#faf9f7]' : 'border-black/10 bg-white',
+          ]"
+          @click="cell && openDayFromMonth(cell.iso)"
+        >
+          <template v-if="cell">
+            <span class="text-xs font-bold" :class="cell.isToday ? 'text-primary-pink' : 'text-neutral-ink'">{{ cell.dayNumber }}</span>
+            <div v-if="cell.shiftCount" class="mt-auto space-y-1">
+              <p class="text-[11px] font-semibold text-neutral-mute">{{ cell.shiftCount }} shift{{ cell.shiftCount === 1 ? '' : 's' }}</p>
+              <div class="flex flex-wrap gap-1">
+                <span v-if="cell.tlCount" class="rounded bg-primary-pink/10 px-1.5 py-0.5 text-[10px] font-bold text-primary-pink">{{ cell.tlCount }} TL</span>
+                <span v-if="cell.pendingCount" class="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">{{ cell.pendingCount }} wacht</span>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
     </section>
 
     <!-- Staffing overview bar — client transcript: "40 shifts, 5 TL, 7 non-TL" as a literal segmented bar. -->
@@ -204,7 +320,15 @@ onUnmounted(() => {
       also explicitly wants it tighter/more efficient than a literal Notion
       board, so this favours row density over whitespace.
     -->
-    <section class="overflow-x-auto border border-black/5 bg-white">
+    <section v-if="viewMode === 'lijst'" class="space-y-3">
+      <div v-if="dateFilter" class="flex items-center gap-2 text-xs">
+        <span class="text-neutral-mute">Gefilterd op</span>
+        <span class="inline-flex items-center gap-2 bg-primary-pink/10 px-2.5 py-1 font-bold text-primary-pink">
+          {{ new Date(dateFilter).toLocaleDateString('nl-BE', { weekday: 'long', day: 'numeric', month: 'long' }) }}
+          <button class="text-primary-pink hover:underline" @click="dateFilter = null">✕</button>
+        </span>
+      </div>
+      <div class="overflow-x-auto border border-black/5 bg-white">
       <table class="w-full min-w-[720px] text-left text-sm">
         <thead class="border-b border-black/5 bg-[#faf9f7] text-[10px] uppercase tracking-[0.16em] text-neutral-mute">
           <tr>
@@ -258,6 +382,7 @@ onUnmounted(() => {
       </table>
       <p v-if="shiftsStore.isLoading" class="p-8 text-center text-sm text-neutral-mute">Laden…</p>
       <p v-else-if="!dayGroups.length" class="p-8 text-center text-sm text-neutral-mute">Nog geen shifts.</p>
+      </div>
     </section>
 
     <div v-if="isFormOpen" class="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4">
