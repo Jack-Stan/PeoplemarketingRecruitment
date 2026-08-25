@@ -4,7 +4,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useAuth } from '@/composables/useAuth';
 import { useShiftsStore } from '@/stores/shifts';
 import { useUiStore } from '@/stores/ui';
-import { FIXED_SHIFT_HOURS, weekStartFor, type Shift, type ShiftCreatePayload, type ShiftType } from '@/types/shift';
+import { FIXED_SHIFT_HOURS, weekStartFor, type Shift, type ShiftCreatePayload } from '@/types/shift';
 
 /**
  * TeamMember self-service planning — decision 008. Employee-authored: the
@@ -44,16 +44,6 @@ function makeEmptyForm(): ShiftCreatePayload {
   };
 }
 const form = ref<ShiftCreatePayload>(makeEmptyForm());
-const isTimeLocked = computed(() => form.value.type !== 'Event');
-
-function onTypeChange(type: ShiftType): void {
-  form.value.type = type;
-  if (type !== 'Event') {
-    form.value.startTime = FIXED_SHIFT_HOURS[type].start;
-    form.value.endTime = FIXED_SHIFT_HOURS[type].end;
-    form.value.eventTitle = null;
-  }
-}
 
 const statusLabels: Record<Shift['status'], string> = {
   draft: 'Concept',
@@ -158,7 +148,7 @@ onUnmounted(() => shiftsStore.unsubscribe());
         <h2 class="mt-1 text-3xl font-bold tracking-tight">Plan jouw week</h2>
       </div>
       <button class="bg-primary-pink px-4 py-2.5 text-sm font-bold text-white" @click="openCreate()">
-        + Shift toevoegen
+        + Dag toevoegen
       </button>
     </section>
 
@@ -177,7 +167,7 @@ onUnmounted(() => shiftsStore.unsubscribe());
             </p>
             <button
               class="text-xs font-bold text-neutral-mute hover:text-primary-pink"
-              title="Shift toevoegen"
+              title="Dag toevoegen"
               @click="openCreate(day.iso)"
             >
               +
@@ -185,10 +175,7 @@ onUnmounted(() => shiftsStore.unsubscribe());
           </div>
           <div v-if="!day.shifts.length" class="flex-1"></div>
           <div v-for="shift in day.shifts" :key="shift.shiftId" class="border border-black/10 bg-white p-2 text-xs">
-            <p class="font-semibold">
-              {{ shift.type }}<span v-if="shift.eventTitle"> — {{ shift.eventTitle }}</span>
-            </p>
-            <p class="text-neutral-mute">{{ shift.startTime }}–{{ shift.endTime }}</p>
+            <p class="font-semibold">Ik werk deze dag</p>
             <p v-if="shift.location" class="text-neutral-mute">{{ shift.location }}</p>
             <div class="mt-1 flex items-center justify-between">
               <span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-bold" :class="statusClasses(shift.status)">
