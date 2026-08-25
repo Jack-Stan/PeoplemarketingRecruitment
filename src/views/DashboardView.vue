@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted } from 'vue';
+import { computed, onUnmounted, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 
 import { useAuth } from '@/composables/useAuth';
+import { useActiveOffice } from '@/composables/useActiveOffice';
 import { useRecruitmentStore } from '@/stores/recruitment';
 import { useShiftsStore } from '@/stores/shifts';
 import { weekStartFor } from '@/types/shift';
@@ -10,6 +11,7 @@ import { weekStartFor } from '@/types/shift';
 const auth = useAuth();
 const shiftsStore = useShiftsStore();
 const recruitmentStore = useRecruitmentStore();
+const { officeId } = useActiveOffice();
 const isMember = computed(() => auth.role.value === 'TeamMember');
 
 const today = new Date().toISOString().slice(0, 10);
@@ -74,15 +76,19 @@ const recruitmentPulse = computed(() => {
   ];
 });
 
-onMounted(() => {
-  if (!auth.officeId.value) return;
-  if (isMember.value) {
-    if (auth.user.value) shiftsStore.subscribeMine(auth.officeId.value, auth.user.value.uid);
-  } else {
-    shiftsStore.subscribe(auth.officeId.value);
-    recruitmentStore.subscribe(auth.officeId.value);
-  }
-});
+watch(
+  officeId,
+  (id) => {
+    if (!id) return;
+    if (isMember.value) {
+      if (auth.user.value) shiftsStore.subscribeMine(id, auth.user.value.uid);
+    } else {
+      shiftsStore.subscribe(id);
+      recruitmentStore.subscribe(id);
+    }
+  },
+  { immediate: true },
+);
 onUnmounted(() => {
   shiftsStore.unsubscribe();
   if (!isMember.value) recruitmentStore.unsubscribe();

@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 
 import { officesService } from '@/services/offices.service';
 import { useAuth } from '@/composables/useAuth';
+import { useActiveOffice } from '@/composables/useActiveOffice';
 import { isValidEmail } from '@/utils/validators';
 import { useUsersStore } from '@/stores/users';
 import { useUiStore } from '@/stores/ui';
@@ -12,11 +13,12 @@ const auth = useAuth();
 const store = useUsersStore();
 const ui = useUiStore();
 
-// Admins can only ever assign their own office (firestore.rules enforces
-// this) — so there's one office to assign into, not a picker. We still
-// resolve every office's name (offices are public-readable) so the table can
-// show which office a pending user actually applied to.
-const ownOfficeId = computed(() => auth.officeId.value ?? '');
+// Multi-office: an Administrator assigns into whichever office they've
+// switched to in AppShell's office switcher (see useActiveOffice) — same
+// approve/assign flow as always, just pointed at a different office. We
+// still resolve every office's name (offices are public-readable) so the
+// table can show which office a pending user actually applied to.
+const { officeId: ownOfficeId } = useActiveOffice();
 const officeNames = ref<Record<string, string>>({});
 
 const editingUid = ref<string | null>(null);
@@ -184,8 +186,8 @@ onUnmounted(() => store.unsubscribe());
             <td class="px-5 py-4 text-xs text-neutral-mute">
               <span v-if="u.role === null">
                 Aangevraagd voor {{ officeLabel(u.desiredOfficeId) }}
-                <span v-if="wantsOtherOffice(u)" class="ml-1 font-semibold text-semantic-danger" title="Niet jouw kantoor — je kan enkel goedkeuren voor je eigen kantoor.">
-                  ⚠ niet van jou
+                <span v-if="wantsOtherOffice(u)" class="ml-1 font-semibold text-semantic-danger" title="Ander kantoor dan je nu beheert — schakel over via het kantoor-menu links.">
+                  ⚠ ander kantoor
                 </span>
               </span>
               <span v-else>{{ officeLabel(u.primaryOfficeId) }}</span>

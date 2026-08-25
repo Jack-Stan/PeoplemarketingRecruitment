@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted } from 'vue';
+import { computed, onUnmounted, watch } from 'vue';
 
 import { useAuth } from '@/composables/useAuth';
+import { useActiveOffice } from '@/composables/useActiveOffice';
 import { useShiftsStore } from '@/stores/shifts';
 import type { Shift } from '@/types/shift';
 
@@ -20,6 +21,7 @@ import type { Shift } from '@/types/shift';
  */
 const auth = useAuth();
 const shiftsStore = useShiftsStore();
+const { officeId } = useActiveOffice();
 const isMember = computed(() => auth.role.value === 'TeamMember');
 
 const monthLabel = (yyyymm: string) =>
@@ -59,14 +61,18 @@ const teamLeaderTrend = computed(() => {
   }));
 });
 
-onMounted(() => {
-  if (!auth.officeId.value || !auth.user.value) return;
-  if (isMember.value) {
-    shiftsStore.subscribeMine(auth.officeId.value, auth.user.value.uid);
-  } else {
-    shiftsStore.subscribe(auth.officeId.value);
-  }
-});
+watch(
+  officeId,
+  (id) => {
+    if (!id || !auth.user.value) return;
+    if (isMember.value) {
+      shiftsStore.subscribeMine(id, auth.user.value.uid);
+    } else {
+      shiftsStore.subscribe(id);
+    }
+  },
+  { immediate: true },
+);
 onUnmounted(() => shiftsStore.unsubscribe());
 </script>
 

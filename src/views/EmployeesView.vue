@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 
 import { useAuth } from '@/composables/useAuth';
+import { useActiveOffice } from '@/composables/useActiveOffice';
 import { useEmployeesStore } from '@/stores/employees';
 import { useUiStore } from '@/stores/ui';
 import { useUsersStore } from '@/stores/users';
@@ -15,7 +16,7 @@ const store = useEmployeesStore();
 const usersStore = useUsersStore();
 const ui = useUiStore();
 
-const officeId = computed(() => auth.officeId.value ?? '');
+const { officeId } = useActiveOffice();
 const isAdmin = computed(() => auth.role.value === 'Administrator');
 
 const search = ref('');
@@ -173,11 +174,18 @@ async function toggleActive(e: Employee): Promise<void> {
   );
 }
 
+// Re-subscribes whenever the active office changes — an Administrator
+// switching offices in AppShell should land on that office's roster.
+watch(
+  officeId,
+  (id) => {
+    if (id) store.subscribe(id);
+  },
+  { immediate: true },
+);
 onMounted(() => {
-  if (!officeId.value) return;
-  store.subscribe(officeId.value);
-  // /users is admin-only readable — a TeamManager on this page would just
-  // eat a permission-denied, and they can't add employees anyway.
+  // /users is admin-only readable and office-agnostic (one flat collection)
+  // — a TeamManager here would just eat a permission-denied anyway.
   if (isAdmin.value) usersStore.subscribe();
 });
 onUnmounted(() => {

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onUnmounted, ref, watch } from 'vue';
 
 import { useAuth } from '@/composables/useAuth';
+import { useActiveOffice } from '@/composables/useActiveOffice';
 import { useRecruitmentStore } from '@/stores/recruitment';
 import { useUiStore } from '@/stores/ui';
 import {
@@ -16,7 +17,7 @@ const auth = useAuth();
 const store = useRecruitmentStore();
 const ui = useUiStore();
 
-const officeId = computed(() => auth.officeId.value ?? '');
+const { officeId } = useActiveOffice();
 const canManage = computed(() => auth.role.value === 'Administrator' || auth.role.value === 'TeamManager');
 
 const selectedStage = ref<LeadStage | 'all'>('all');
@@ -67,9 +68,13 @@ async function moveStage(leadId: string, stage: LeadStage): Promise<void> {
   ui.push(ok ? 'Fase bijgewerkt.' : (store.error ?? 'Er ging iets mis.'), ok ? 'success' : 'error');
 }
 
-onMounted(() => {
-  if (officeId.value) store.subscribe(officeId.value);
-});
+watch(
+  officeId,
+  (id) => {
+    if (id) store.subscribe(id);
+  },
+  { immediate: true },
+);
 onUnmounted(() => store.unsubscribe());
 </script>
 

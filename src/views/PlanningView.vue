@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onUnmounted, ref, watch } from 'vue';
 
 import { useAuth } from '@/composables/useAuth';
+import { useActiveOffice } from '@/composables/useActiveOffice';
 import { useEmployeesStore } from '@/stores/employees';
 import { useShiftsStore } from '@/stores/shifts';
 import { useUiStore } from '@/stores/ui';
@@ -12,7 +13,7 @@ const employeesStore = useEmployeesStore();
 const shiftsStore = useShiftsStore();
 const ui = useUiStore();
 
-const officeId = computed(() => auth.officeId.value ?? '');
+const { officeId } = useActiveOffice();
 const isAdmin = computed(() => auth.role.value === 'Administrator');
 const canDraft = computed(() => auth.role.value === 'Administrator' || auth.role.value === 'TeamManager');
 
@@ -213,12 +214,17 @@ async function deleteDraft(shift: Shift): Promise<void> {
   ui.push(ok ? 'Concept verwijderd.' : (shiftsStore.error ?? 'Er ging iets mis.'), ok ? 'success' : 'error');
 }
 
-onMounted(() => {
-  if (officeId.value) {
-    shiftsStore.subscribe(officeId.value);
-    employeesStore.subscribe(officeId.value);
-  }
-});
+// Re-subscribes whenever the active office changes — an Administrator
+// switching offices should see that office's shifts/roster, not Gent's.
+watch(
+  officeId,
+  (id) => {
+    if (!id) return;
+    shiftsStore.subscribe(id);
+    employeesStore.subscribe(id);
+  },
+  { immediate: true },
+);
 onUnmounted(() => {
   shiftsStore.unsubscribe();
   employeesStore.unsubscribe();

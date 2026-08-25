@@ -47,9 +47,12 @@ service cloud.firestore {
       return isSignedIn() && myOfficeId() == officeId;
     }
 
-    // Admin or manager, scoped to their own office.
+    // Multi-office: an Administrator is staff of EVERY office, not just
+    // their own primaryOfficeId — the client-side office switcher
+    // (useActiveOffice/AppShell) lets them do the same CRUD in any office
+    // they pick. A TeamManager stays office-locked, same as before.
     function isStaffOf(officeId) {
-      return sameOffice(officeId) && (isAdmin() || isManager());
+      return isAdmin() || (sameOffice(officeId) && isManager());
     }
 
     match /users/{userId} {
@@ -67,12 +70,10 @@ service cloud.firestore {
           && request.resource.data.desiredOfficeId is string
           && request.resource.data.desiredOfficeId.size() > 0);
       // Role assignment: admin can grant role/office/isTeamLeader directly —
-      // no Cloud Function needed now that role lives in Firestore. Checked
-      // against the INCOMING office (request.resource.data), not the
-      // existing one, because a pending user's existing primaryOfficeId is
-      // null — this is exactly the write that approves them.
+      // no Cloud Function needed now that role lives in Firestore. Multi-office:
+      // an Administrator may assign into ANY office (not just their own) — the
+      // office switcher is how they pick which one, same as isStaffOf below.
       allow update: if isAdmin()
-        && sameOffice(request.resource.data.primaryOfficeId)
         && request.resource.data.role in ['Administrator', 'TeamManager', 'TeamMember'];
       allow delete: if isAdmin();
     }
@@ -84,7 +85,9 @@ service cloud.firestore {
       // applying to (see decisions/005). Sub-collections below stay fully
       // locked down regardless of this.
       allow read: if true;
-      allow write: if isAdmin() && sameOffice(officeId);
+      // Multi-office: any Administrator may create/edit an office (e.g. a
+      // second office going live); write is not office-scoped for admins.
+      allow write: if isAdmin();
 
       match /employees/{employeeId} {
         // Admin + manager see the full roster; a member only sees their own doc.
@@ -95,11 +98,13 @@ service cloud.firestore {
         // assignedEmployeeId — so a doc keyed by an auto-generated ID is
         // permanently invisible to the person it represents. Enforcing it here
         // means no client can ever recreate that bug, not just the one that
-        // used to call addDoc().
-        allow create: if isAdmin() && sameOffice(officeId)
+        // used to call addDoc(). Multi-office: admin isn't sameOffice-restricted
+        // here either, but the target account's OWN primaryOfficeId must still
+        // match this office — an admin can't file someone under the wrong one.
+        allow create: if isAdmin()
           && exists(/databases/$(database)/documents/users/$(employeeId))
           && get(/databases/$(database)/documents/users/$(employeeId)).data.primaryOfficeId == officeId;
-        allow update, delete: if isAdmin() && sameOffice(officeId);
+        allow update, delete: if isAdmin();
       }
 
       match /shifts/{shiftId} {
@@ -123,7 +128,7 @@ service cloud.firestore {
         // (ticket-03 defect) let a manager silently un-approve a shift by
         // writing status: 'pending' over an already-approved doc. A member is
         // further restricted to their own shift, and can't reassign it.
-        allow update: if (isAdmin() && sameOffice(officeId))
+        allow update: if isAdmin()
           || (isManager() && sameOffice(officeId)
               && resource.data.status in ['draft', 'pending']
               && request.resource.data.status in ['draft', 'pending'])
@@ -133,9 +138,9 @@ service cloud.firestore {
               && ownsShift()
               && request.resource.data.status in ['draft', 'pending']);
 
-        // Delete: admin, office-scoped. A member may also delete their own
+        // Delete: admin, any office. A member may also delete their own
         // draft before ever submitting it (undo an accidental add).
-        allow delete: if (isAdmin() && sameOffice(officeId))
+        allow delete: if isAdmin()
           || (isMember() && sameOffice(officeId)
               && resource.data.assignedEmployeeId == request.auth.uid
               && resource.data.status == 'draft');
@@ -150,7 +155,7 @@ service cloud.firestore {
       match /periods/{periodId} {
         // Historical snapshots are written server-side only (Cloud Function via Admin SDK,
         // which bypasses these rules entirely) — no client writes, ever.
-        allow read: if sameOffice(officeId);
+        allow read: if isAdmin() || sameOffice(officeId);
         allow write: if false;
       }
     }
