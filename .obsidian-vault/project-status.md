@@ -283,7 +283,13 @@ Independent FRD-vs-app audit (no vault claims trusted blind), then fixes, then p
   `firebase_get_security_rules` against live `peoplemarketing-c5bfd`, matches the committed rules exactly.
 - **§19 Security & Privacy checked.** RBAC done (now multi-office-aware). HTTPS effectively covered by
   Netlify/Firebase hosting defaults — one manual item: confirm Netlify's "Force HTTPS" toggle is on for
-  `peoplemarketing.be` (dashboard setting, not code). **Audit trail confirmed missing** — no log of who
-  approved a shift, assigned a role, or deleted an employee; flagged as buildable next, not started. **GDPR
-  review not started and isn't a code task** — needs a human/legal call (retention, lawful basis, data-subject
-  rights, any DPA with Firebase), not an engineering one.
+  `peoplemarketing.be` (dashboard setting, not code).
+- **✅ Audit trail built.** New append-only `/offices/{id}/auditLog` collection (`firestore.rules`: create for
+  staff, update/delete denied to everyone including admins). Logs shift approve/reject, role assignment,
+  employee create/deactivate/reactivate, and recruitment stage changes — each entry denormalises actor email
+  + a human-readable target label. New `/audit` route (Administrator only), follows the office switcher.
+  Audit writes are fire-and-forget from the calling view. **Not yet deployed to prod** — code pushed, held
+  pending confirmation before `firebase deploy --only firestore:rules` (same as §18 was).
+- **GDPR review not started and isn't a code task** — needs a human/legal call (retention, lawful basis,
+  data-subject rights, any DPA with Firebase). A separate session was kicked off to put together a factual
+  data inventory (what personal data lives where) for that conversation — see cross-session coordination.
