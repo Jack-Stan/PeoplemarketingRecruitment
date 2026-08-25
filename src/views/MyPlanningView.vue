@@ -80,8 +80,26 @@ const weekLabel = computed(() => {
   return `${fmt(start)} – ${fmt(end)}`;
 });
 
-function openCreate(): void {
+/** Weekly agenda grid — client + Stan both asked to see the week as a calendar, not a flat list. */
+const weekDays = computed(() => {
+  const start = new Date(`${currentWeekStart.value}T00:00:00`);
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(start);
+    d.setDate(d.getDate() + i);
+    const iso = d.toISOString().slice(0, 10);
+    return {
+      iso,
+      weekday: d.toLocaleDateString('nl-BE', { weekday: 'short' }),
+      dayNumber: d.getDate(),
+      isToday: iso === today,
+      shifts: sortedShifts.value.filter((s) => s.date === iso),
+    };
+  });
+});
+
+function openCreate(date?: string): void {
   form.value = makeEmptyForm();
+  if (date) form.value.date = date;
   formError.value = null;
   isFormOpen.value = true;
 }
@@ -133,46 +151,60 @@ onUnmounted(() => shiftsStore.unsubscribe());
 </script>
 
 <template>
-  <div class="mx-auto max-w-3xl space-y-6">
+  <div class="mx-auto max-w-6xl space-y-6">
     <section class="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
       <div>
         <p class="text-sm text-neutral-mute">Mijn planning · week van {{ weekLabel }}</p>
         <h2 class="mt-1 text-3xl font-bold tracking-tight">Plan jouw week</h2>
       </div>
-      <button class="bg-primary-pink px-4 py-2.5 text-sm font-bold text-white" @click="openCreate">
+      <button class="bg-primary-pink px-4 py-2.5 text-sm font-bold text-white" @click="openCreate()">
         + Shift toevoegen
       </button>
     </section>
 
     <section class="border border-black/5 bg-white p-6">
-      <ul v-if="sortedShifts.length" class="divide-y divide-black/5">
-        <li v-for="shift in sortedShifts" :key="shift.shiftId" class="flex items-center justify-between py-3 text-sm">
-          <div>
-            <p class="font-semibold">
-              {{ new Date(shift.date).toLocaleDateString('nl-BE', { weekday: 'long', day: 'numeric', month: 'long' }) }}
+      <p v-if="shiftsStore.isLoading" class="text-sm text-neutral-mute">Laden…</p>
+      <div v-else class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7">
+        <div
+          v-for="day in weekDays"
+          :key="day.iso"
+          class="flex min-h-32 flex-col gap-2 border p-3"
+          :class="day.isToday ? 'border-primary-pink/40 bg-primary-pink/5' : 'border-black/10 bg-[#faf9f7]'"
+        >
+          <div class="flex items-center justify-between">
+            <p class="text-xs font-bold uppercase tracking-[0.1em]" :class="day.isToday ? 'text-primary-pink' : 'text-neutral-mute'">
+              {{ day.weekday }} {{ day.dayNumber }}
             </p>
-            <p class="text-xs text-neutral-mute">
-              {{ shift.type }}<span v-if="shift.eventTitle"> — {{ shift.eventTitle }}</span> ·
-              {{ shift.startTime }}–{{ shift.endTime }}
-              <span v-if="shift.location"> · {{ shift.location }}</span>
-            </p>
-          </div>
-          <div class="flex items-center gap-3">
-            <span class="inline-block rounded px-2 py-0.5 text-[11px] font-bold" :class="statusClasses(shift.status)">
-              {{ statusLabels[shift.status] }}
-            </span>
             <button
-              v-if="shift.status === 'draft'"
-              class="text-xs font-semibold text-neutral-mute hover:text-semantic-danger"
-              @click="removeDraft(shift)"
+              class="text-xs font-bold text-neutral-mute hover:text-primary-pink"
+              title="Shift toevoegen"
+              @click="openCreate(day.iso)"
             >
-              Verwijderen
+              +
             </button>
           </div>
-        </li>
-      </ul>
-      <p v-else-if="shiftsStore.isLoading" class="text-sm text-neutral-mute">Laden…</p>
-      <p v-else class="text-sm text-neutral-mute">Nog geen shifts deze week. Voeg er een toe om te beginnen.</p>
+          <div v-if="!day.shifts.length" class="flex-1"></div>
+          <div v-for="shift in day.shifts" :key="shift.shiftId" class="border border-black/10 bg-white p-2 text-xs">
+            <p class="font-semibold">
+              {{ shift.type }}<span v-if="shift.eventTitle"> — {{ shift.eventTitle }}</span>
+            </p>
+            <p class="text-neutral-mute">{{ shift.startTime }}–{{ shift.endTime }}</p>
+            <p v-if="shift.location" class="text-neutral-mute">{{ shift.location }}</p>
+            <div class="mt-1 flex items-center justify-between">
+              <span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-bold" :class="statusClasses(shift.status)">
+                {{ statusLabels[shift.status] }}
+              </span>
+              <button
+                v-if="shift.status === 'draft'"
+                class="text-[10px] font-semibold text-neutral-mute hover:text-semantic-danger"
+                @click="removeDraft(shift)"
+              >
+                Verwijderen
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div v-if="draftCount" class="mt-6 flex items-center justify-between border-t border-black/5 pt-4">
         <p class="text-xs text-neutral-mute">{{ draftCount }} concept-shift{{ draftCount === 1 ? '' : 's' }} klaar om in te dienen.</p>

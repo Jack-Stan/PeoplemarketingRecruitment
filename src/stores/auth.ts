@@ -92,6 +92,18 @@ export const useAuthStore = defineStore('auth', () => {
     clear();
   }
 
+  /** Firebase's built-in reset email — see authService.sendPasswordReset. */
+  async function sendPasswordReset(email: string): Promise<boolean> {
+    error.value = null;
+    try {
+      await authService.sendPasswordReset(email);
+      return true;
+    } catch (err) {
+      error.value = friendlyError(err);
+      return false;
+    }
+  }
+
   /**
    * Admin-only: send a passwordless invite email. See authService.sendInvite
    * for why this doesn't need a Cloud Function.
@@ -199,6 +211,7 @@ export const useAuthStore = defineStore('auth', () => {
     signIn,
     signUp,
     signOut,
+    sendPasswordReset,
     sendInvite,
     completeInvite,
     hydrate,
