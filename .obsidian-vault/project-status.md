@@ -273,3 +273,17 @@ Independent FRD-vs-app audit (no vault claims trusted blind), then fixes, then p
   month grid shows per-day shift count, TL headcount, and pending-approval count, highlights today/weekends,
   and clicking a day scopes the list view to that date. Client-side only (office shifts already fully loaded),
   no new query. `MyPlanningView`'s weekly grid was already done — daily/weekly/monthly views are now all covered.
+- **✅ FRD §18 Multi-Office admin support added.** New `useOfficeContextStore`/`useActiveOffice()` — an
+  Administrator gets an office switcher in `AppShell.vue` and every office-scoped view (Employees, Planning,
+  Recruitment, History, Users) follows whichever office they've switched to, same CRUD as Gent. TeamManager/
+  TeamMember stay office-locked, unaffected. `firestore.rules` updated: `isStaffOf(officeId)` now grants any
+  Administrator access regardless of their own `primaryOfficeId`; user role-assignment, office writes, and
+  employee/shift admin writes are no longer same-office-gated. **Deployed to prod 2026-08-25** — Stan confirmed
+  and another session ran `firebase deploy --only firestore:rules`; independently re-verified here via
+  `firebase_get_security_rules` against live `peoplemarketing-c5bfd`, matches the committed rules exactly.
+- **§19 Security & Privacy checked.** RBAC done (now multi-office-aware). HTTPS effectively covered by
+  Netlify/Firebase hosting defaults — one manual item: confirm Netlify's "Force HTTPS" toggle is on for
+  `peoplemarketing.be` (dashboard setting, not code). **Audit trail confirmed missing** — no log of who
+  approved a shift, assigned a role, or deleted an employee; flagged as buildable next, not started. **GDPR
+  review not started and isn't a code task** — needs a human/legal call (retention, lawful basis, data-subject
+  rights, any DPA with Firebase), not an engineering one.
