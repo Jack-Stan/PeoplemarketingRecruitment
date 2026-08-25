@@ -109,6 +109,37 @@ onUnmounted(() => store.unsubscribe());
       </article>
     </section>
 
+    <!-- FRD §15 Recruitment Quality Reporting — attendance/no-show/conversion + performance per bron. -->
+    <section v-if="canManage" class="grid gap-6 xl:grid-cols-[1fr_1.4fr]">
+      <div class="grid grid-cols-3 gap-4">
+        <article class="border border-black/5 bg-white p-5">
+          <p class="text-xs uppercase tracking-[0.16em] text-neutral-mute">Opkomst</p>
+          <p class="mt-3 text-3xl font-bold text-emerald-600">{{ store.qualityStats.attendanceRate }}%</p>
+        </article>
+        <article class="border border-black/5 bg-white p-5">
+          <p class="text-xs uppercase tracking-[0.16em] text-neutral-mute">No-show</p>
+          <p class="mt-3 text-3xl font-bold text-semantic-danger">{{ store.qualityStats.noShowRate }}%</p>
+        </article>
+        <article class="border border-black/5 bg-white p-5">
+          <p class="text-xs uppercase tracking-[0.16em] text-neutral-mute">Conversie</p>
+          <p class="mt-3 text-3xl font-bold">{{ store.qualityStats.conversionRate }}%</p>
+        </article>
+      </div>
+      <div class="border border-black/5 bg-white p-5">
+        <h3 class="text-sm font-bold">Prestatie per bron</h3>
+        <div class="mt-4 space-y-3">
+          <div v-for="row in store.bySourcePerformance" :key="row.source" class="flex items-center gap-3 text-xs">
+            <span class="w-28 shrink-0 font-semibold">{{ row.source }}</span>
+            <div class="h-2 flex-1 bg-neutral-100">
+              <div class="h-full bg-primary-pink" :style="{ width: `${row.hiredRate}%` }"></div>
+            </div>
+            <span class="w-20 shrink-0 text-right text-neutral-mute">{{ row.hired }}/{{ row.total }} aangenomen</span>
+          </div>
+          <p v-if="!store.bySourcePerformance.length" class="text-neutral-mute">Nog geen leads.</p>
+        </div>
+      </div>
+    </section>
+
     <div class="flex gap-1 overflow-x-auto border-b border-black/10 pb-px">
       <button
         class="whitespace-nowrap border-b-2 px-4 py-3 text-xs font-bold"
