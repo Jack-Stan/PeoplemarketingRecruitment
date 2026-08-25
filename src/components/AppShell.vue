@@ -2,6 +2,8 @@
 import { computed } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { useAuth } from '@/composables/useAuth';
+import { brand } from '@/assets/brand';
+import logoUrl from '@/assets/logo.svg';
 
 const route = useRoute();
 const router = useRouter();
@@ -27,7 +29,7 @@ async function signOut(): Promise<void> {
 <template>
   <div class="min-h-screen bg-[#f6f5f3] text-neutral-ink">
     <aside class="fixed inset-y-0 left-0 z-20 hidden w-64 flex-col bg-[#111111] text-white lg:flex">
-      <div class="border-b border-white/10 px-7 py-6"><p class="text-sm font-bold">PeopleMarketing</p><p class="mt-1 text-[10px] uppercase tracking-[0.2em] text-white/40">Operations</p></div>
+      <div class="border-b border-white/10 px-7 py-6"><img :src="logoUrl" :alt="brand.logo.alt" class="h-8 w-auto" /><p class="mt-2 text-[10px] uppercase tracking-[0.2em] text-white/40">Operations</p></div>
       <nav class="flex-1 space-y-1 px-3 py-7"><p class="px-4 pb-3 text-[10px] font-bold uppercase tracking-[0.2em] text-white/35">Workspace</p><RouterLink v-for="link in links" :key="link.to" :to="link.to" class="flex items-center gap-3 border-l-2 px-4 py-3 text-sm font-medium text-white/60 hover:bg-white/5 hover:text-white" :class="route.path === link.to ? 'border-primary-pink bg-white/10 text-white' : 'border-transparent'"><span class="w-5 text-primary-pink">{{ link.icon }}</span>{{ link.label }}</RouterLink></nav>
       <div class="border-t border-white/10 p-4"><button class="flex w-full items-center gap-3 px-2 py-3 text-left" title="Sign out" @click="signOut"><span class="grid h-9 w-9 place-items-center rounded-full bg-primary-pink text-xs font-bold">{{ initials }}</span><span class="min-w-0 flex-1 truncate text-xs">{{ auth.user.value?.email ?? 'Administrator' }}</span><span class="text-white/50">↪</span></button></div>
     </aside>

@@ -1,21 +1,20 @@
 /**
  * Brand tokens for People Marketing.
  *
- * Values marked PLACEHOLDER must be confirmed with the client before
- * production launch. The current site (https://peoplemarketing.nl) reads
- * visually as pink/black/white — the exact pink hex is pending confirmation.
- * Grab the real hex from the browser DevTools (Elements panel → computed
- * styles on the primary CTA) and replace the placeholder below.
- *
- * If multiple shades are needed, derive them programmatically with a colour
- * library (e.g. chroma-js) rather than hard-coding every tint.
+ * Pink is the real value, pulled straight from the logo SVG served on
+ * https://peoplemarketing.nl (fill="#e6007e" on the site's own <a.logo>
+ * markup) — no longer a guess. This also resolves the client's "onze
+ * kleuren zijn wit" comment: white is the mark/text colour used against a
+ * dark ground (see the same source SVG), not a rejection of the pink.
  */
+const primaryPink = '#e6007e';
+
 export const brand = {
   primary: {
-    // PLACEHOLDER pink — default is a balanced, modern pink close to common
-    // "People Marketing" hues. Replace with the client's confirmed hex.
-    pink: '#EC4899',
-    // PLACEHOLDER secondary accent (slightly hotter pink). Replace if needed.
+    pink: primaryPink,
+    // PLACEHOLDER secondary accent (slightly hotter pink) — not sourced from
+    // the client site, only used for hover states. Replace if the client
+    // has an actual secondary tone.
     pinkAlt: '#FF3D8A',
     // PLACEHOLDER soft tint derived from pink — used for hover/background.
     pinkSoft: '#FCE7F3',
@@ -36,20 +35,23 @@ export const brand = {
     bg: '#FFFFFF',
     bgMuted: '#FAFAFA',
     border: '#E5E7EB',
-    accent: '#EC4899',
+    accent: primaryPink,
     accentText: '#FFFFFF',
-    focus: '#EC4899',
+    focus: primaryPink,
     success: '#10B981',
     warning: '#F59E0B',
     danger: '#EF4444',
   },
 
   logo: {
-    // Replace with the real asset URL or `import logoUrl from '@/assets/logo.svg'`.
+    // Not imported here: this file is also loaded by tailwind.config.ts
+    // outside Vite's module graph (via jiti), which can't resolve a raw
+    // asset import. Import '@/assets/logo.svg' directly in the component
+    // that renders it instead (see AppShell.vue).
     src: null as string | null,
     alt: 'People Marketing',
-    width: 120,
-    height: 32,
+    width: 122,
+    height: 51,
   },
 
   font: {
