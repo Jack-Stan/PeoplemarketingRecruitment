@@ -194,16 +194,19 @@ service cloud.firestore {
       match /locations/{locationId} {
         // Location Manager (client asked for a briggsandwalker-style
         // canvassing map+list, meetings/2026-08-25-client-callback-new-asks
-        // item 7). Members need read access to see where to go; only staff
-        // (admin/manager) manage the location list itself.
+        // item 7). Members need read access to see where to go. Managing the
+        // location list (creating zones/pins, editing, deleting) is for
+        // isCoverageViewer — admin, TeamManager, OR a plain TeamMember who
+        // carries the isTeamLeader flag — per Stan: "teamleaders & admin can
+        // make zones", not staff-role-only.
         allow read: if isStaffOf(officeId) || (isMember() && sameOffice(officeId));
-        allow create, delete: if isStaffOf(officeId);
-        // Update: staff may edit anything. A member never touches the
-        // location's own fields (name/address/status/etc) — the ONLY write
-        // they're allowed here is the visit-counter bump that
-        // locationsService.logVisit batches alongside a visits/{visitId}
-        // create, so their write must be exactly "timesVisited +1,
-        // lastVisitedAt set" with everything else unchanged.
+        allow create, delete: if isCoverageViewer(officeId);
+        // Update: a manager (see isCoverageViewer above) may edit anything.
+        // A plain member never touches the location's own fields (name/
+        // address/status/etc) — the ONLY write they're allowed here is the
+        // visit-counter bump that locationsService.logVisit batches alongside
+        // a visits/{visitId} create, so their write must be exactly
+        // "timesVisited +1, lastVisitedAt set" with everything else unchanged.
         function onlyVisitCounterChanged() {
           return request.resource.data.name == resource.data.name
             && request.resource.data.address == resource.data.address
@@ -215,7 +218,7 @@ service cloud.firestore {
             && request.resource.data.status == resource.data.status
             && request.resource.data.timesVisited == resource.data.timesVisited + 1;
         }
-        allow update: if isStaffOf(officeId)
+        allow update: if isCoverageViewer(officeId)
           || (isMember() && sameOffice(officeId) && onlyVisitCounterChanged());
 
         match /visits/{visitId} {
