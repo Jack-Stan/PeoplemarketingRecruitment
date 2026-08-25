@@ -54,6 +54,22 @@ onMounted(() => document.addEventListener('click', closeAccountMenu));
 onUnmounted(() => document.removeEventListener('click', closeAccountMenu));
 
 /**
+ * Below the `lg` breakpoint the sidebar collapses (see the `aside` below),
+ * so this dropdown is the only nav — was a horizontally-scrolling flat row
+ * of every link (workspace + Beheer + no account access at all), now a
+ * proper menu grouped the same way the sidebar is, plus account actions so
+ * a narrow-viewport user can still reach Instellingen/Uitloggen.
+ */
+const isMobileMenuOpen = ref(false);
+const mobileMenuRef = ref<HTMLElement | null>(null);
+function closeMobileMenu(e: MouseEvent): void {
+  if (mobileMenuRef.value && !mobileMenuRef.value.contains(e.target as Node)) isMobileMenuOpen.value = false;
+}
+onMounted(() => document.addEventListener('click', closeMobileMenu));
+onUnmounted(() => document.removeEventListener('click', closeMobileMenu));
+watch(route, () => (isMobileMenuOpen.value = false));
+
+/**
  * Multi-office switcher — Administrator only. Every office-scoped view reads
  * from `useActiveOffice()`, which follows this selection for an admin; a
  * TeamManager/TeamMember never sees this and stays locked to their own
@@ -119,7 +135,46 @@ watch(
       </div>
     </aside>
     <div class="lg:pl-64">
-      <nav class="flex gap-1 overflow-x-auto border-b border-black/5 bg-white px-5 py-2 lg:hidden"><RouterLink v-for="link in allLinks" :key="link.to" :to="link.to" class="whitespace-nowrap px-3 py-2 text-xs font-semibold" :class="isLinkActive(link.to) ? 'text-primary-pink' : 'text-neutral-mute'">{{ link.label }}</RouterLink></nav>
+      <nav class="flex items-center justify-between border-b border-black/5 bg-white px-5 py-2 lg:hidden">
+        <img :src="logoUrl" :alt="brand.logo.alt" class="h-6 w-auto" />
+        <div ref="mobileMenuRef" class="relative">
+          <button
+            class="flex items-center gap-2 border border-black/10 px-3 py-1.5 text-xs font-semibold"
+            @click="isMobileMenuOpen = !isMobileMenuOpen"
+          >
+            {{ allLinks.find((l) => isLinkActive(l.to))?.label ?? 'Menu' }}
+            <span class="text-neutral-mute">{{ isMobileMenuOpen ? '▲' : '▼' }}</span>
+          </button>
+          <div v-if="isMobileMenuOpen" class="absolute right-0 z-30 mt-2 w-56 border border-black/10 bg-white py-1 shadow-lg">
+            <p class="px-4 pb-1 pt-2 text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">Workspace</p>
+            <RouterLink
+              v-for="link in links"
+              :key="link.to"
+              :to="link.to"
+              class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium"
+              :class="isLinkActive(link.to) ? 'bg-primary-pink/5 text-primary-pink' : 'text-neutral-ink hover:bg-[#faf9f7]'"
+            >
+              <span class="w-4 text-primary-pink">{{ link.icon }}</span>{{ link.label }}
+            </RouterLink>
+            <template v-if="adminLinks.length">
+              <p class="border-t border-black/5 px-4 pb-1 pt-2 text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">Beheer</p>
+              <RouterLink
+                v-for="link in adminLinks"
+                :key="link.to"
+                :to="link.to"
+                class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium"
+                :class="isLinkActive(link.to) ? 'bg-primary-pink/5 text-primary-pink' : 'text-neutral-ink hover:bg-[#faf9f7]'"
+              >
+                <span class="w-4 text-primary-pink">{{ link.icon }}</span>{{ link.label }}
+              </RouterLink>
+            </template>
+            <div class="border-t border-black/5 pt-1">
+              <RouterLink to="/settings" class="block px-4 py-2.5 text-sm text-neutral-ink hover:bg-[#faf9f7]">Instellingen</RouterLink>
+              <button class="block w-full px-4 py-2.5 text-left text-sm text-neutral-ink hover:bg-[#faf9f7]" @click="signOut">Uitloggen</button>
+            </div>
+          </div>
+        </div>
+      </nav>
       <main class="p-5 sm:p-8"><slot /></main>
     </div>
   </div>
