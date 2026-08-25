@@ -266,3 +266,6 @@ Independent FRD-vs-app audit (no vault claims trusted blind), then fixes, then p
   another mock-data leftover while in there: the admin Dashboard header showed a hardcoded
   "Monday, 24 August 2026" instead of the real date — fixed.
 - All committed and pushed to `origin/main` (Netlify auto-deploys).
+- **✅ FRD §15 Recruitment Quality Reporting added** — attendance rate, no-show rate, overall conversion, and
+  hired-per-source performance, all computed live from `/recruitmentLeads` (no new infra). Admin/manager only,
+  same gate as the rest of pipeline management. Also pushed.
