@@ -192,10 +192,41 @@ Stan started live-testing against prod via his own local dev server while this w
 - `firestore.rules` changes from 007/008 **still not deployed** — held per Stan's explicit "no" earlier.
 
 ### Immediate next steps (in order Stan asked for)
-1. Finish the password-reset UI (store wrapper + LoginView link).
-2. Build the `MyPlanningView` weekly agenda grid.
-3. Get Stan's go-ahead to commit + push (redeploys Netlify automatically) — separate from the still-pending
-   firestore.rules deploy, which is a different action (CLI `firebase deploy --only firestore:rules`).
+1. ✅ Password-reset UI wired — `authService.sendPasswordReset` now has a "Forgot password?" toggle on `LoginView.vue`.
+2. ✅ `MyPlanningView` weekly agenda grid built — 7-day grid replacing the flat list, per-day quick-add.
+3. ✅ Committed + pushed to `origin/main` (Netlify auto-deploys from there) — twice this round: Dashboard/role-drift fixes, then password-reset/agenda-grid.
+
+## Update — audit + fix round (2026-08-25)
+
+Independent FRD-vs-app audit (no vault claims trusted blind), then fixes, then prod deploy:
+
+- **Fixed: Dashboard was 100% mock data.** `DashboardView.vue`'s admin view hardcoded a staffing bar and recruitment
+  funnel next to `PlanningView`/`RecruitmentView`, which already had the real numbers one click away. Now pulls
+  from `useShiftsStore`/`useRecruitmentStore` directly — no more fabricated KPIs on the page an admin lands on first.
+- **Fixed: role/isTeamLeader duplication.** `/users/{uid}` and `/offices/{id}/employees/{uid}` both carried
+  independently-editable `role`/`isTeamLeader` copies with no sync — a promotion on the Users page silently went
+  stale on the Employees roster (which is what shift TL-stamping actually reads from, since a TeamManager can't
+  read other people's `/users` docs under the rules). Fix: `usersStore.assignRole` now also pushes the same values
+  onto the roster doc (`employeesService.syncRoleAndTeamLeader`); `EmployeesView`'s edit form shows role/TL
+  read-only with a link to Users instead of offering a second write path.
+- **Password reset wired**, weekly agenda grid built (see above).
+- **🔴 007 + 008 firestore.rules changes deployed to prod** (2026-08-25, `firebase deploy --only firestore:rules`,
+  confirmed success) — employee-doc uid-keying and self-service shift creation are now enforced server-side, not
+  just client-side. This was the last piece holding those two features back from being real on prod.
+- **New: client sent the logo file** (inline image, not yet saved to disk — waiting on Stan to drop it at a real
+  path, e.g. `src/assets/logo.png`, since it arrived as chat content with nothing to read/write from). Once it's
+  on disk it replaces `src/assets/logo-placeholder.svg` — also resolves half of the branding open question
+  (logo itself; the pink-vs-"wit" colour conflict is still open, needs the client asked directly, see below).
+
+### Still open after this round
+
+- Netlify frontend now matches `origin/main` HEAD as of this push — worth Stan double-checking the live site once
+  the deploy finishes, same as any push.
+- Logo file — waiting on a real path from Stan.
+- Colour conflict (pink vs "wit") — still needs a direct question to the client, not guessed at.
+- Recruitment auto-messaging, multi-office cross-admin flow, TL headcount trend report — all still blocked on
+  decisions only Stan/the client can make (send channel, Blaze-vs-free-tier, `/periods` design), not touched
+  this round.
 
 ## Production Firestore state (2026-08-24)
 
