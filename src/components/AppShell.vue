@@ -21,6 +21,7 @@ const links = computed(() => [
   { label: 'Rekrutering', to: '/recruitment', icon: '◎' },
   { label: 'Geschiedenis', to: '/history', icon: '◷' },
   ...(auth.hasRole('Administrator') ? [{ label: 'Gebruikers', to: '/users', icon: '☺' }] : []),
+  ...(auth.hasRole('Administrator') ? [{ label: 'Audit trail', to: '/audit', icon: '⎘' }] : []),
 ]);
 const initials = computed(() => (auth.user.value?.email?.slice(0, 2) ?? 'PM').toUpperCase());
 async function signOut(): Promise<void> {

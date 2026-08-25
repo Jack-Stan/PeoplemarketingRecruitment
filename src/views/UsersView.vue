@@ -5,12 +5,14 @@ import { officesService } from '@/services/offices.service';
 import { useAuth } from '@/composables/useAuth';
 import { useActiveOffice } from '@/composables/useActiveOffice';
 import { isValidEmail } from '@/utils/validators';
+import { useAuditLogStore } from '@/stores/auditLog';
 import { useUsersStore } from '@/stores/users';
 import { useUiStore } from '@/stores/ui';
 import { ROLE_LABELS, Roles, type Role, type UserProfile } from '@/types/user';
 
 const auth = useAuth();
 const store = useUsersStore();
+const auditLog = useAuditLogStore();
 const ui = useUiStore();
 
 // Multi-office: an Administrator assigns into whichever office they've
@@ -88,7 +90,19 @@ async function submit(): Promise<void> {
   const ok = await store.assignRole(editingUid.value, form.value.role, ownOfficeId.value, form.value.isTeamLeader);
   saving.value = false;
   ui.push(ok ? 'Rol toegewezen.' : (store.error ?? 'Er ging iets mis.'), ok ? 'success' : 'error');
-  if (ok) closeEdit();
+  if (ok) {
+    if (auth.user.value) {
+      auditLog.log(ownOfficeId.value, {
+        actorUid: auth.user.value.uid,
+        actorEmail: auth.user.value.email ?? '',
+        action: 'role_assigned',
+        targetLabel: `${editingUser?.displayName || editingUser?.email} → ${ROLE_LABELS[form.value.role]}`,
+        details: form.value.isTeamLeader ? 'Teamleider' : null,
+        createdAtMs: Date.now(),
+      });
+    }
+    closeEdit();
+  }
 }
 
 async function sendInvite(): Promise<void> {

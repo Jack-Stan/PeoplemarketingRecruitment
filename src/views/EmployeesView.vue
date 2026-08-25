@@ -4,6 +4,7 @@ import { RouterLink } from 'vue-router';
 
 import { useAuth } from '@/composables/useAuth';
 import { useActiveOffice } from '@/composables/useActiveOffice';
+import { useAuditLogStore } from '@/stores/auditLog';
 import { useEmployeesStore } from '@/stores/employees';
 import { useUiStore } from '@/stores/ui';
 import { useUsersStore } from '@/stores/users';
@@ -14,6 +15,7 @@ import type { Employee, EmployeeCreatePayload } from '@/types/employee';
 const auth = useAuth();
 const store = useEmployeesStore();
 const usersStore = useUsersStore();
+const auditLog = useAuditLogStore();
 const ui = useUiStore();
 
 const { officeId } = useActiveOffice();
@@ -160,6 +162,16 @@ async function submitForm(): Promise<void> {
 
   if (ok) {
     ui.push(editingId.value ? 'Medewerker bijgewerkt.' : 'Medewerker toegevoegd.', 'success');
+    if (!editingId.value && auth.user.value) {
+      auditLog.log(officeId.value, {
+        actorUid: auth.user.value.uid,
+        actorEmail: auth.user.value.email ?? '',
+        action: 'employee_created',
+        targetLabel: `${form.value.firstName} ${form.value.lastName}`,
+        details: null,
+        createdAtMs: Date.now(),
+      });
+    }
     isFormOpen.value = false;
   } else {
     formError.value = store.error;
@@ -167,11 +179,22 @@ async function submitForm(): Promise<void> {
 }
 
 async function toggleActive(e: Employee): Promise<void> {
-  const ok = await store.setActive(officeId.value, e.employeeId, !e.isActive);
+  const nextActive = !e.isActive;
+  const ok = await store.setActive(officeId.value, e.employeeId, nextActive);
   ui.push(
-    ok ? `${e.firstName} is nu ${!e.isActive ? 'actief' : 'inactief'}.` : (store.error ?? 'Er ging iets mis.'),
+    ok ? `${e.firstName} is nu ${nextActive ? 'actief' : 'inactief'}.` : (store.error ?? 'Er ging iets mis.'),
     ok ? 'success' : 'error',
   );
+  if (ok && auth.user.value) {
+    auditLog.log(officeId.value, {
+      actorUid: auth.user.value.uid,
+      actorEmail: auth.user.value.email ?? '',
+      action: nextActive ? 'employee_reactivated' : 'employee_deactivated',
+      targetLabel: `${e.firstName} ${e.lastName}`,
+      details: null,
+      createdAtMs: Date.now(),
+    });
+  }
 }
 
 // Re-subscribes whenever the active office changes — an Administrator

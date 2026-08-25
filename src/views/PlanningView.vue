@@ -3,6 +3,7 @@ import { computed, onUnmounted, ref, watch } from 'vue';
 
 import { useAuth } from '@/composables/useAuth';
 import { useActiveOffice } from '@/composables/useActiveOffice';
+import { useAuditLogStore } from '@/stores/auditLog';
 import { useEmployeesStore } from '@/stores/employees';
 import { useShiftsStore } from '@/stores/shifts';
 import { useUiStore } from '@/stores/ui';
@@ -11,6 +12,7 @@ import { FIXED_SHIFT_HOURS, type Shift, type ShiftCreatePayload, type ShiftType 
 const auth = useAuth();
 const employeesStore = useEmployeesStore();
 const shiftsStore = useShiftsStore();
+const auditLog = useAuditLogStore();
 const ui = useUiStore();
 
 const { officeId } = useActiveOffice();
@@ -20,6 +22,7 @@ const canDraft = computed(() => auth.role.value === 'Administrator' || auth.role
 const isFormOpen = ref(false);
 const formError = ref(null as string | null);
 const rejectingId = ref(null as string | null);
+const rejectingShift = ref(null as Shift | null);
 const rejectReason = ref('');
 
 function makeEmptyForm(): ShiftCreatePayload {
@@ -189,24 +192,47 @@ async function approveShift(shift: Shift): Promise<void> {
   if (!auth.user.value) return;
   const ok = await shiftsStore.approve(officeId.value, shift.shiftId, auth.user.value.uid, Date.now());
   ui.push(ok ? 'Shift goedgekeurd.' : (shiftsStore.error ?? 'Er ging iets mis.'), ok ? 'success' : 'error');
+  if (ok) {
+    auditLog.log(officeId.value, {
+      actorUid: auth.user.value.uid,
+      actorEmail: auth.user.value.email ?? '',
+      action: 'shift_approved',
+      targetLabel: `${shift.employeeName} · ${shift.date} (${shift.type})`,
+      details: null,
+      createdAtMs: Date.now(),
+    });
+  }
 }
 
 function openReject(shift: Shift): void {
   rejectingId.value = shift.shiftId;
+  rejectingShift.value = shift;
   rejectReason.value = '';
 }
 
 async function confirmReject(): Promise<void> {
   if (!rejectingId.value || !auth.user.value) return;
+  const reason = rejectReason.value.trim() || 'Geen reden opgegeven';
   const ok = await shiftsStore.reject(
     officeId.value,
     rejectingId.value,
-    rejectReason.value.trim() || 'Geen reden opgegeven',
+    reason,
     auth.user.value.uid,
     Date.now(),
   );
   ui.push(ok ? 'Shift afgewezen.' : (shiftsStore.error ?? 'Er ging iets mis.'), ok ? 'success' : 'error');
+  if (ok && rejectingShift.value) {
+    auditLog.log(officeId.value, {
+      actorUid: auth.user.value.uid,
+      actorEmail: auth.user.value.email ?? '',
+      action: 'shift_rejected',
+      targetLabel: `${rejectingShift.value.employeeName} · ${rejectingShift.value.date} (${rejectingShift.value.type})`,
+      details: reason,
+      createdAtMs: Date.now(),
+    });
+  }
   rejectingId.value = null;
+  rejectingShift.value = null;
 }
 
 async function deleteDraft(shift: Shift): Promise<void> {

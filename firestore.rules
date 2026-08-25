@@ -152,6 +152,17 @@ service cloud.firestore {
         allow write: if isStaffOf(officeId);
       }
 
+      match /auditLog/{entryId} {
+        // FRD §19 audit trail — append-only. No update/delete for ANYONE,
+        // not even an admin: a log that can be edited after the fact isn't
+        // an audit trail. Same visibility/write gate as staff actions
+        // generally (isStaffOf already grants any Administrator access
+        // office-agnostically, see the multi-office comment above).
+        allow read: if isStaffOf(officeId);
+        allow create: if isStaffOf(officeId);
+        allow update, delete: if false;
+      }
+
       match /periods/{periodId} {
         // Historical snapshots are written server-side only (Cloud Function via Admin SDK,
         // which bypasses these rules entirely) — no client writes, ever.

@@ -3,11 +3,12 @@ import { computed, onUnmounted, ref, watch } from 'vue';
 
 import { useAuth } from '@/composables/useAuth';
 import { useActiveOffice } from '@/composables/useActiveOffice';
+import { useAuditLogStore } from '@/stores/auditLog';
 import { useRecruitmentStore } from '@/stores/recruitment';
 import { useUiStore } from '@/stores/ui';
 import {
-  LEAD_STAGES,
   LEAD_STAGE_LABELS,
+  LEAD_STAGES,
   type LeadSource,
   type LeadStage,
   type RecruitmentLeadCreatePayload,
@@ -15,6 +16,7 @@ import {
 
 const auth = useAuth();
 const store = useRecruitmentStore();
+const auditLog = useAuditLogStore();
 const ui = useUiStore();
 
 const { officeId } = useActiveOffice();
@@ -64,8 +66,20 @@ async function submitForm(): Promise<void> {
 }
 
 async function moveStage(leadId: string, stage: LeadStage): Promise<void> {
+  const lead = store.leads.find((l) => l.leadId === leadId);
+  const fromStage = lead?.stage;
   const ok = await store.setStage(officeId.value, leadId, stage);
   ui.push(ok ? 'Fase bijgewerkt.' : (store.error ?? 'Er ging iets mis.'), ok ? 'success' : 'error');
+  if (ok && lead && auth.user.value) {
+    auditLog.log(officeId.value, {
+      actorUid: auth.user.value.uid,
+      actorEmail: auth.user.value.email ?? '',
+      action: 'recruitment_stage_changed',
+      targetLabel: lead.name,
+      details: `${fromStage ? LEAD_STAGE_LABELS[fromStage] : '?'} → ${LEAD_STAGE_LABELS[stage]}`,
+      createdAtMs: Date.now(),
+    });
+  }
 }
 
 watch(

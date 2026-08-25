@@ -126,6 +126,16 @@ export const routes: RouteRecordRaw[] = [
     },
   },
   {
+    path: '/audit',
+    name: 'audit',
+    component: () => import('@/views/AuditLogView.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: [Roles.Administrator],
+      title: 'Audit trail',
+    },
+  },
+  {
     path: '/unauthorized',
     name: 'unauthorized',
     component: () => import('@/views/UnauthorizedView.vue'),
