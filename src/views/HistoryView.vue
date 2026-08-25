@@ -10,12 +10,13 @@ import type { Shift } from '@/types/shift';
  * Admin/manager see the whole office's completed shifts; a TeamMember sees
  * only their own (same read-rule split as everywhere else in this app).
  *
- * Deliberately NOT the full "TL headcount trend over time" report from the
- * client transcript / ticket-06 — that needs a real snapshot cadence
- * decision (the old `/periods` write path was a Cloud Function that no
- * longer exists, see decisions/006) and hasn't been scoped yet. This groups
- * whatever's live in `/shifts` by month, which is honest about what's
- * actually there instead of showing invented numbers.
+ * TL headcount trend (client transcript: "where am I losing/gaining team
+ * leaders") is computed live from `/shifts` rather than a written `/periods`
+ * snapshot — there's no Cloud Function to write one any more (decisions/006)
+ * and the client's own ask is a trend to look at, not an immutable audit
+ * record, so a live client-side aggregate is honest and good enough. Revisit
+ * with a real `/periods` design only if an actual immutability requirement
+ * shows up.
  */
 const auth = useAuth();
 const shiftsStore = useShiftsStore();
@@ -47,6 +48,17 @@ const monthlyRows = computed(() => {
     });
 });
 
+/** Oldest → newest, with month-over-month delta, for the trend chart below. */
+const teamLeaderTrend = computed(() => {
+  const chronological = [...monthlyRows.value].sort((a, b) => a.month.localeCompare(b.month));
+  const maxCount = Math.max(1, ...chronological.map((r) => r.teamLeaders));
+  return chronological.map((r, i) => ({
+    ...r,
+    fill: Math.round((r.teamLeaders / maxCount) * 100),
+    delta: i === 0 ? null : r.teamLeaders - chronological[i - 1].teamLeaders,
+  }));
+});
+
 onMounted(() => {
   if (!auth.officeId.value || !auth.user.value) return;
   if (isMember.value) {
@@ -63,6 +75,30 @@ onUnmounted(() => shiftsStore.unsubscribe());
     <section>
       <p class="text-sm text-neutral-mute">{{ isMember ? 'Jouw shiftgeschiedenis' : 'Shiftgeschiedenis per maand' }}</p>
       <h2 class="mt-1 text-3xl font-bold tracking-tight">Geschiedenis</h2>
+    </section>
+
+    <section v-if="!isMember && teamLeaderTrend.length" class="border border-black/5 bg-white p-6">
+      <div>
+        <h3 class="text-lg font-bold">Teamleiders per maand</h3>
+        <p class="mt-1 text-xs text-neutral-mute">Waar win of verlies je teamleiders?</p>
+      </div>
+      <div class="mt-8 flex h-40 items-end justify-between gap-3 overflow-x-auto border-b border-black/10 px-2">
+        <div v-for="row in teamLeaderTrend" :key="row.month" class="flex flex-1 flex-col items-center gap-2">
+          <span class="flex items-center gap-1 text-xs font-bold">
+            {{ row.teamLeaders }}
+            <span
+              v-if="row.delta !== null && row.delta !== 0"
+              :class="row.delta > 0 ? 'text-emerald-600' : 'text-semantic-danger'"
+            >
+              {{ row.delta > 0 ? '▲' : '▼' }}{{ Math.abs(row.delta) }}
+            </span>
+          </span>
+          <div class="flex w-full max-w-12 flex-col justify-end bg-primary-pink/15" :style="{ height: `${row.fill}%` }">
+            <div class="h-2 bg-primary-pink"></div>
+          </div>
+          <span class="whitespace-nowrap text-[11px] capitalize text-neutral-mute">{{ row.label }}</span>
+        </div>
+      </div>
     </section>
 
     <section class="overflow-x-auto border border-black/5 bg-white">
@@ -88,9 +124,8 @@ onUnmounted(() => shiftsStore.unsubscribe());
       <p v-else-if="!monthlyRows.length" class="p-8 text-center text-sm text-neutral-mute">Nog geen geschiedenis.</p>
     </section>
 
-    <p class="text-xs text-neutral-mute">
-      Rekruteringsgeschiedenis en de teamleider-trendgrafiek volgen nog — daarvoor is eerst een echte
-      dataset nodig (zie ticket-06).
+    <p v-if="!isMember" class="text-xs text-neutral-mute">
+      Rekruteringsgeschiedenis volgt nog — dat wordt meegenomen zodra de rekruteringsmodule langer meedraait.
     </p>
   </div>
 </template>
