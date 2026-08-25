@@ -36,3 +36,5 @@ serviceAccountKey.json
 # Cache
 .eslintcache
 .cache/
+# Claude Code background-agent worktrees — local scratch state, not project code
+.claude/worktrees/
