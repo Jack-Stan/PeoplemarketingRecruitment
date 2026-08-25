@@ -104,17 +104,6 @@ export const useUsersStore = defineStore('users', () => {
     }
   }
 
-  async function setPhoneVerified(uid: string, verified: boolean): Promise<boolean> {
-    error.value = null;
-    try {
-      await usersService.setPhoneVerified(uid, verified);
-      return true;
-    } catch (err) {
-      error.value = friendlyError(err);
-      return false;
-    }
-  }
-
   return {
     users,
     isLoading,
@@ -127,6 +116,5 @@ export const useUsersStore = defineStore('users', () => {
     setActive,
     deleteUser,
     setPhone,
-    setPhoneVerified,
   };
 });

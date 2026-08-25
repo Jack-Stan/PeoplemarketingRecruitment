@@ -39,7 +39,6 @@ export const usersService = {
       isActive: true,
       phone,
       emailVerified: false,
-      phoneVerified: false,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
@@ -100,36 +99,21 @@ export const usersService = {
     await updateDoc(doc(db, 'users', uid), { isActive, updatedAt: serverTimestamp() });
   },
 
-  /**
-   * Admin-only: set/clear the contact number shown on the user detail page.
-   * Resets `phoneVerified` — a changed number needs confirming again,
-   * whoever changed it.
-   */
+  /** Admin-only: set/clear the contact number shown on the user detail page. */
   async setPhone(uid: string, phone: string | null): Promise<void> {
-    await updateDoc(doc(db, 'users', uid), { phone, phoneVerified: false, updatedAt: serverTimestamp() });
+    await updateDoc(doc(db, 'users', uid), { phone, updatedAt: serverTimestamp() });
   },
 
   /**
    * Self-service: a user updates their OWN phone number from Settings.
-   * firestore.rules scopes this so a non-admin can only ever touch
-   * `phone`/`phoneVerified` on their own doc — everything else (role,
-   * office, email, isActive…) stays admin-only. Resets `phoneVerified` —
-   * a changed number needs re-confirming (see `setPhoneVerified`).
+   * firestore.rules scopes this so a non-admin can only ever touch `phone`
+   * on their own doc — everything else (role, office, email, isActive…)
+   * stays admin-only. No verification concept on this field — see
+   * project_spark_plan_no_blaze for why real phone verification (SMS OTP)
+   * isn't in scope here.
    */
   async setOwnPhone(uid: string, phone: string | null): Promise<void> {
-    await updateDoc(doc(db, 'users', uid), { phone, phoneVerified: false, updatedAt: serverTimestamp() });
-  },
-
-  /**
-   * Sets/clears the phone-verified flag. No Firebase Phone Auth in this app
-   * (SMS OTP needs the Blaze plan — see project_spark_plan_no_blaze), so
-   * this is always a self-attestation, not an automated check. Callable by
-   * the account owner on their own doc (Settings — "confirm this number is
-   * correct", a todo the user does themselves) or by an admin on anyone's
-   * doc; firestore.rules gates which is which.
-   */
-  async setPhoneVerified(uid: string, verified: boolean): Promise<void> {
-    await updateDoc(doc(db, 'users', uid), { phoneVerified: verified, updatedAt: serverTimestamp() });
+    await updateDoc(doc(db, 'users', uid), { phone, updatedAt: serverTimestamp() });
   },
 
   /**

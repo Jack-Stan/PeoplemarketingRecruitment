@@ -13,7 +13,6 @@ export type AuditAction =
   | 'user_deactivated'
   | 'user_reactivated'
   | 'user_deleted'
-  | 'phone_verified_changed'
   | 'recruitment_stage_changed';
 
 export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
@@ -26,7 +25,6 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   user_deactivated: 'Gebruiker gedeactiveerd',
   user_reactivated: 'Gebruiker gereactiveerd',
   user_deleted: 'Gebruiker verwijderd',
-  phone_verified_changed: 'Telefoonnummer verificatie gewijzigd',
   recruitment_stage_changed: 'Rekrutering: fase gewijzigd',
 };
 

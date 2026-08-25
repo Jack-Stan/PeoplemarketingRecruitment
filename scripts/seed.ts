@@ -91,7 +91,6 @@ async function seedUserDoc(uid: string): Promise<void> {
         isActive: true,
         phone: null,
         emailVerified: false,
-        phoneVerified: false,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       },

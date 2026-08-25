@@ -55,6 +55,14 @@ service cloud.firestore {
       return isAdmin() || (sameOffice(officeId) && isManager());
     }
 
+    // isTeamLeader is a flag on a TeamMember (squad lead), separate from the
+    // TeamManager role — see EmployeesView's Teamleider/Teamlid split. Used
+    // by Location Manager: coverage stats (who visited where, how often)
+    // are for leadership only, not the whole canvassing team.
+    function isCoverageViewer(officeId) {
+      return isStaffOf(officeId) || (sameOffice(officeId) && myProfile().isTeamLeader == true);
+    }
+
     match /users/{userId} {
       // Own doc always readable; admin can read any user (needed to see
       // pending signups before they have an office at all).
@@ -75,16 +83,13 @@ service cloud.firestore {
       // office switcher is how they pick which one, same as isStaffOf below.
       //
       // Self-service (Settings page): a non-admin may update ONLY their own
-      // doc's phone/phoneVerified/emailVerified — every other field (role,
-      // office, isActive, email, displayName…) must come out unchanged, so
-      // this can never be used as a privilege-escalation path. `phoneVerified`
-      // is a self-attestation ("I confirm this number is correct"), done by
-      // the user themselves as a todo on Settings — not an admin sign-off,
-      // since there's no Firebase Phone Auth here to check it automatically
-      // (SMS needs Blaze) either way, so an admin confirming it wasn't any
-      // more trustworthy than the user doing it themselves. `emailVerified`
-      // must match the caller's own ID token claim — it can't be
-      // self-attested to an arbitrary value the same way.
+      // doc's phone/emailVerified — every other field (role, office,
+      // isActive, email, displayName…) must come out unchanged, so this can
+      // never be used as a privilege-escalation path. No phone verification
+      // concept here (real phone verification needs Firebase Phone Auth,
+      // which requires Blaze — out of scope, see project_spark_plan_no_blaze).
+      // `emailVerified` must match the caller's own ID token claim — it
+      // can't be self-attested to an arbitrary value.
       function selfProfileUpdateOnly() {
         return isSignedIn() && request.auth.uid == userId
           && request.resource.data.role == resource.data.role
@@ -94,8 +99,7 @@ service cloud.firestore {
           && request.resource.data.isActive == resource.data.isActive
           && request.resource.data.email == resource.data.email
           && request.resource.data.displayName == resource.data.displayName
-          && request.resource.data.emailVerified == request.auth.token.email_verified
-          && request.resource.data.phoneVerified is bool;
+          && request.resource.data.emailVerified == request.auth.token.email_verified;
       }
       allow update: if (isAdmin() && request.resource.data.role in ['Administrator', 'TeamManager', 'TeamMember'])
         || selfProfileUpdateOnly();
@@ -206,6 +210,8 @@ service cloud.firestore {
             && request.resource.data.neighbourhood == resource.data.neighbourhood
             && request.resource.data.lat == resource.data.lat
             && request.resource.data.lng == resource.data.lng
+            && request.resource.data.boundary == resource.data.boundary
+            && request.resource.data.notes == resource.data.notes
             && request.resource.data.status == resource.data.status
             && request.resource.data.timesVisited == resource.data.timesVisited + 1;
         }
@@ -215,9 +221,9 @@ service cloud.firestore {
         match /visits/{visitId} {
           // Visit log: any signed-in office member can log that THEY visited
           // a location (self-attested, matches the employee-authored shift
-          // model in decisions/008) — a team leader/admin needs to see who
-          // covered a neighbourhood, not just staff-logged visits.
-          allow read: if isStaffOf(officeId) || (isMember() && sameOffice(officeId));
+          // model in decisions/008) — but only a Teamleider/admin may READ
+          // the log back, per Stan: coverage stats are leadership-only.
+          allow read: if isCoverageViewer(officeId);
           allow create: if (isStaffOf(officeId) || (isMember() && sameOffice(officeId)))
             && request.resource.data.employeeId == request.auth.uid;
           allow update, delete: if false;

@@ -92,33 +92,11 @@ async function savePhone(): Promise<void> {
     await usersService.setOwnPhone(uid, phoneDraft.value.trim() || null);
     await loadProfile();
     isEditingPhone.value = false;
-    ui.push('Telefoonnummer opgeslagen — bevestig het hieronder als het klopt.', 'success');
+    ui.push('Telefoonnummer opgeslagen.', 'success');
   } catch {
     ui.push('Kon het telefoonnummer niet opslaan.', 'error');
   } finally {
     savingPhone.value = false;
-  }
-}
-
-/**
- * Self-attestation todo — no Firebase Phone Auth here (SMS needs Blaze), so
- * this is just the user confirming the number is theirs, not a real OTP
- * check. See firestore.rules `selfProfileUpdateOnly` for why this is a
- * self-write now rather than an admin sign-off.
- */
-const confirmingPhone = ref(false);
-async function confirmPhone(): Promise<void> {
-  const uid = auth.user.value?.uid;
-  if (!uid) return;
-  confirmingPhone.value = true;
-  try {
-    await usersService.setPhoneVerified(uid, true);
-    await loadProfile();
-    ui.push('Telefoonnummer bevestigd.', 'success');
-  } catch {
-    ui.push('Kon het niet bevestigen.', 'error');
-  } finally {
-    confirmingPhone.value = false;
   }
 }
 
@@ -133,7 +111,7 @@ const faqs = [
   },
   {
     q: 'Hoe wijzig ik mijn telefoonnummer?',
-    a: 'Onder "Mijn gegevens" bij Telefoon op Bewerken. Een nieuw nummer staat op "Niet geverifieerd" tot je het zelf bevestigt met de knop ernaast.',
+    a: 'Onder "Mijn gegevens" bij Telefoon op Bewerken.',
   },
   {
     q: 'Waarom zie ik bepaalde pagina’s niet in het menu?',
@@ -238,30 +216,11 @@ function toggleFaq(i: number): void {
             <div v-if="!isEditingPhone" class="flex items-center justify-between gap-3">
               <div class="min-w-0">
                 <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">Telefoon</p>
-                <p class="flex items-center gap-2 truncate text-sm">
-                  {{ profile.phone || 'Niet ingesteld' }}
-                  <span
-                    v-if="profile.phone && !skipVerification"
-                    class="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
-                    :class="profile.phoneVerified ? 'bg-emerald-500/10 text-emerald-600' : 'bg-neutral-200 text-neutral-mute'"
-                  >
-                    {{ profile.phoneVerified ? 'Geverifieerd' : 'Niet geverifieerd' }}
-                  </span>
-                </p>
+                <p class="truncate text-sm">{{ profile.phone || 'Niet ingesteld' }}</p>
               </div>
-              <div class="flex shrink-0 gap-2">
-                <button
-                  v-if="!skipVerification && profile.phone && !profile.phoneVerified"
-                  class="border border-black/10 px-3 py-1.5 text-xs font-semibold hover:border-primary-pink hover:text-primary-pink disabled:opacity-50"
-                  :disabled="confirmingPhone"
-                  @click="confirmPhone"
-                >
-                  Bevestigen
-                </button>
-                <button class="border border-black/10 px-3 py-1.5 text-xs font-semibold text-neutral-mute hover:border-primary-pink hover:text-primary-pink" @click="startEditPhone">
-                  {{ profile.phone ? 'Bewerken' : '+ Toevoegen' }}
-                </button>
-              </div>
+              <button class="shrink-0 border border-black/10 px-3 py-1.5 text-xs font-semibold text-neutral-mute hover:border-primary-pink hover:text-primary-pink" @click="startEditPhone">
+                {{ profile.phone ? 'Bewerken' : '+ Toevoegen' }}
+              </button>
             </div>
             <form v-else class="flex items-center gap-2" @submit.prevent="savePhone">
               <input v-model="phoneDraft" type="tel" placeholder="+32 4xx xx xx xx" class="min-w-0 flex-1 border-black/10 bg-[#faf9f7] text-sm" />

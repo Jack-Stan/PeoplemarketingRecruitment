@@ -53,7 +53,6 @@ describe('auth store', () => {
       isActive: true,
       phone: null,
       emailVerified: false,
-      phoneVerified: false,
     });
 
     const store = useAuthStore();
@@ -183,7 +182,6 @@ describe('auth store', () => {
       isActive: true,
       phone: null,
       emailVerified: false,
-      phoneVerified: false,
     });
 
     const store = useAuthStore();
@@ -212,7 +210,6 @@ describe('auth store', () => {
       isActive: true,
       phone: null,
       emailVerified: false,
-      phoneVerified: false,
     });
     vi.mocked(authService.signOut).mockResolvedValueOnce(undefined);
 

@@ -87,28 +87,5 @@ export function useUserActions(officeLabel: (officeId: string | null) => string,
     return ok;
   }
 
-  /**
-   * Admin manually attests a phone number as verified/unverified — there's
-   * no Firebase Phone Auth in this app (SMS OTP needs the Blaze plan), so
-   * this is a "yes, I confirmed this by calling them" toggle, not automated.
-   */
-  async function setPhoneVerified(u: UserProfile, verified: boolean): Promise<void> {
-    const ok = await store.setPhoneVerified(u.uid, verified);
-    ui.push(
-      ok ? `Telefoonnummer van ${u.displayName || u.email} is nu ${verified ? 'geverifieerd' : 'ongeverifieerd'}.` : (store.error ?? 'Er ging iets mis.'),
-      ok ? 'success' : 'error',
-    );
-    if (ok && auth.user.value) {
-      auditLog.log(u.primaryOfficeId ?? ownOfficeId.value ?? '', {
-        actorUid: auth.user.value.uid,
-        actorEmail: auth.user.value.email ?? '',
-        action: 'phone_verified_changed',
-        targetLabel: `${u.displayName || u.email} → ${verified ? 'geverifieerd' : 'ongeverifieerd'}`,
-        details: null,
-        createdAtMs: Date.now(),
-      });
-    }
-  }
-
-  return { isSelf, isUserActive, wouldRemoveLastAdminByStatus, toggleActive, removeUser, setPhoneVerified };
+  return { isSelf, isUserActive, wouldRemoveLastAdminByStatus, toggleActive, removeUser };
 }

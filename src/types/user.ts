@@ -55,9 +55,12 @@ export interface UserProfile {
   isTeamLeader: boolean;
   isActive: boolean;
   /**
-   * Admin-set contact number — nothing collects this at signup/invite time,
-   * so it starts null and is filled in later from the user detail page.
-   * Distinct from an Employee's `phone` (decisions/005 split still applies).
+   * Contact number — an admin can set it from the user detail page, or the
+   * account owner can set their own from Settings. Distinct from an
+   * Employee's `phone` (decisions/005 split still applies). No verification
+   * concept: real phone verification needs Firebase Phone Auth, which
+   * requires the Blaze plan (see project_spark_plan_no_blaze) and is out of
+   * scope here — unlike email, there's no free way to confirm it.
    */
   phone: string | null;
   /**
@@ -69,12 +72,4 @@ export interface UserProfile {
    * match `request.auth.token.email_verified`, never an arbitrary value.
    */
   emailVerified: boolean;
-  /**
-   * No Firebase Phone Auth here — SMS sign-in requires the Blaze plan (see
-   * project_spark_plan_no_blaze), so there's no automated OTP to verify
-   * against. This is admin-attested only: firestore.rules lets a user reset
-   * it to `false` when they change their own number, but only an
-   * Administrator may ever flip it to `true` (after confirming by phone).
-   */
-  phoneVerified: boolean;
 }

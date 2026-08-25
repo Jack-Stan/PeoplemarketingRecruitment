@@ -126,16 +126,7 @@ onUnmounted(() => store.unsubscribe());
 
           <div v-if="!isEditingPhone">
             <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">Telefoon</p>
-            <div class="mt-1.5 flex items-center gap-2">
-              <p class="text-base">{{ user.phone || 'Niet ingesteld' }}</p>
-              <span
-                v-if="user.phone && !skipVerification"
-                class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                :class="user.phoneVerified ? 'bg-emerald-500/10 text-emerald-600' : 'bg-neutral-200 text-neutral-mute'"
-              >
-                {{ user.phoneVerified ? 'Geverifieerd' : 'Niet geverifieerd' }}
-              </span>
-            </div>
+            <p class="mt-1.5 text-base">{{ user.phone || 'Niet ingesteld' }}</p>
             <div class="mt-3 flex gap-2">
               <template v-if="user.phone">
                 <button

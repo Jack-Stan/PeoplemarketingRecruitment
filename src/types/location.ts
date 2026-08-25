@@ -13,14 +13,23 @@ export const LOCATION_STATUS_LABELS: Record<LocationStatus, string> = {
  * for a plain "how many times" number on every list render would mean N
  * extra reads per location.
  */
+export interface LatLng {
+  lat: number;
+  lng: number;
+}
+
 export interface Location {
   locationId: string;
   officeId: string;
   name: string;
   address: string | null;
   neighbourhood: string | null;
+  /** Pin/centroid — always set, even for an area (used to zoom/fit the map). */
   lat: number;
   lng: number;
+  /** Drawn area boundary (Ghent street/neighbourhood outline), or null for a plain point pin. */
+  boundary: LatLng[] | null;
+  notes: string | null;
   status: LocationStatus;
   timesVisited: number;
   lastVisitedAt: number | null;
