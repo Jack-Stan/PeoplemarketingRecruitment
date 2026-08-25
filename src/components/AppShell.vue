@@ -37,7 +37,8 @@ const allLinks = computed(() => [...links.value, ...adminLinks.value]);
 function isLinkActive(to: string): boolean {
   return route.path === to || route.path.startsWith(`${to}/`);
 }
-const initials = computed(() => (auth.user.value?.email?.slice(0, 2) ?? 'PM').toUpperCase());
+const accountLabel = computed(() => auth.displayName.value || auth.user.value?.email || 'Administrator');
+const initials = computed(() => accountLabel.value.slice(0, 2).toUpperCase());
 async function signOut(): Promise<void> {
   await auth.signOut();
   await router.replace({ name: 'login' });
@@ -112,7 +113,7 @@ watch(
         </div>
         <button class="flex w-full items-center gap-3 px-2 py-3 text-left" title="Account" @click="isAccountMenuOpen = !isAccountMenuOpen">
           <span class="grid h-9 w-9 place-items-center rounded-full bg-primary-pink text-xs font-bold">{{ initials }}</span>
-          <span class="min-w-0 flex-1 truncate text-xs">{{ auth.user.value?.email ?? 'Administrator' }}</span>
+          <span class="min-w-0 flex-1 truncate text-xs">{{ accountLabel }}</span>
           <span class="text-white/50">⋯</span>
         </button>
       </div>

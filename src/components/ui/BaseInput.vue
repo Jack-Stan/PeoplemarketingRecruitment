@@ -6,6 +6,8 @@ interface Props {
   placeholder?: string;
   required?: boolean;
   autocomplete?: string;
+  /** Password managers (Chrome's included) key off `name` alongside `autocomplete` — without it, save-password prompts can silently fail to trigger. */
+  name?: string;
   error?: string;
   id?: string;
 }
@@ -30,6 +32,7 @@ const inputId = props.id ?? `field-${Math.random().toString(36).slice(2, 9)}`;
     <input
       :id="inputId"
       :type="type"
+      :name="name"
       :value="modelValue"
       :placeholder="placeholder"
       :required="required"

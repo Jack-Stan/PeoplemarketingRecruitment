@@ -53,6 +53,13 @@ export const useAuthStore = defineStore('auth', () => {
   const role = ref<Role | null>(null);
   const officeId = ref<string | null>(null);
   const isTeamLeader = ref<boolean>(false);
+  /**
+   * From the `/users/{uid}` doc, NOT `user.value.displayName` — Firebase
+   * Auth's own displayName is only ever set for the old self-signup flow
+   * (authService.signUp calls updateProfile); invite-completed accounts
+   * (the normal path now) never touch it, so it's null for most users.
+   */
+  const displayName = ref<string | null>(null);
   const isLoading = ref<boolean>(false);
   const error = ref<string | null>(null);
   let unsubProfile: Unsubscribe | null = null;
@@ -250,13 +257,17 @@ export const useAuthStore = defineStore('auth', () => {
     role.value = null;
     officeId.value = null;
     isTeamLeader.value = false;
+    displayName.value = null;
     error.value = null;
   }
 
-  function applyProfile(profile: { role: Role | null; primaryOfficeId: string | null; isTeamLeader: boolean } | null): void {
+  function applyProfile(
+    profile: { role: Role | null; primaryOfficeId: string | null; isTeamLeader: boolean; displayName?: string | null } | null,
+  ): void {
     role.value = profile?.role ?? null;
     officeId.value = profile?.primaryOfficeId ?? null;
     isTeamLeader.value = Boolean(profile?.isTeamLeader);
+    displayName.value = profile?.displayName ?? null;
   }
 
   /**
@@ -332,6 +343,7 @@ export const useAuthStore = defineStore('auth', () => {
     role,
     officeId,
     isTeamLeader,
+    displayName,
     isLoading,
     error,
     isAuthenticated,

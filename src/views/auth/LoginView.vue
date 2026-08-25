@@ -77,6 +77,7 @@ async function onSendReset(): Promise<void> {
           v-model="email"
           label="E-mail"
           type="email"
+          name="username"
           autocomplete="username"
           required
         />
@@ -84,6 +85,7 @@ async function onSendReset(): Promise<void> {
           v-model="password"
           label="Wachtwoord"
           type="password"
+          name="current-password"
           autocomplete="current-password"
           required
         />
