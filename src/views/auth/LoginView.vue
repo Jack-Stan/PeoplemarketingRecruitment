@@ -25,11 +25,11 @@ async function onSubmit(): Promise<void> {
   const ok = await auth.signIn(email.value.trim(), password.value);
   submitting.value = false;
   if (ok) {
-    ui.push('Signed in', 'success');
+    ui.push('Aangemeld', 'success');
     const redirect = (route.query.redirect as string | undefined) ?? '/dashboard';
     await router.replace(redirect);
   } else {
-    ui.push(auth.error.value ?? 'Sign-in failed', 'error');
+    ui.push(auth.error.value ?? 'Aanmelden mislukt', 'error');
   }
 }
 
@@ -44,7 +44,7 @@ async function onSendReset(): Promise<void> {
   resetting.value = false;
   // Same message either way — never reveal whether an email address has an
   // account (Firebase's own reset-email API doesn't leak that either).
-  ui.push('If that email has an account, a reset link is on its way.', 'success');
+  ui.push('Als dat e-mailadres een account heeft, is er een reset-link onderweg.', 'success');
   if (ok) isResetMode.value = false;
 }
 </script>
@@ -54,60 +54,60 @@ async function onSendReset(): Promise<void> {
     <section class="w-full max-w-sm rounded-lg bg-neutral-white p-8 shadow-md">
       <header class="mb-6 text-center">
         <h1 class="text-2xl font-bold text-neutral-ink">People Marketing</h1>
-        <p class="mt-1 text-sm text-neutral-mute">Sign in to continue</p>
+        <p class="mt-1 text-sm text-neutral-mute">Meld je aan om verder te gaan</p>
       </header>
 
       <form v-if="!isResetMode" class="space-y-4" @submit.prevent="onSubmit">
         <BaseInput
           v-model="email"
-          label="Email"
+          label="E-mail"
           type="email"
           autocomplete="email"
           required
-          placeholder="you@peoplemarketing.nl"
+          placeholder="jij@peoplemarketing.nl"
         />
         <BaseInput
           v-model="password"
-          label="Password"
+          label="Wachtwoord"
           type="password"
           autocomplete="current-password"
           required
         />
         <BaseButton type="submit" block :loading="submitting" :disabled="!email || !password">
-          Sign in
+          Aanmelden
         </BaseButton>
         <p class="text-center text-xs">
           <button type="button" class="font-semibold text-primary-pink hover:underline" @click="openReset">
-            Forgot password?
+            Wachtwoord vergeten?
           </button>
         </p>
       </form>
 
       <form v-else class="space-y-4" @submit.prevent="onSendReset">
         <p class="text-xs text-neutral-mute">
-          Enter your email and we'll send you a link to reset your password.
+          Vul je e-mailadres in en we sturen je een link om je wachtwoord opnieuw in te stellen.
         </p>
         <BaseInput
           v-model="resetEmail"
-          label="Email"
+          label="E-mail"
           type="email"
           autocomplete="email"
           required
-          placeholder="you@peoplemarketing.nl"
+          placeholder="jij@peoplemarketing.nl"
         />
         <BaseButton type="submit" block :loading="resetting" :disabled="!resetEmail">
-          Send reset link
+          Reset-link versturen
         </BaseButton>
         <p class="text-center text-xs">
           <button type="button" class="font-semibold text-neutral-mute hover:underline" @click="isResetMode = false">
-            Back to sign in
+            Terug naar aanmelden
           </button>
         </p>
       </form>
 
       <p v-if="!isResetMode" class="mt-6 text-center text-xs text-neutral-mute">
-        No account yet?
-        <RouterLink to="/signup" class="font-semibold text-primary-pink">Create one</RouterLink>
+        Nog geen account?
+        <RouterLink to="/signup" class="font-semibold text-primary-pink">Account aanmaken</RouterLink>
       </p>
     </section>
   </main>

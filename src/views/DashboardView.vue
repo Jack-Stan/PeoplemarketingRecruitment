@@ -13,6 +13,12 @@ const recruitmentStore = useRecruitmentStore();
 const isMember = computed(() => auth.role.value === 'TeamMember');
 
 const today = new Date().toISOString().slice(0, 10);
+const todayLabel = new Date(`${today}T00:00:00`).toLocaleDateString('nl-BE', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+});
 const upcoming = computed(() =>
   shiftsStore.shifts
     .filter((s) => s.date >= today && s.status === 'approved')
@@ -86,30 +92,30 @@ onUnmounted(() => {
 <template>
   <div v-if="isMember" class="mx-auto max-w-3xl space-y-8">
     <section>
-      <p class="text-sm text-neutral-mute">Your shifts</p>
+      <p class="text-sm text-neutral-mute">Jouw shifts</p>
       <h2 class="mt-1 text-3xl font-bold tracking-tight">
-        Good to see you, {{ auth.user.value?.displayName || auth.user.value?.email }}.
+        Fijn je te zien, {{ auth.user.value?.displayName || auth.user.value?.email }}.
       </h2>
     </section>
     <section class="grid gap-4 sm:grid-cols-2">
       <article class="border border-black/5 bg-white p-5">
-        <p class="text-xs font-bold uppercase tracking-[0.16em] text-neutral-mute">Shifts completed</p>
+        <p class="text-xs font-bold uppercase tracking-[0.16em] text-neutral-mute">Shifts voltooid</p>
         <p class="mt-4 text-3xl font-bold">{{ completedCount }}</p>
       </article>
       <article class="border border-black/5 bg-white p-5">
-        <p class="text-xs font-bold uppercase tracking-[0.16em] text-neutral-mute">Awaiting approval</p>
+        <p class="text-xs font-bold uppercase tracking-[0.16em] text-neutral-mute">Wacht op goedkeuring</p>
         <p class="mt-4 text-3xl font-bold">{{ pendingCount }}</p>
       </article>
     </section>
     <section class="border border-black/5 bg-white p-6">
-      <h3 class="text-lg font-bold">Upcoming shifts</h3>
+      <h3 class="text-lg font-bold">Aankomende shifts</h3>
       <ul v-if="upcoming.length" class="mt-4 divide-y divide-black/5">
         <li v-for="s in upcoming" :key="s.shiftId" class="flex items-center justify-between py-3 text-sm">
           <span class="font-semibold">{{ s.date }}</span>
           <span class="text-neutral-mute">{{ s.type }} · {{ s.startTime }}–{{ s.endTime }}</span>
         </li>
       </ul>
-      <p v-else class="mt-4 text-sm text-neutral-mute">No upcoming shifts scheduled yet.</p>
+      <p v-else class="mt-4 text-sm text-neutral-mute">Nog geen aankomende shifts ingepland.</p>
     </section>
     <RouterLink
       to="/mijn-planning"
@@ -122,12 +128,12 @@ onUnmounted(() => {
   <div v-else class="mx-auto max-w-7xl space-y-8">
     <section class="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
       <div>
-        <p class="text-sm text-neutral-mute">Monday, 24 August 2026</p>
-        <h2 class="mt-1 text-3xl font-bold tracking-tight">Good morning, Big Boss.</h2>
+        <p class="text-sm text-neutral-mute capitalize">{{ todayLabel }}</p>
+        <h2 class="mt-1 text-3xl font-bold tracking-tight">Goedemorgen, baas.</h2>
       </div>
       <RouterLink to="/planning"
         class="inline-flex items-center justify-center bg-primary-pink px-4 py-2.5 text-sm font-bold text-white hover:bg-primary-pink-alt">
-        Open planning <span class="ml-3">→</span></RouterLink>
+        Planning openen <span class="ml-3">→</span></RouterLink>
     </section>
     <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <article class="min-h-32 border border-black/5 bg-neutral-ink p-5 text-white">
