@@ -12,6 +12,7 @@ import {
   type RecruitmentLeadCreatePayload,
 } from '@/types/recruitmentLead';
 import { weekStartFor } from '@/types/shift';
+import { todayLocalISO, toLocalISODate } from '@/utils/date';
 
 /**
  * Recruitment leads store. Same shape as employees/shifts stores: a live
@@ -44,9 +45,9 @@ export const useRecruitmentStore = defineStore('recruitment', () => {
 
   /** "Zoveel leads deze week" — client transcript's weekly leads bar. */
   const leadsThisWeek = computed(() => {
-    const thisWeekStart = weekStartFor(new Date().toISOString().slice(0, 10));
+    const thisWeekStart = weekStartFor(todayLocalISO());
     return leads.value.filter(
-      (l) => weekStartFor(new Date(l.createdAtMs).toISOString().slice(0, 10)) === thisWeekStart,
+      (l) => weekStartFor(toLocalISODate(new Date(l.createdAtMs))) === thisWeekStart,
     ).length;
   });
 

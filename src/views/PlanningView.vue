@@ -4,20 +4,25 @@ import { computed, onUnmounted, ref, watch } from 'vue';
 import { useAuth } from '@/composables/useAuth';
 import { useActiveOffice } from '@/composables/useActiveOffice';
 import { useAuditLogStore } from '@/stores/auditLog';
+import { useAvailabilityStore } from '@/stores/availability';
 import { useEmployeesStore } from '@/stores/employees';
 import { useShiftsStore } from '@/stores/shifts';
 import { useUiStore } from '@/stores/ui';
+import { weekStartFor } from '@/types/availability';
 import { FIXED_SHIFT_HOURS, type Shift, type ShiftCreatePayload, type ShiftType } from '@/types/shift';
+import { toLocalISODate, todayLocalISO } from '@/utils/date';
 
 const auth = useAuth();
 const employeesStore = useEmployeesStore();
 const shiftsStore = useShiftsStore();
+const availabilityStore = useAvailabilityStore();
 const auditLog = useAuditLogStore();
 const ui = useUiStore();
 
 const { officeId } = useActiveOffice();
 const isAdmin = computed(() => auth.role.value === 'Administrator');
 const canDraft = computed(() => auth.role.value === 'Administrator' || auth.role.value === 'TeamManager');
+const canSeeAvailability = computed(() => canDraft.value || auth.isTeamLeader.value);
 
 const isFormOpen = ref(false);
 const formError = ref(null as string | null);
@@ -28,7 +33,7 @@ const rejectReason = ref('');
 function makeEmptyForm(): ShiftCreatePayload {
   return {
     assignedEmployeeId: '',
-    date: new Date().toISOString().slice(0, 10),
+    date: todayLocalISO(),
     type: 'D2D',
     startTime: FIXED_SHIFT_HOURS.D2D.start,
     endTime: FIXED_SHIFT_HOURS.D2D.end,
@@ -73,8 +78,8 @@ const dayGroups = computed(() => {
 const totals = computed(() => shiftsStore.staffingTotals);
 
 /** FRD §8 — monthly view: coverage, weekend highlighting, TL visibility per day. */
-const viewMode = ref<'lijst' | 'maand'>('lijst');
-const today = new Date().toISOString().slice(0, 10);
+const viewMode = ref<'lijst' | 'maand' | 'beschikbaarheid'>('lijst');
+const today = todayLocalISO();
 const selectedMonth = ref(today.slice(0, 7));
 
 const monthLabel = computed(() => {
@@ -122,6 +127,36 @@ const monthCells = computed<(MonthCell | null)[]>(() => {
 });
 
 const weekdayLabels = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo'];
+
+/** Beschikbaarheid tab — same week-grid shape as MyPlanningView, but office-wide. */
+const availabilityWeekStart = ref(weekStartFor(today));
+const availabilityWeekLabel = computed(() => {
+  const start = new Date(`${availabilityWeekStart.value}T00:00:00`);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  const fmt = (d: Date) => d.toLocaleDateString('nl-BE', { day: 'numeric', month: 'long' });
+  return `${fmt(start)} – ${fmt(end)}`;
+});
+function shiftAvailabilityWeek(deltaDays: number): void {
+  const d = new Date(`${availabilityWeekStart.value}T00:00:00`);
+  d.setDate(d.getDate() + deltaDays);
+  availabilityWeekStart.value = weekStartFor(toLocalISODate(d));
+}
+const availabilityWeekDays = computed(() => {
+  const start = new Date(`${availabilityWeekStart.value}T00:00:00`);
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(start);
+    d.setDate(d.getDate() + i);
+    const iso = toLocalISODate(d);
+    return {
+      iso,
+      weekday: d.toLocaleDateString('nl-BE', { weekday: 'short' }),
+      dayNumber: d.getDate(),
+      isToday: iso === today,
+      people: (availabilityStore.byDate.get(iso) ?? []).sort((a, b) => a.employeeName.localeCompare(b.employeeName)),
+    };
+  });
+});
 
 function openDayFromMonth(iso: string): void {
   dateFilter.value = iso;
@@ -248,12 +283,14 @@ watch(
     if (!id) return;
     shiftsStore.subscribe(id);
     employeesStore.subscribe(id);
+    if (canSeeAvailability.value) availabilityStore.subscribe(id);
   },
   { immediate: true },
 );
 onUnmounted(() => {
   shiftsStore.unsubscribe();
   employeesStore.unsubscribe();
+  availabilityStore.unsubscribe();
 });
 </script>
 
@@ -284,6 +321,14 @@ onUnmounted(() => {
         @click="viewMode = 'maand'"
       >
         Maand
+      </button>
+      <button
+        v-if="canSeeAvailability"
+        class="border-b-2 px-4 py-2 text-xs font-bold"
+        :class="viewMode === 'beschikbaarheid' ? 'border-primary-pink text-primary-pink' : 'border-transparent text-neutral-mute'"
+        @click="viewMode = 'beschikbaarheid'"
+      >
+        Beschikbaarheid
       </button>
     </div>
 
@@ -320,6 +365,37 @@ onUnmounted(() => {
               </div>
             </div>
           </template>
+        </div>
+      </div>
+    </section>
+
+    <!-- Beschikbaarheid — who marked themselves available, per day. TL/admin only. -->
+    <section v-if="viewMode === 'beschikbaarheid'" class="border border-black/5 bg-white p-6">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-bold text-neutral-mute">Week van {{ availabilityWeekLabel }}</h3>
+        <div class="flex gap-2">
+          <button class="border border-black/10 px-2.5 py-1 text-sm font-bold hover:bg-[#faf9f7]" @click="shiftAvailabilityWeek(-7)">‹</button>
+          <button class="border border-black/10 px-2.5 py-1 text-sm font-bold hover:bg-[#faf9f7]" @click="shiftAvailabilityWeek(7)">›</button>
+        </div>
+      </div>
+      <p v-if="availabilityStore.isLoading" class="mt-4 text-sm text-neutral-mute">Laden…</p>
+      <div v-else class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7">
+        <div
+          v-for="day in availabilityWeekDays"
+          :key="day.iso"
+          class="flex min-h-32 flex-col gap-2 border p-3"
+          :class="day.isToday ? 'border-primary-pink/40 bg-primary-pink/5' : 'border-black/10 bg-[#faf9f7]'"
+        >
+          <p class="text-xs font-bold uppercase tracking-[0.1em]" :class="day.isToday ? 'text-primary-pink' : 'text-neutral-mute'">
+            {{ day.weekday }} {{ day.dayNumber }}
+          </p>
+          <p v-if="!day.people.length" class="text-xs text-neutral-mute">Niemand beschikbaar gemeld.</p>
+          <ul v-else class="space-y-1">
+            <li v-for="person in day.people" :key="person.availabilityId" class="text-xs font-semibold">
+              {{ person.employeeName }}
+              <span v-if="person.employeeIsTeamLeader" class="ml-1 text-[10px] font-bold uppercase tracking-wider text-primary-pink">TL</span>
+            </li>
+          </ul>
         </div>
       </div>
     </section>

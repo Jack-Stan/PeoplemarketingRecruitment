@@ -1,3 +1,5 @@
+import { toLocalISODate } from '@/utils/date';
+
 export type ShiftType = 'D2D' | 'Straat' | 'Event';
 export type ShiftStatus = 'draft' | 'pending' | 'approved' | 'rejected';
 
@@ -7,13 +9,19 @@ export const FIXED_SHIFT_HOURS: Record<Exclude<ShiftType, 'Event'>, { start: str
   Straat: { start: '09:30', end: '17:00' },
 };
 
-/** Monday of the ISO week containing `date` (yyyy-MM-dd in, yyyy-MM-dd out). */
+/**
+ * Monday of the ISO week containing `date` (yyyy-MM-dd in, yyyy-MM-dd out).
+ * Uses toLocalISODate, NOT toISOString() — the latter converts to UTC,
+ * which silently rolls local midnight back to the previous day for any
+ * positive UTC offset (Belgium is always UTC+1/+2), making every computed
+ * week start Sunday instead of Monday.
+ */
 export function weekStartFor(date: string): string {
   const d = new Date(`${date}T00:00:00`);
   const day = d.getDay(); // 0 = Sunday
   const diff = day === 0 ? -6 : 1 - day;
   d.setDate(d.getDate() + diff);
-  return d.toISOString().slice(0, 10);
+  return toLocalISODate(d);
 }
 
 export interface Shift {

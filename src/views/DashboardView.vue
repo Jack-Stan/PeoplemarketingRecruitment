@@ -7,6 +7,7 @@ import { useActiveOffice } from '@/composables/useActiveOffice';
 import { useRecruitmentStore } from '@/stores/recruitment';
 import { useShiftsStore } from '@/stores/shifts';
 import { weekStartFor } from '@/types/shift';
+import { toLocalISODate, todayLocalISO } from '@/utils/date';
 
 const auth = useAuth();
 const shiftsStore = useShiftsStore();
@@ -14,7 +15,7 @@ const recruitmentStore = useRecruitmentStore();
 const { officeId } = useActiveOffice();
 const isMember = computed(() => auth.role.value === 'TeamMember');
 
-const today = new Date().toISOString().slice(0, 10);
+const today = todayLocalISO();
 const todayLabel = new Date(`${today}T00:00:00`).toLocaleDateString('nl-BE', {
   weekday: 'long',
   day: 'numeric',
@@ -37,7 +38,7 @@ const weekShifts = computed(() => {
   const start = currentWeekStart.value;
   const endExclusive = new Date(`${start}T00:00:00`);
   endExclusive.setDate(endExclusive.getDate() + 7);
-  const end = endExclusive.toISOString().slice(0, 10);
+  const end = toLocalISODate(endExclusive);
   return shiftsStore.shifts.filter((s) => s.date >= start && s.date < end);
 });
 const todaysShifts = computed(() => shiftsStore.shifts.filter((s) => s.date === today));

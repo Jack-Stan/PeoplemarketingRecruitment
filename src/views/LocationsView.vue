@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
-import MapboxDraw from '@mapbox/mapbox-gl-draw';
-import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import 'leaflet-draw';
+import 'leaflet-draw/dist/leaflet.draw.css';
 
 import { useAuth } from '@/composables/useAuth';
 import { useActiveOffice } from '@/composables/useActiveOffice';
@@ -16,8 +16,6 @@ import {
   type LocationCreatePayload,
   type LocationStatus,
 } from '@/types/location';
-
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
 const STATUS_COLORS: Record<LocationStatus, string> = {
   planned: '#f59e0b',
@@ -76,105 +74,79 @@ watch(selectedId, (id) => {
 
 // --- Map ---------------------------------------------------------------
 const mapEl = ref<HTMLElement | null>(null);
-let map: mapboxgl.Map | null = null;
-let draw: MapboxDraw | null = null;
+let map: L.Map | null = null;
+let drawPolygonHandler: L.Draw.Polygon | null = null;
+type EditablePolygon = L.Polygon & { editing: { enable(): void; disable(): void } };
+let reshapeLayer: EditablePolygon | null = null;
 /** none = browsing/selecting; 'point'/'area' = placing a NEW location; 'reshape' = editing an existing zone's boundary. */
 const mode = ref<'none' | 'point' | 'area' | 'reshape'>('none');
-const markers: mapboxgl.Marker[] = [];
-let reshapeDraftBoundary: LatLng[] | null = null;
+const markers: L.Marker[] = [];
+const zoneLayers: L.Polygon[] = [];
 
 function clearMapLayers(): void {
   markers.forEach((m) => m.remove());
   markers.length = 0;
-  if (map?.getLayer('location-areas-fill')) map.removeLayer('location-areas-fill');
-  if (map?.getLayer('location-areas-line')) map.removeLayer('location-areas-line');
-  if (map?.getLayer('location-areas-selected')) map.removeLayer('location-areas-selected');
-  if (map?.getSource('location-areas')) map.removeSource('location-areas');
+  zoneLayers.forEach((l) => l.remove());
+  zoneLayers.length = 0;
+}
+
+function pinIcon(color: string, isSelected: boolean): L.DivIcon {
+  const size = isSelected ? 22 : 16;
+  return L.divIcon({
+    className: '',
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    html: `<div style="width:${size}px;height:${size}px;border-radius:50%;border:2px solid #fff;background:${color};box-shadow:0 0 0 ${isSelected ? 3 : 1}px ${isSelected ? '#111' : 'rgba(0,0,0,.2)'};cursor:pointer;"></div>`,
+  });
 }
 
 function renderLocations(): void {
   if (!map) return;
   clearMapLayers();
 
-  const areaLocations = filtered.value.filter(
-    (l) => l.boundary && l.boundary.length >= 3 && l.locationId !== (mode.value === 'reshape' ? selectedId.value : null),
-  );
-  if (areaLocations.length) {
-    map.addSource('location-areas', {
-      type: 'geojson',
-      data: {
-        type: 'FeatureCollection',
-        features: areaLocations.map((l) => ({
-          type: 'Feature' as const,
-          properties: { locationId: l.locationId },
-          geometry: {
-            type: 'Polygon' as const,
-            coordinates: [[...l.boundary!.map((p) => [p.lng, p.lat]), [l.boundary![0].lng, l.boundary![0].lat]]],
-          },
-        })),
-      },
-    });
-    const colorMatch = [
-      'match',
-      ['get', 'locationId'],
-      ...areaLocations.flatMap((l) => [l.locationId, STATUS_COLORS[l.status]]),
-      '#999999',
-    ] as unknown as mapboxgl.ExpressionSpecification;
-    map.addLayer({ id: 'location-areas-fill', type: 'fill', source: 'location-areas', paint: { 'fill-color': colorMatch, 'fill-opacity': 0.35 } });
-    map.addLayer({
-      id: 'location-areas-selected',
-      type: 'line',
-      source: 'location-areas',
-      paint: { 'line-color': '#111111', 'line-width': 3 },
-      filter: ['==', ['get', 'locationId'], selectedId.value ?? ''],
-    });
-    map.addLayer({ id: 'location-areas-line', type: 'line', source: 'location-areas', paint: { 'line-color': colorMatch, 'line-width': 2 } });
-    map.on('click', 'location-areas-fill', (e) => {
-      const l = filtered.value.find((x) => x.locationId === e.features?.[0]?.properties?.locationId);
-      if (l) selectLocation(l);
-    });
-    map.on('mouseenter', 'location-areas-fill', () => (map!.getCanvas().style.cursor = 'pointer'));
-    map.on('mouseleave', 'location-areas-fill', () => (map!.getCanvas().style.cursor = ''));
-  }
-
-  const bounds = new mapboxgl.LngLatBounds();
+  const bounds = L.latLngBounds([]);
   let hasPoints = false;
+
   for (const l of filtered.value) {
-    hasPoints = true;
-    bounds.extend([l.lng, l.lat]);
+    if (mode.value === 'reshape' && l.locationId === selectedId.value) continue;
     if (l.boundary && l.boundary.length >= 3) {
-      l.boundary.forEach((p) => bounds.extend([p.lng, p.lat]));
-      continue; // rendered via the fill/line layers above, not a pin
+      hasPoints = true;
+      const latlngs = l.boundary.map((p) => [p.lat, p.lng] as [number, number]);
+      latlngs.forEach((ll) => bounds.extend(ll));
+      const isSelected = l.locationId === selectedId.value;
+      const polygon = L.polygon(latlngs, {
+        color: isSelected ? '#111111' : STATUS_COLORS[l.status],
+        weight: isSelected ? 3 : 2,
+        fillColor: STATUS_COLORS[l.status],
+        fillOpacity: 0.35,
+      }).addTo(map);
+      polygon.on('click', () => selectLocation(l));
+      polygon.on('mouseover', () => map && (map.getContainer().style.cursor = 'pointer'));
+      polygon.on('mouseout', () => map && (map.getContainer().style.cursor = ''));
+      zoneLayers.push(polygon);
+      continue; // rendered as a polygon, not a pin
     }
-    const el = document.createElement('div');
+    hasPoints = true;
+    bounds.extend([l.lat, l.lng]);
     const isSelected = l.locationId === selectedId.value;
-    el.style.cssText = `width:${isSelected ? 22 : 16}px;height:${isSelected ? 22 : 16}px;border-radius:50%;border:2px solid #fff;background:${STATUS_COLORS[l.status]};box-shadow:0 0 0 ${isSelected ? 3 : 1}px ${isSelected ? '#111' : 'rgba(0,0,0,.2)'};cursor:pointer;`;
-    el.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      selectLocation(l);
-    });
-    const marker = new mapboxgl.Marker({ element: el }).setLngLat([l.lng, l.lat]).addTo(map);
+    const marker = L.marker([l.lat, l.lng], { icon: pinIcon(STATUS_COLORS[l.status], isSelected) }).addTo(map);
+    marker.on('click', () => selectLocation(l));
     markers.push(marker);
   }
-  if (hasPoints && !bounds.isEmpty() && mode.value !== 'reshape') map.fitBounds(bounds, { padding: 48, maxZoom: 15 });
+  if (hasPoints && bounds.isValid() && mode.value !== 'reshape') map.fitBounds(bounds, { padding: [48, 48], maxZoom: 15 });
 }
 
 onMounted(async () => {
   await nextTick();
-  if (!mapEl.value || !MAPBOX_TOKEN) return;
-  mapboxgl.accessToken = MAPBOX_TOKEN;
-  map = new mapboxgl.Map({
-    container: mapEl.value,
-    style: 'mapbox://styles/mapbox/streets-v12',
-    center: [3.725, 51.0538], // Ghent
-    zoom: 12,
-  });
-  draw = new MapboxDraw({ displayControlsDefault: false });
-  map.addControl(draw);
-  map.on('draw.create', onAreaDrawn);
-  map.on('draw.update', onAreaReshaped);
+  if (!mapEl.value) return;
+  map = L.map(mapEl.value).setView([51.0538, 3.725], 12); // Ghent
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19,
+  }).addTo(map);
   map.on('click', onMapClick);
-  map.on('load', renderLocations);
+  map.on('draw:created', ((e: L.DrawEvents.Created) => onAreaDrawn(e)) as L.LeafletEventHandlerFn);
+  renderLocations();
 });
 onBeforeUnmount(() => {
   map?.remove();
@@ -183,22 +155,23 @@ onBeforeUnmount(() => {
 watch(filtered, () => renderLocations());
 watch(selectedId, () => renderLocations());
 
-function onMapClick(e: mapboxgl.MapMouseEvent): void {
+function onMapClick(e: L.LeafletMouseEvent): void {
   if (mode.value !== 'point') return;
   openCreate();
-  form.value = { ...form.value, lat: e.lngLat.lat, lng: e.lngLat.lng };
+  form.value = { ...form.value, lat: e.latlng.lat, lng: e.latlng.lng };
   mode.value = 'none';
 }
 
 function toggleDrawArea(): void {
-  if (!draw) return;
+  if (!map) return;
   if (mode.value === 'area') {
     mode.value = 'none';
-    draw.deleteAll();
+    drawPolygonHandler?.disable();
+    drawPolygonHandler = null;
   } else {
     mode.value = 'area';
-    draw.deleteAll();
-    draw.changeMode('draw_polygon');
+    drawPolygonHandler = new L.Draw.Polygon(map as unknown as L.DrawMap, { shapeOptions: { color: '#ec4899' } });
+    drawPolygonHandler.enable();
   }
 }
 function toggleAddPoint(): void {
@@ -209,50 +182,42 @@ function boundaryCentroid(boundary: LatLng[]): LatLng {
   return boundary.reduce((acc, p) => ({ lat: acc.lat + p.lat / boundary.length, lng: acc.lng + p.lng / boundary.length }), { lat: 0, lng: 0 });
 }
 
-function onAreaDrawn(e: { features: Array<{ geometry: { coordinates: number[][][] } }> }): void {
-  if (mode.value === 'reshape') return; // handled by onAreaReshaped instead
-  const ring = e.features[0]?.geometry.coordinates[0];
-  if (!ring) return;
-  const boundary: LatLng[] = ring.slice(0, -1).map(([lng, lat]) => ({ lat, lng }));
+function onAreaDrawn(e: L.DrawEvents.Created): void {
+  drawPolygonHandler = null;
+  const latlngs = (e.layer as L.Polygon).getLatLngs()[0] as L.LatLng[];
+  const boundary: LatLng[] = latlngs.map((ll) => ({ lat: ll.lat, lng: ll.lng }));
   openCreate();
   const centroid = boundaryCentroid(boundary);
   form.value = { ...form.value, boundary, ...centroid };
-  draw?.deleteAll();
   mode.value = 'none';
 }
 
 // --- Reshape an existing zone's boundary --------------------------------
 function startReshape(l: Location): void {
-  if (!draw || !l.boundary) return;
+  if (!map || !l.boundary) return;
   mode.value = 'reshape';
   closePanel();
-  draw.deleteAll();
-  const feature = draw.add({
-    type: 'Polygon',
-    coordinates: [[...l.boundary.map((p) => [p.lng, p.lat]), [l.boundary[0].lng, l.boundary[0].lat]]],
-  } as GeoJSON.Polygon)[0];
-  reshapeDraftBoundary = l.boundary;
+  const latlngs = l.boundary.map((p) => [p.lat, p.lng] as [number, number]);
+  reshapeLayer = L.polygon(latlngs, { color: '#111111', weight: 3 }).addTo(map) as EditablePolygon;
   reshapeTargetId.value = l.locationId;
-  draw.changeMode('direct_select', { featureId: feature });
   renderLocations();
-}
-function onAreaReshaped(e: { features: Array<{ geometry: { coordinates: number[][][] } }> }): void {
-  const ring = e.features[0]?.geometry.coordinates[0];
-  if (!ring) return;
-  reshapeDraftBoundary = ring.slice(0, -1).map(([lng, lat]) => ({ lat, lng }));
+  reshapeLayer.editing?.enable();
 }
 const reshapeTargetId = ref<string | null>(null);
 async function saveReshape(): Promise<void> {
-  if (!reshapeTargetId.value || !reshapeDraftBoundary) return;
-  const centroid = boundaryCentroid(reshapeDraftBoundary);
-  const ok = await store.update(officeId.value, reshapeTargetId.value, { boundary: reshapeDraftBoundary, ...centroid });
+  if (!reshapeTargetId.value || !reshapeLayer) return;
+  const latlngs = reshapeLayer.getLatLngs()[0] as L.LatLng[];
+  const boundary: LatLng[] = latlngs.map((ll) => ({ lat: ll.lat, lng: ll.lng }));
+  const centroid = boundaryCentroid(boundary);
+  const ok = await store.update(officeId.value, reshapeTargetId.value, { boundary, ...centroid });
   ui.push(ok ? 'Zone bijgewerkt.' : (store.error ?? 'Er ging iets mis.'), ok ? 'success' : 'error');
   cancelReshape();
 }
 function cancelReshape(): void {
-  draw?.deleteAll();
+  reshapeLayer?.editing?.disable();
+  reshapeLayer?.remove();
+  reshapeLayer = null;
   mode.value = 'none';
-  reshapeDraftBoundary = null;
   reshapeTargetId.value = null;
   renderLocations();
 }
@@ -376,10 +341,6 @@ onBeforeUnmount(() => {
       </div>
     </section>
 
-    <p v-if="!MAPBOX_TOKEN" class="border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
-      Geen Mapbox-token ingesteld (<code>VITE_MAPBOX_TOKEN</code>) — de kaart kan niet laden. Maak een gratis token aan
-      op mapbox.com en voeg het toe aan de omgevingsvariabelen.
-    </p>
     <p v-if="mode === 'point'" class="border border-primary-pink/30 bg-primary-pink/5 p-3 text-xs font-semibold text-primary-pink">
       Klik ergens op de kaart om daar een nieuwe locatie te plaatsen.
     </p>

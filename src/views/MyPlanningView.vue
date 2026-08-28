@@ -2,9 +2,11 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 
 import { useAuth } from '@/composables/useAuth';
+import { useAvailabilityStore } from '@/stores/availability';
 import { useShiftsStore } from '@/stores/shifts';
 import { useUiStore } from '@/stores/ui';
 import { FIXED_SHIFT_HOURS, weekStartFor, type Shift, type ShiftCreatePayload } from '@/types/shift';
+import { toLocalISODate, todayLocalISO } from '@/utils/date';
 
 /**
  * TeamMember self-service planning — decision 008. Employee-authored: the
@@ -15,12 +17,13 @@ import { FIXED_SHIFT_HOURS, weekStartFor, type Shift, type ShiftCreatePayload } 
  */
 const auth = useAuth();
 const shiftsStore = useShiftsStore();
+const availabilityStore = useAvailabilityStore();
 const ui = useUiStore();
 
 const officeId = computed(() => auth.officeId.value ?? '');
 const uid = computed(() => auth.user.value?.uid ?? '');
 
-const today = new Date().toISOString().slice(0, 10);
+const today = todayLocalISO();
 const currentWeekStart = ref(weekStartFor(today));
 
 const isFormOpen = ref(false);
@@ -76,7 +79,7 @@ const weekDays = computed(() => {
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(start);
     d.setDate(d.getDate() + i);
-    const iso = d.toISOString().slice(0, 10);
+    const iso = toLocalISODate(d);
     return {
       iso,
       weekday: d.toLocaleDateString('nl-BE', { weekday: 'short' }),
@@ -133,11 +136,28 @@ async function submitWeek(): Promise<void> {
 function subscribe(): void {
   if (officeId.value && uid.value) {
     shiftsStore.subscribeMineForWeek(officeId.value, uid.value, currentWeekStart.value);
+    availabilityStore.subscribeMine(officeId.value, uid.value);
   }
 }
 
+async function toggleAvailable(date: string): Promise<void> {
+  const existing = availabilityStore.isMarked(uid.value, date);
+  const ok = existing
+    ? await availabilityStore.unmark(officeId.value, existing.availabilityId)
+    : await availabilityStore.mark(officeId.value, {
+        employeeId: uid.value,
+        employeeName: auth.user.value?.displayName || auth.user.value?.email || '',
+        employeeIsTeamLeader: auth.isTeamLeader.value,
+        date,
+      });
+  if (!ok) ui.push(availabilityStore.error ?? 'Er ging iets mis.', 'error');
+}
+
 onMounted(subscribe);
-onUnmounted(() => shiftsStore.unsubscribe());
+onUnmounted(() => {
+  shiftsStore.unsubscribe();
+  availabilityStore.unsubscribe();
+});
 </script>
 
 <template>
@@ -173,6 +193,17 @@ onUnmounted(() => shiftsStore.unsubscribe());
               +
             </button>
           </div>
+          <button
+            class="border px-1.5 py-1 text-[10px] font-bold uppercase tracking-wide"
+            :class="
+              availabilityStore.isMarked(uid, day.iso)
+                ? 'border-emerald-600/30 bg-emerald-100 text-emerald-700'
+                : 'border-black/10 text-neutral-mute hover:border-primary-pink/40 hover:text-primary-pink'
+            "
+            @click="toggleAvailable(day.iso)"
+          >
+            {{ availabilityStore.isMarked(uid, day.iso) ? '✓ Beschikbaar' : 'Beschikbaar?' }}
+          </button>
           <div v-if="!day.shifts.length" class="flex-1"></div>
           <div v-for="shift in day.shifts" :key="shift.shiftId" class="border border-black/10 bg-white p-2 text-xs">
             <p class="font-semibold">Ik werk deze dag</p>
@@ -203,24 +234,9 @@ onUnmounted(() => shiftsStore.unsubscribe());
 
     <div v-if="isFormOpen" class="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4">
       <div class="w-full max-w-md border border-black/10 bg-white p-6">
-        <h3 class="text-lg font-bold">Shift toevoegen</h3>
+        <h3 class="text-lg font-bold">Dag toevoegen</h3>
         <form class="mt-4 space-y-3" @submit.prevent="submitForm">
           <input v-model="form.date" type="date" :min="currentWeekStart" class="w-full border-black/10 bg-[#faf9f7] text-sm" />
-          <select :value="form.type" class="w-full border-black/10 bg-[#faf9f7] text-sm" @change="onTypeChange(($event.target as HTMLSelectElement).value as ShiftType)">
-            <option value="D2D">D2D (deur-tot-deur) — 11:00–19:00</option>
-            <option value="Straat">Straat — 09:30–17:00</option>
-            <option value="Event">Event — vrije uren</option>
-          </select>
-          <input
-            v-if="form.type === 'Event'"
-            v-model="form.eventTitle"
-            placeholder="Titel van het event"
-            class="w-full border-black/10 bg-[#faf9f7] text-sm"
-          />
-          <div class="grid grid-cols-2 gap-3">
-            <input v-model="form.startTime" type="time" :disabled="isTimeLocked" class="border-black/10 bg-[#faf9f7] text-sm disabled:opacity-50" />
-            <input v-model="form.endTime" type="time" :disabled="isTimeLocked" class="border-black/10 bg-[#faf9f7] text-sm disabled:opacity-50" />
-          </div>
           <input v-model="form.location" placeholder="Locatie (optioneel)" class="w-full border-black/10 bg-[#faf9f7] text-sm" />
           <p v-if="formError" class="text-xs font-semibold text-semantic-danger">{{ formError }}</p>
           <div class="flex justify-end gap-2 pt-2">

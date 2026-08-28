@@ -135,15 +135,15 @@ watch(
       </div>
     </aside>
     <div class="lg:pl-64">
-      <nav class="flex items-center justify-between border-b border-black/5 bg-white px-5 py-2 lg:hidden">
+      <nav class="flex items-center justify-between border-b border-black/5 bg-[#111111] px-5 py-2 lg:hidden">
         <img :src="logoUrl" :alt="brand.logo.alt" class="h-6 w-auto" />
         <div ref="mobileMenuRef" class="relative">
           <button
-            class="flex items-center gap-2 border border-black/10 px-3 py-1.5 text-xs font-semibold"
+            class="flex items-center gap-2 border border-white/20 px-3 py-1.5 text-xs font-semibold text-white"
             @click="isMobileMenuOpen = !isMobileMenuOpen"
           >
             {{ allLinks.find((l) => isLinkActive(l.to))?.label ?? 'Menu' }}
-            <span class="text-neutral-mute">{{ isMobileMenuOpen ? '▲' : '▼' }}</span>
+            <span class="text-white/50">{{ isMobileMenuOpen ? '▲' : '▼' }}</span>
           </button>
           <div v-if="isMobileMenuOpen" class="absolute right-0 z-30 mt-2 w-56 border border-black/10 bg-white py-1 shadow-lg">
             <p class="px-4 pb-1 pt-2 text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">Workspace</p>
