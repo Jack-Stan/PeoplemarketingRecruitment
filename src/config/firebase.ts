@@ -18,6 +18,34 @@ export const firebaseConfig: FirebaseOptions = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID ?? '1:533725479834:web:327357b2387d02e64eb023',
 };
 
+export const PROD_APP_URL = 'https://peoplemarketing.netlify.app';
+
+/**
+ * Resolves the base URL for email action links (invites, password resets, verification).
+ * Falls back to the live Netlify production URL when running on localhost so that invite
+ * emails sent from local dev environments still send recipients to the live app.
+ */
+export function getAppBaseUrl(): string {
+  const envUrl = import.meta.env.VITE_APP_URL;
+  if (envUrl && typeof envUrl === 'string' && envUrl.trim() !== '') {
+    return envUrl.trim().replace(/\/$/, '');
+  }
+
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    const hostname = window.location.hostname;
+    if (
+      hostname !== 'localhost' &&
+      hostname !== '127.0.0.1' &&
+      !hostname.startsWith('192.168.') &&
+      !hostname.startsWith('10.')
+    ) {
+      return window.location.origin.replace(/\/$/, '');
+    }
+  }
+
+  return PROD_APP_URL;
+}
+
 export const useEmulators =
   (import.meta.env.VITE_USE_EMULATORS ?? '').toString().toLowerCase() === 'true';
 

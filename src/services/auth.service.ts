@@ -21,6 +21,7 @@ import {
   type User,
 } from 'firebase/auth';
 
+import { getAppBaseUrl } from '@/config/firebase';
 import { auth } from '@/services/firebase';
 
 /**
@@ -59,9 +60,12 @@ export const authService = {
     return signOut(auth);
   },
 
-  /** Firebase Auth's built-in reset email — same free mail relay as sendInvite, no console toggle needed (unlike email-link sign-in, password reset is on by default). */
+  /** Firebase Auth's built-in reset email — points back to the login page. */
   sendPasswordReset(email: string): Promise<void> {
-    return sendPasswordResetEmail(auth, email);
+    return sendPasswordResetEmail(auth, email, {
+      url: `${getAppBaseUrl()}/login`,
+      handleCodeInApp: false,
+    });
   },
 
   /**
@@ -83,7 +87,7 @@ export const authService = {
    */
   sendInvite(email: string, desiredOfficeId: string): Promise<void> {
     return sendSignInLinkToEmail(auth, email, {
-      url: `${window.location.origin}/complete-invite?email=${encodeURIComponent(email)}&office=${encodeURIComponent(desiredOfficeId)}`,
+      url: `${getAppBaseUrl()}/complete-invite?email=${encodeURIComponent(email)}&office=${encodeURIComponent(desiredOfficeId)}`,
       handleCodeInApp: true,
     });
   },
@@ -122,12 +126,18 @@ export const authService = {
     if (!user.email) throw new Error('No current email on this account.');
     const credential = EmailAuthProvider.credential(user.email, currentPassword);
     await reauthenticateWithCredential(user, credential);
-    await verifyBeforeUpdateEmail(user, newEmail);
+    await verifyBeforeUpdateEmail(user, newEmail, {
+      url: `${getAppBaseUrl()}/settings`,
+      handleCodeInApp: false,
+    });
   },
 
-  /** Uses the console's "Email address verification" template — same free mail relay, no config needed here. */
+  /** Uses the console's "Email address verification" template — points back to settings. */
   sendVerificationEmail(user: User): Promise<void> {
-    return sendEmailVerification(user);
+    return sendEmailVerification(user, {
+      url: `${getAppBaseUrl()}/settings`,
+      handleCodeInApp: false,
+    });
   },
 
   /**
