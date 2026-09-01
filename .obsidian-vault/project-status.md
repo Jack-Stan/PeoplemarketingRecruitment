@@ -294,6 +294,26 @@ Independent FRD-vs-app audit (no vault claims trusted blind), then fixes, then p
   data-subject rights, any DPA with Firebase). A separate session was kicked off to put together a factual
   data inventory (what personal data lives where) for that conversation — see cross-session coordination.
 
+## Update — app review + functie feature shipped (2026-09-01)
+
+- **"Haggs" resolved**: the client's "same app as haggs" ask = **Briggs & Walker**
+  (briggsandwalker.com/agency-field-marketing, callback item 7). Feature set fetched and gap-analysed.
+- **Full app review done** — findings + Briggs gap analysis + recommended order in
+  `research/2026-09-01-app-review-and-briggs-gap.md`. Biggest strategic gap: **no shift-results/sales
+  entity** — blocks leaderboards, conversion metrics, client reporting (the core of what Briggs sells).
+  Suggested Spark-compatible roadmap: shift-results → per-person analytics/leaderboard → in-app
+  notifications → PWA → planning templates.
+- **Functie feature shipped** (crm-d6 session): admin-assignable career ladder (Trainee → Country
+  manager) + time-based dashboard greeting. Review's two HIGH findings fixed pre-commit (drift-proof
+  `validFunctie()` rule; role modal no longer silently moves cross-office users) plus roster mirroring.
+  Committed (`kc145535`), pushed (Netlify auto-deploys).
+- **Rules deployed to prod + smoke-tested**: `firebase deploy --only firestore:rules` succeeded;
+  6/6 live smoke tests passed via throwaway custom-token accounts (see review note's Outcome section).
+- **Open security debt from the review, not yet fixed** (bundle into one rules pass): self-signup can
+  forge `email`/`emailVerified`/`isTeamLeader`; audit entries lack an `actorUid == auth.uid` check;
+  role can never be revoked back to pending; rules test suite has two inverted cross-office tests and
+  never runs under `npm test`. Also: no `limit()` on any subscription (Spark quota risk, auditLog worst).
+
 ## Update — new client asks, raw brain-dump (2026-08-25)
 
 Stan relayed a batch of new asks straight from a client callback — captured verbatim plus Claude's

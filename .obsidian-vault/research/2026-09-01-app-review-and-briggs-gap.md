@@ -96,6 +96,24 @@ client-side + Firestore, no Blaze needed.
 
 ---
 
+## Outcome (2026-09-01, same day)
+
+- **A1–A3 fixed** by the crm-d6 session same day, verified independently here (rules list byte-identical
+  to `FUNCTIES`, targetOfficeId frozen to the user's own office for assignment + last-admin count + audit,
+  functie now mirrored to the roster via `syncRoleAndTeamLeader`). vue-tsc clean, 40/40 unit tests green.
+- **Committed** as `kc145535` "Add admin-assignable functie ladder and time-based dashboard greeting"
+  (includes the A9 fake-timers test fix), pushed → Netlify auto-deploy.
+- **`firestore.rules` deployed to prod** (`firebase deploy --only firestore:rules`, compiled + released
+  to `peoplemarketing-c5bfd`).
+- **Prod smoke test: 6/6 PASS** — throwaway accounts via Admin-SDK custom tokens (no passwords), client
+  SDK against live rules: admin update with functie untouched ✅ (A1 unchanged branch), valid functie ✅,
+  invalid functie denied ✅, member self-update phone ✅, member changing own functie denied ✅, member
+  writing another user's doc denied ✅. Test accounts + docs deleted afterwards.
+- **Still open from this review:** A4–A8 polish, all of section B (B1 inverted rules tests, B2 signup
+  forgery incl. `isTeamLeader: true`, B3 audit forgeability, B4 lead-PII exposure, B5 role-revoke),
+  section C (C1 availability idempotency, C2 unbounded subscriptions/Spark quota, C3–C10), the Briggs
+  roadmap (D), and the test-coverage gaps.
+
 ## Recommended order
 
 1. **Before crm-d6 commits:** fix A1 (rules gate), A2 (office reassignment — at least freeze

@@ -32,7 +32,8 @@ Location: `C:\RFT\Projects\CRM\.obsidian-vault\` (in-repo so it's version-contro
 │   └── ticket-03-shift-create.md
 ├── research/
 │   ├── mcp-recommendations.md     ← Firebase + GitHub MCPs for Claude Desktop
-│   └── pink-hex-investigation.md
+│   ├── pink-hex-investigation.md
+│   └── 2026-09-01-app-review-and-briggs-gap.md ← full review + Briggs ("haggs") gap analysis
 └── meetings/
     ├── 2026-08-24-stan-discovery.md
     ├── 2026-08-24-client-transcript-shifts-recruitment.md
