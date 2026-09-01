@@ -11,7 +11,7 @@ import {
 
 import { db } from '@/services/firebase';
 import type { Employee, EmployeeCreatePayload, EmployeePatch } from '@/types/employee';
-import type { Role } from '@/types/user';
+import type { Functie, Role } from '@/types/user';
 
 function employeesCollection(officeId: string) {
   return collection(db, 'offices', officeId, 'employees');
@@ -98,11 +98,12 @@ export const employeesService = {
     employeeId: string,
     role: Role,
     isTeamLeader: boolean,
+    functie: Functie | null = null,
   ): Promise<void> {
     const ref = doc(db, 'offices', officeId, 'employees', employeeId);
     const existing = await getDoc(ref);
     if (!existing.exists()) return;
-    await updateDoc(ref, { role, isTeamLeader, updatedAt: serverTimestamp() });
+    await updateDoc(ref, { role, isTeamLeader, functie, updatedAt: serverTimestamp() });
   },
 };
 

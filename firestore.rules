@@ -75,6 +75,7 @@ service cloud.firestore {
         || (isSignedIn() && request.auth.uid == userId
           && request.resource.data.role == null
           && request.resource.data.primaryOfficeId == null
+          && request.resource.data.get('functie', null) == null
           && request.resource.data.desiredOfficeId is string
           && request.resource.data.desiredOfficeId.size() > 0);
       // Role assignment: admin can grant role/office/isTeamLeader directly —
@@ -99,9 +100,23 @@ service cloud.firestore {
           && request.resource.data.isActive == resource.data.isActive
           && request.resource.data.email == resource.data.email
           && request.resource.data.displayName == resource.data.displayName
+          // functie is admin-assigned career-ladder data — a self-update may
+          // never change it. get(..., null) so docs from before the field
+          // existed (missing on both sides) still pass.
+          && request.resource.data.get('functie', null) == resource.data.get('functie', null)
           && request.resource.data.emailVerified == request.auth.token.email_verified;
       }
-      allow update: if (isAdmin() && request.resource.data.role in ['Administrator', 'TeamManager', 'TeamMember'])
+      // functie: admin-only, must be one of the career-ladder values or null
+      // (see types/user.ts FUNCTIES — keep the two lists in sync). Scoped to
+      // writes that actually CHANGE functie — an unchanged value always
+      // passes, so a TS/rules list drift can never brick unrelated admin
+      // updates (setActive/setPhone) on a doc holding a newer functie value.
+      function validFunctie() {
+        return request.resource.data.get('functie', null) == resource.data.get('functie', null)
+          || request.resource.data.get('functie', null) == null
+          || request.resource.data.functie in ['Trainee', 'Werver', 'Topverkoper', 'Teamcaptain', 'Manager', 'Branch manager', 'Regio manager', 'Country manager'];
+      }
+      allow update: if (isAdmin() && request.resource.data.role in ['Administrator', 'TeamManager', 'TeamMember'] && validFunctie())
         || selfProfileUpdateOnly();
       allow delete: if isAdmin();
     }

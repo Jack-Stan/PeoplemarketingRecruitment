@@ -5,7 +5,7 @@ import type { Unsubscribe } from 'firebase/firestore';
 import { employeesService } from '@/services/employees.service';
 import { usersService } from '@/services/users.service';
 import { friendlyError } from '@/utils/errors';
-import type { Role, UserProfile } from '@/types/user';
+import type { Functie, Role, UserProfile } from '@/types/user';
 
 /**
  * Admin-only user directory. Backs `UsersView.vue` — lists every account
@@ -59,11 +59,12 @@ export const useUsersStore = defineStore('users', () => {
     role: Role,
     officeId: string,
     isTeamLeader: boolean,
+    functie: Functie | null = null,
   ): Promise<boolean> {
     error.value = null;
     try {
-      await usersService.assignRole(uid, role, officeId, isTeamLeader);
-      await employeesService.syncRoleAndTeamLeader(officeId, uid, role, isTeamLeader);
+      await usersService.assignRole(uid, role, officeId, isTeamLeader, functie);
+      await employeesService.syncRoleAndTeamLeader(officeId, uid, role, isTeamLeader, functie);
       return true;
     } catch (err) {
       error.value = friendlyError(err);

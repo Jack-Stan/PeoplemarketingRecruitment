@@ -175,7 +175,7 @@ onUnmounted(() => store.unsubscribe());
 
       <section class="border border-black/5 bg-white p-6">
         <h3 class="text-sm font-bold">Toegang</h3>
-        <dl class="mt-4 grid grid-cols-3 gap-6 text-sm">
+        <dl class="mt-4 grid grid-cols-2 gap-6 text-sm sm:grid-cols-4">
           <div>
             <dt class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">Rol</dt>
             <dd class="mt-1.5">
@@ -190,6 +190,10 @@ onUnmounted(() => store.unsubscribe());
           <div>
             <dt class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">Teamleider</dt>
             <dd class="mt-1.5 text-base">{{ user.isTeamLeader ? 'Ja' : 'Nee' }}</dd>
+          </div>
+          <div>
+            <dt class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">Functie</dt>
+            <dd class="mt-1.5 text-base">{{ user.functie || 'Niet toegewezen' }}</dd>
           </div>
         </dl>
         <div class="mt-5 flex gap-2 border-t border-black/5 pt-5">

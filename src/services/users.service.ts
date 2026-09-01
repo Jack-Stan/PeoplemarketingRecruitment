@@ -11,7 +11,7 @@ import {
 } from 'firebase/firestore';
 
 import { db } from '@/services/firebase';
-import type { Role, UserProfile } from '@/types/user';
+import type { Functie, Role, UserProfile } from '@/types/user';
 
 /**
  * Thin wrapper for `/users/{uid}` — the ONLY source of role/officeId/
@@ -35,6 +35,7 @@ export const usersService = {
       role: null,
       primaryOfficeId: null,
       desiredOfficeId,
+      functie: null,
       isTeamLeader: false,
       isActive: true,
       phone,
@@ -79,12 +80,19 @@ export const usersService = {
     );
   },
 
-  /** Admin-only: grant role/office/isTeamLeader with a direct Firestore write. */
-  async assignRole(uid: string, role: Role, officeId: string, isTeamLeader: boolean): Promise<void> {
+  /** Admin-only: grant role/office/isTeamLeader/functie with a direct Firestore write. */
+  async assignRole(
+    uid: string,
+    role: Role,
+    officeId: string,
+    isTeamLeader: boolean,
+    functie: Functie | null = null,
+  ): Promise<void> {
     await updateDoc(doc(db, 'users', uid), {
       role,
       primaryOfficeId: officeId,
       isTeamLeader,
+      functie,
       updatedAt: serverTimestamp(),
     });
   },

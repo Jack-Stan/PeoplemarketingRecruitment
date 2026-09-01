@@ -15,6 +15,23 @@ const recruitmentStore = useRecruitmentStore();
 const { officeId } = useActiveOffice();
 const isMember = computed(() => auth.role.value === 'TeamMember');
 
+/**
+ * Time-of-day greeting (client ask, 2026-09-01): greet the signed-in person
+ * by name — or by their functie when no display name is set — with
+ * goedemorgen / goedemiddag / goedenavond / goedenacht based on the local
+ * clock at page load.
+ */
+function greetingForHour(hour: number): string {
+  if (hour < 5) return 'Goedenacht';
+  if (hour < 12) return 'Goedemorgen';
+  if (hour < 18) return 'Goedemiddag';
+  return 'Goedenavond';
+}
+const greeting = computed(() => {
+  const who = auth.displayName.value || auth.functie.value || auth.user.value?.email || '';
+  return `${greetingForHour(new Date().getHours())}${who ? `, ${who}` : ''}.`;
+});
+
 const today = todayLocalISO();
 const todayLabel = new Date(`${today}T00:00:00`).toLocaleDateString('nl-BE', {
   weekday: 'long',
@@ -99,10 +116,8 @@ onUnmounted(() => {
 <template>
   <div v-if="isMember" class="mx-auto max-w-3xl space-y-8">
     <section>
-      <p class="text-sm text-neutral-mute">Jouw shifts</p>
-      <h2 class="mt-1 text-3xl font-bold tracking-tight">
-        Fijn je te zien, {{ auth.user.value?.displayName || auth.user.value?.email }}.
-      </h2>
+      <p class="text-sm text-neutral-mute">{{ auth.functie.value || 'Jouw shifts' }}</p>
+      <h2 class="mt-1 text-3xl font-bold tracking-tight">{{ greeting }}</h2>
     </section>
     <section class="grid gap-4 sm:grid-cols-2">
       <article class="border border-black/5 bg-white p-5">
@@ -135,8 +150,10 @@ onUnmounted(() => {
   <div v-else class="mx-auto max-w-7xl space-y-8">
     <section class="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
       <div>
-        <p class="text-sm text-neutral-mute capitalize">{{ todayLabel }}</p>
-        <h2 class="mt-1 text-3xl font-bold tracking-tight">Goedemorgen, baas.</h2>
+        <p class="text-sm text-neutral-mute capitalize">
+          {{ todayLabel }}<template v-if="auth.functie.value"> · {{ auth.functie.value }}</template>
+        </p>
+        <h2 class="mt-1 text-3xl font-bold tracking-tight">{{ greeting }}</h2>
       </div>
       <RouterLink to="/planning"
         class="inline-flex items-center justify-center bg-primary-pink px-4 py-2.5 text-sm font-bold text-white hover:bg-primary-pink-alt">

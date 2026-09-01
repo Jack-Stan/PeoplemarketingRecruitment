@@ -21,6 +21,35 @@ export const ROLE_LABELS: Record<Role, string> = {
   TeamMember: 'Teamlid',
 };
 
+/**
+ * Job function ("functie") — the sales-career ladder, orthogonal to Role
+ * (which is an authorization concept). Assigned by an admin alongside the
+ * role; shown on the dashboard greeting and the user detail page. Values
+ * are the client's own labels verbatim (Dutch/English mix), used as both
+ * the stored value and the display text.
+ */
+export type Functie =
+  | 'Trainee'
+  | 'Werver'
+  | 'Topverkoper'
+  | 'Teamcaptain'
+  | 'Manager'
+  | 'Branch manager'
+  | 'Regio manager'
+  | 'Country manager';
+
+/** Ordered lowest → highest rung; drives the functie <select> options. */
+export const FUNCTIES: readonly Functie[] = [
+  'Trainee',
+  'Werver',
+  'Topverkoper',
+  'Teamcaptain',
+  'Manager',
+  'Branch manager',
+  'Regio manager',
+  'Country manager',
+] as const;
+
 export interface AppUser {
   uid: string;
   email: string | null;
@@ -52,6 +81,12 @@ export interface UserProfile {
    * admin-created accounts, which never went through signup.
    */
   desiredOfficeId: string | null;
+  /**
+   * Career-ladder functie — admin-assigned via the same modal as role
+   * (usersService.assignRole), null until first assignment. Optional-typed
+   * because docs created before this field existed simply don't have it.
+   */
+  functie?: Functie | null;
   isTeamLeader: boolean;
   isActive: boolean;
   /**

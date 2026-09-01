@@ -6,7 +6,7 @@ import type { Unsubscribe } from 'firebase/firestore';
 import { authService } from '@/services/auth.service';
 import { usersService } from '@/services/users.service';
 import { friendlyError } from '@/utils/errors';
-import { Roles, type AppUser, type Role } from '@/types/user';
+import { Roles, type AppUser, type Functie, type Role } from '@/types/user';
 
 /**
  * Auth store. Wraps `authService` with reactive state. Role/officeId/
@@ -60,6 +60,8 @@ export const useAuthStore = defineStore('auth', () => {
    * (the normal path now) never touch it, so it's null for most users.
    */
   const displayName = ref<string | null>(null);
+  /** Career-ladder functie from the `/users/{uid}` doc — see types/user.ts. */
+  const functie = ref<Functie | null>(null);
   const isLoading = ref<boolean>(false);
   const error = ref<string | null>(null);
   let unsubProfile: Unsubscribe | null = null;
@@ -258,16 +260,24 @@ export const useAuthStore = defineStore('auth', () => {
     officeId.value = null;
     isTeamLeader.value = false;
     displayName.value = null;
+    functie.value = null;
     error.value = null;
   }
 
   function applyProfile(
-    profile: { role: Role | null; primaryOfficeId: string | null; isTeamLeader: boolean; displayName?: string | null } | null,
+    profile: {
+      role: Role | null;
+      primaryOfficeId: string | null;
+      isTeamLeader: boolean;
+      displayName?: string | null;
+      functie?: Functie | null;
+    } | null,
   ): void {
     role.value = profile?.role ?? null;
     officeId.value = profile?.primaryOfficeId ?? null;
     isTeamLeader.value = Boolean(profile?.isTeamLeader);
     displayName.value = profile?.displayName ?? null;
+    functie.value = profile?.functie ?? null;
   }
 
   /**
@@ -344,6 +354,7 @@ export const useAuthStore = defineStore('auth', () => {
     officeId,
     isTeamLeader,
     displayName,
+    functie,
     isLoading,
     error,
     isAuthenticated,

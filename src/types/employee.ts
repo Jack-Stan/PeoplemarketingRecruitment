@@ -1,4 +1,4 @@
-import type { Role } from './user';
+import type { Functie, Role } from './user';
 
 export type EmploymentType = 'FullTime' | 'PartTime' | 'Flex';
 
@@ -10,6 +10,12 @@ export interface Employee {
   email: string;
   phone: string | null;
   role: Role;
+  /**
+   * Roster mirror of the user doc's functie (same reason role/isTeamLeader
+   * are mirrored: a TeamManager can't read other people's /users docs).
+   * Optional — docs from before the field existed don't have it.
+   */
+  functie?: Functie | null;
   isActive: boolean;
   isTeamLeader: boolean;
   weeklyContractHours: number | null;

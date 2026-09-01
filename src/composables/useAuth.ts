@@ -8,7 +8,7 @@ import type { Role } from '@/types/user';
  */
 export function useAuth() {
   const store = useAuthStore();
-  const { user, role, officeId, isTeamLeader, displayName, isAuthenticated, isLoading, error } =
+  const { user, role, officeId, isTeamLeader, displayName, functie, isAuthenticated, isLoading, error } =
     storeToRefs(store);
 
   return {
@@ -18,6 +18,7 @@ export function useAuth() {
     officeId,
     isTeamLeader,
     displayName,
+    functie,
     isAuthenticated,
     isLoading,
     error,

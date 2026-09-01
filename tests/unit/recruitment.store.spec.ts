@@ -56,15 +56,21 @@ describe('recruitment store', () => {
   });
 
   it('leadsThisWeek only counts leads created in the current ISO week', () => {
-    vi.mocked(recruitmentService.subscribe).mockImplementationOnce((_officeId, onChange) => {
-      onChange([LEAD_A, LEAD_B, LEAD_C]);
-      return () => {};
-    });
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    try {
+      vi.mocked(recruitmentService.subscribe).mockImplementationOnce((_officeId, onChange) => {
+        onChange([LEAD_A, LEAD_B, LEAD_C]);
+        return () => {};
+      });
 
-    const store = useRecruitmentStore();
-    store.subscribe('gent');
+      const store = useRecruitmentStore();
+      store.subscribe('gent');
 
-    expect(store.leadsThisWeek).toBe(2);
+      expect(store.leadsThisWeek).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('create stamps the given timestamp and delegates to the service', async () => {
