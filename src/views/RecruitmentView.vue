@@ -4,6 +4,7 @@ import { computed, onUnmounted, ref, watch } from 'vue';
 import { useAuth } from '@/composables/useAuth';
 import { useActiveOffice } from '@/composables/useActiveOffice';
 import { useAuditLogStore } from '@/stores/auditLog';
+import { useEmployeesStore } from '@/stores/employees';
 import { useRecruitmentStore } from '@/stores/recruitment';
 import { useUiStore } from '@/stores/ui';
 import {
@@ -16,6 +17,7 @@ import {
 
 const auth = useAuth();
 const store = useRecruitmentStore();
+const employees = useEmployeesStore();
 const auditLog = useAuditLogStore();
 const ui = useUiStore();
 
@@ -29,6 +31,12 @@ const visibleLeads = computed(() =>
 
 const sources: LeadSource[] = ['WhatsApp', 'Instagram', 'Website', 'Doorverwijzing', 'Anders'];
 
+/** Roster to attribute a street-recruited lead to — see `RecruitmentLead.recruitedBy`. */
+const recruiters = computed(() => employees.activeEmployees);
+const recruiterNames = computed(
+  () => new Map(employees.employees.map((e) => [e.employeeId, `${e.firstName} ${e.lastName}`])),
+);
+
 const isFormOpen = ref(false);
 const formError = ref<string | null>(null);
 type LeadFormModel = Omit<RecruitmentLeadCreatePayload, 'age'> & { age: number | null };
@@ -41,6 +49,7 @@ function makeEmptyForm(): LeadFormModel {
     source: 'WhatsApp',
     stage: 'new',
     notes: null,
+    recruitedBy: null,
     createdBy: auth.user.value?.uid ?? '',
   };
 }
@@ -91,11 +100,17 @@ async function moveStage(leadId: string, stage: LeadStage): Promise<void> {
 watch(
   officeId,
   (id) => {
-    if (id) store.subscribe(id);
+    if (!id) return;
+    store.subscribe(id);
+    // Roster feeds the "geworven door" selector and resolves ids to names.
+    employees.subscribe(id);
   },
   { immediate: true },
 );
-onUnmounted(() => store.unsubscribe());
+onUnmounted(() => {
+  store.unsubscribe();
+  employees.unsubscribe();
+});
 </script>
 
 <template>
@@ -190,6 +205,7 @@ onUnmounted(() => store.unsubscribe());
           <tr>
             <th class="px-5 py-4">Kandidaat</th>
             <th class="px-5 py-4">Bron</th>
+            <th class="px-5 py-4">Geworven door</th>
             <th class="px-5 py-4">Fase</th>
             <th class="px-5 py-4">Contact</th>
             <th v-if="canManage" class="px-5 py-4"></th>
@@ -202,14 +218,21 @@ onUnmounted(() => store.unsubscribe());
               <p v-if="lead.notes" class="text-[11px] text-neutral-mute">{{ lead.notes }}</p>
             </td>
             <td class="px-5 py-4 text-xs text-neutral-mute">{{ lead.source }}</td>
+            <td class="px-5 py-4 text-xs text-neutral-mute">
+              {{ (lead.recruitedBy && recruiterNames.get(lead.recruitedBy)) || '—' }}
+            </td>
             <td class="px-5 py-4">
               <span class="inline-block bg-primary-pink/10 px-2.5 py-1 text-xs font-bold text-primary-pink">
                 {{ LEAD_STAGE_LABELS[lead.stage] }}
               </span>
             </td>
             <td class="px-5 py-4 text-xs text-neutral-mute">
-              <p v-if="lead.email">{{ lead.email }}</p>
-              <p v-if="lead.phone">{{ lead.phone }}</p>
+              <p v-if="lead.email">
+                <a :href="`mailto:${lead.email}`" class="hover:text-primary-pink" title="Mailen">{{ lead.email }}</a>
+              </p>
+              <p v-if="lead.phone">
+                <a :href="`tel:${lead.phone}`" class="hover:text-primary-pink" title="Bellen">{{ lead.phone }}</a>
+              </p>
             </td>
             <td v-if="canManage" class="px-5 py-4 text-right">
               <select
@@ -244,6 +267,12 @@ onUnmounted(() => store.unsubscribe());
           <input v-model="form.phone" placeholder="Telefoon (optioneel)" class="w-full border-black/10 bg-[#faf9f7] text-sm" />
           <select v-model="form.source" class="w-full border-black/10 bg-[#faf9f7] text-sm">
             <option v-for="s in sources" :key="s" :value="s">{{ s }}</option>
+          </select>
+          <select v-model="form.recruitedBy" class="w-full border-black/10 bg-[#faf9f7] text-sm">
+            <option :value="null">Geworven door (optioneel)</option>
+            <option v-for="r in recruiters" :key="r.employeeId" :value="r.employeeId">
+              {{ r.firstName }} {{ r.lastName }}
+            </option>
           </select>
           <textarea v-model="form.notes" rows="2" placeholder="Notities (optioneel)" class="w-full border-black/10 bg-[#faf9f7] text-sm"></textarea>
           <p v-if="formError" class="text-xs font-semibold text-semantic-danger">{{ formError }}</p>
