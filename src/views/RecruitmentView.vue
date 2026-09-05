@@ -34,6 +34,7 @@ const formError = ref<string | null>(null);
 function makeEmptyForm(): RecruitmentLeadCreatePayload {
   return {
     name: '',
+    age: null,
     email: null,
     phone: null,
     source: 'WhatsApp',
@@ -53,6 +54,10 @@ function openCreate(): void {
 async function submitForm(): Promise<void> {
   if (!form.value.name.trim()) {
     formError.value = 'Naam is verplicht.';
+    return;
+  }
+  if (!form.value.age || form.value.age <= 0) {
+    formError.value = 'Leeftijd is verplicht.';
     return;
   }
   formError.value = null;
@@ -192,7 +197,7 @@ onUnmounted(() => store.unsubscribe());
         <tbody class="divide-y divide-black/5">
           <tr v-for="lead in visibleLeads" :key="lead.leadId" class="hover:bg-[#faf9f7]">
             <td class="px-5 py-4">
-              <p class="font-bold">{{ lead.name }}</p>
+              <p class="font-bold">{{ lead.name }}<span v-if="lead.age" class="font-normal text-neutral-mute"> ({{ lead.age }})</span></p>
               <p v-if="lead.notes" class="text-[11px] text-neutral-mute">{{ lead.notes }}</p>
             </td>
             <td class="px-5 py-4 text-xs text-neutral-mute">{{ lead.source }}</td>
@@ -226,6 +231,13 @@ onUnmounted(() => store.unsubscribe());
         <h3 class="text-lg font-bold">Lead toevoegen</h3>
         <form class="mt-4 space-y-3" @submit.prevent="submitForm">
           <input v-model="form.name" placeholder="Naam" class="w-full border-black/10 bg-[#faf9f7] text-sm" />
+          <input
+            v-model.number="form.age"
+            type="number"
+            min="0"
+            placeholder="Leeftijd"
+            class="w-full border-black/10 bg-[#faf9f7] text-sm"
+          />
           <input v-model="form.email" type="email" placeholder="E-mail (optioneel)" class="w-full border-black/10 bg-[#faf9f7] text-sm" />
           <input v-model="form.phone" placeholder="Telefoon (optioneel)" class="w-full border-black/10 bg-[#faf9f7] text-sm" />
           <select v-model="form.source" class="w-full border-black/10 bg-[#faf9f7] text-sm">

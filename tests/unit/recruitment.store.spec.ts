@@ -20,6 +20,7 @@ const LEAD_A: RecruitmentLead = {
   leadId: 'l1',
   officeId: 'gent',
   name: 'Fleur Jansen',
+  age: 24,
   email: null,
   phone: null,
   source: 'WhatsApp',
@@ -79,6 +80,7 @@ describe('recruitment store', () => {
     const store = useRecruitmentStore();
     const ok = await store.create('gent', NOW, {
       name: 'New Candidate',
+      age: 30,
       email: null,
       phone: null,
       source: 'Website',
@@ -113,6 +115,7 @@ describe('recruitment store', () => {
     const store = useRecruitmentStore();
     const ok = await store.create('gent', NOW, {
       name: 'Blocked',
+      age: 28,
       email: null,
       phone: null,
       source: 'Website',

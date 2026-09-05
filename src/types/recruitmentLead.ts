@@ -45,6 +45,7 @@ export interface RecruitmentLead {
   leadId: string;
   officeId: string;
   name: string;
+  age: number | null;
   email: string | null;
   phone: string | null;
   source: LeadSource;
