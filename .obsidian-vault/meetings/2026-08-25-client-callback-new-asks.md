@@ -108,7 +108,11 @@ GDPR is waiting on** — this is a policy decision, not a code task Claude shoul
   (`EmployeesView` never rendered phone, so nothing to do there).
 - **Item 3, `recruitedBy` half** — done. `RecruitmentLead.recruitedBy` holds an `employeeId` (= uid,
   decisions/007), nullable for legacy docs and non-street sources. Captured via a "Geworven door" selector on
-  the add-lead form and shown as its own column in the leads table.
+  the add-lead form and shown as its own column in the leads table — **staff only**: a TeamMember may read
+  `/recruitmentLeads` but only their own `/employees/{uid}` doc, so they can't resolve recruiter ids to names.
+  The view subscribes to the roster only when the viewer is allowed to list it, and hides the column
+  otherwise. Lead reads now normalize `age`/`recruitedBy` to `null` in `recruitment.service.ts`, since
+  Firestore omits those fields entirely on docs written before they existed.
   **Not built: the per-recruiter analytics/leaderboard** — it groups by whatever status model wins the
   question below, so building the view now risks redoing it.
 - **Unrelated but adjacent** — a required `age` field on the lead form shipped in #1, from Michiel's

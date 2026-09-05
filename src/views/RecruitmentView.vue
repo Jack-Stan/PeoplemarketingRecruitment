@@ -100,10 +100,21 @@ async function moveStage(leadId: string, stage: LeadStage): Promise<void> {
 watch(
   officeId,
   (id) => {
-    if (!id) return;
-    store.subscribe(id);
-    // Roster feeds the "geworven door" selector and resolves ids to names.
-    employees.subscribe(id);
+    if (id) store.subscribe(id);
+  },
+  { immediate: true },
+);
+
+// Roster feeds the "geworven door" selector and resolves ids to names, but only
+// staff may list /employees — a member reads just their own doc
+// (firestore.rules), so subscribing as one is a guaranteed permission-denied.
+// The column is hidden for members for the same reason. Watches the role too,
+// since it resolves from Firestore and can arrive after officeId does.
+watch(
+  [officeId, canManage],
+  ([id, mayList]) => {
+    if (id && mayList) employees.subscribe(id);
+    else employees.unsubscribe();
   },
   { immediate: true },
 );
@@ -205,7 +216,7 @@ onUnmounted(() => {
           <tr>
             <th class="px-5 py-4">Kandidaat</th>
             <th class="px-5 py-4">Bron</th>
-            <th class="px-5 py-4">Geworven door</th>
+            <th v-if="canManage" class="px-5 py-4">Geworven door</th>
             <th class="px-5 py-4">Fase</th>
             <th class="px-5 py-4">Contact</th>
             <th v-if="canManage" class="px-5 py-4"></th>
@@ -218,8 +229,10 @@ onUnmounted(() => {
               <p v-if="lead.notes" class="text-[11px] text-neutral-mute">{{ lead.notes }}</p>
             </td>
             <td class="px-5 py-4 text-xs text-neutral-mute">{{ lead.source }}</td>
-            <td class="px-5 py-4 text-xs text-neutral-mute">
-              {{ (lead.recruitedBy && recruiterNames.get(lead.recruitedBy)) || '—' }}
+            <td v-if="canManage" class="px-5 py-4 text-xs text-neutral-mute">
+              <!-- Falls back to the raw id so attribution to an employee who has
+                   since left the roster isn't silently hidden. -->
+              {{ lead.recruitedBy ? (recruiterNames.get(lead.recruitedBy) ?? lead.recruitedBy) : '—' }}
             </td>
             <td class="px-5 py-4">
               <span class="inline-block bg-primary-pink/10 px-2.5 py-1 text-xs font-bold text-primary-pink">
