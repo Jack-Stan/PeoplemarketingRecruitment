@@ -56,5 +56,7 @@ export interface RecruitmentLead {
   createdAtMs: number;
 }
 
-export type RecruitmentLeadCreatePayload = Omit<RecruitmentLead, 'leadId' | 'officeId' | 'createdAtMs'>;
+export type RecruitmentLeadCreatePayload = Omit<RecruitmentLead, 'leadId' | 'officeId' | 'createdAtMs' | 'age'> & {
+  age: number;
+};
 export type RecruitmentLeadPatch = Partial<Omit<RecruitmentLead, 'leadId' | 'officeId'>>;

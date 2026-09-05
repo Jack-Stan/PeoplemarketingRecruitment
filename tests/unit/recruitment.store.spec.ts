@@ -93,7 +93,7 @@ describe('recruitment store', () => {
     expect(recruitmentService.create).toHaveBeenCalledWith(
       'gent',
       NOW,
-      expect.objectContaining({ name: 'New Candidate' }),
+      expect.objectContaining({ name: 'New Candidate', age: 30 }),
     );
   });
 

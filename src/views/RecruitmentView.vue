@@ -31,7 +31,8 @@ const sources: LeadSource[] = ['WhatsApp', 'Instagram', 'Website', 'Doorverwijzi
 
 const isFormOpen = ref(false);
 const formError = ref<string | null>(null);
-function makeEmptyForm(): RecruitmentLeadCreatePayload {
+type LeadFormModel = Omit<RecruitmentLeadCreatePayload, 'age'> & { age: number | null };
+function makeEmptyForm(): LeadFormModel {
   return {
     name: '',
     age: null,
@@ -43,7 +44,7 @@ function makeEmptyForm(): RecruitmentLeadCreatePayload {
     createdBy: auth.user.value?.uid ?? '',
   };
 }
-const form = ref<RecruitmentLeadCreatePayload>(makeEmptyForm());
+const form = ref<LeadFormModel>(makeEmptyForm());
 
 function openCreate(): void {
   form.value = makeEmptyForm();
@@ -56,12 +57,12 @@ async function submitForm(): Promise<void> {
     formError.value = 'Naam is verplicht.';
     return;
   }
-  if (!form.value.age || form.value.age <= 0) {
-    formError.value = 'Leeftijd is verplicht.';
+  if (!Number.isInteger(form.value.age) || (form.value.age as number) <= 0) {
+    formError.value = 'Leeftijd is verplicht en moet een geheel getal groter dan 0 zijn.';
     return;
   }
   formError.value = null;
-  const ok = await store.create(officeId.value, Date.now(), form.value);
+  const ok = await store.create(officeId.value, Date.now(), { ...form.value, age: form.value.age as number });
   if (ok) {
     ui.push('Lead toegevoegd.', 'success');
     isFormOpen.value = false;
@@ -197,7 +198,7 @@ onUnmounted(() => store.unsubscribe());
         <tbody class="divide-y divide-black/5">
           <tr v-for="lead in visibleLeads" :key="lead.leadId" class="hover:bg-[#faf9f7]">
             <td class="px-5 py-4">
-              <p class="font-bold">{{ lead.name }}<span v-if="lead.age" class="font-normal text-neutral-mute"> ({{ lead.age }})</span></p>
+              <p class="font-bold">{{ lead.name }}<span v-if="typeof lead.age === 'number'" class="font-normal text-neutral-mute"> ({{ lead.age }})</span></p>
               <p v-if="lead.notes" class="text-[11px] text-neutral-mute">{{ lead.notes }}</p>
             </td>
             <td class="px-5 py-4 text-xs text-neutral-mute">{{ lead.source }}</td>
@@ -234,7 +235,8 @@ onUnmounted(() => store.unsubscribe());
           <input
             v-model.number="form.age"
             type="number"
-            min="0"
+            min="1"
+            step="1"
             placeholder="Leeftijd"
             class="w-full border-black/10 bg-[#faf9f7] text-sm"
           />
