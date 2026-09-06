@@ -30,7 +30,20 @@ export const recruitmentService = {
     return onSnapshot(
       leadsCollection(officeId),
       (snapshot) => {
-        const leads = snapshot.docs.map((d) => ({ leadId: d.id, officeId, ...d.data() }) as RecruitmentLead);
+        const leads = snapshot.docs.map((d) => {
+          const data = d.data();
+          return {
+            leadId: d.id,
+            officeId,
+            ...data,
+            // Fields added after the collection already had documents: Firestore
+            // omits them entirely on older docs, which would hand consumers
+            // `undefined` where the type promises `T | null`. Normalize here so
+            // the boundary is the only place that has to know.
+            age: data.age ?? null,
+            recruitedBy: data.recruitedBy ?? null,
+          } as RecruitmentLead;
+        });
         onChange(leads);
       },
       onError,

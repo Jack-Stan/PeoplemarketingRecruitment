@@ -26,6 +26,7 @@ const LEAD_A: RecruitmentLead = {
   source: 'WhatsApp',
   stage: 'new',
   notes: null,
+  recruitedBy: null,
   createdBy: 'admin-1',
   createdAtMs: NOW,
 };
@@ -86,6 +87,7 @@ describe('recruitment store', () => {
       source: 'Website',
       stage: 'new',
       notes: null,
+      recruitedBy: 'emp-7',
       createdBy: 'admin-1',
     });
 
@@ -93,7 +95,7 @@ describe('recruitment store', () => {
     expect(recruitmentService.create).toHaveBeenCalledWith(
       'gent',
       NOW,
-      expect.objectContaining({ name: 'New Candidate', age: 30 }),
+      expect.objectContaining({ name: 'New Candidate', age: 30, recruitedBy: 'emp-7' }),
     );
   });
 
@@ -121,6 +123,7 @@ describe('recruitment store', () => {
       source: 'Website',
       stage: 'new',
       notes: null,
+      recruitedBy: null,
       createdBy: 'admin-1',
     });
 
