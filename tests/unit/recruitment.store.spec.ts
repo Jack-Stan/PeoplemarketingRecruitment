@@ -121,10 +121,31 @@ describe('recruitment store', () => {
 
     expect(store.streetLeads).toHaveLength(5);
     expect(store.byRecruiterPerformance).toEqual([
-      // emp-1 first: more hires break the tie before total does.
+      // Hires are tied at 1 here, so `total` decides the order — the
+      // hires-first key is covered by the next test.
       { recruiterId: 'emp-1', total: 4, hired: 1, noShow: 1, planned: 1, pending: 1, hiredRate: 50 },
       { recruiterId: 'emp-2', total: 1, hired: 1, noShow: 0, planned: 0, pending: 0, hiredRate: 100 },
     ]);
+  });
+
+  it('byRecruiterPerformance ranks by hires before total', () => {
+    // emp-low has more signups but fewer hires, so it must sort second.
+    vi.mocked(recruitmentService.subscribe).mockImplementationOnce((_officeId, onChange) => {
+      onChange([
+        { ...LEAD_A, leadId: 'a1', recruitedBy: 'emp-low', streetStatus: 'no_show' },
+        { ...LEAD_A, leadId: 'a2', recruitedBy: 'emp-low', streetStatus: 'no_show' },
+        { ...LEAD_A, leadId: 'a3', recruitedBy: 'emp-low', streetStatus: 'hired' },
+        { ...LEAD_A, leadId: 'b1', recruitedBy: 'emp-high', streetStatus: 'hired' },
+        { ...LEAD_A, leadId: 'b2', recruitedBy: 'emp-high', streetStatus: 'hired' },
+      ]);
+      return () => {};
+    });
+
+    const store = useRecruitmentStore();
+    store.subscribe('gent');
+
+    expect(store.byRecruiterPerformance.map((r) => r.recruiterId)).toEqual(['emp-high', 'emp-low']);
+    expect(store.byRecruiterPerformance[0]).toMatchObject({ total: 2, hired: 2, hiredRate: 100 });
   });
 
   it('byRecruiterPerformance reports 0% rather than dividing by zero when nothing is decided', () => {
