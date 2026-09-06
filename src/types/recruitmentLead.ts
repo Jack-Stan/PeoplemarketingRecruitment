@@ -41,6 +41,28 @@ export const OPEN_LEAD_STAGES: LeadStage[] = ['new', 'contacted', 'interview_pla
 
 export type LeadSource = 'WhatsApp' | 'Instagram' | 'Website' | 'Doorverwijzing' | 'Anders';
 
+/**
+ * Outcome of a *street* signup — the three-state status the client asked for in
+ * meetings/2026-08-25-client-callback-new-asks.md (§3), confirmed by Stan
+ * 2026-09-06 as a SEPARATE status for street-recruited leads rather than a
+ * simplification of `LeadStage` (see decisions/009).
+ *
+ * It answers "what happened to the person this recruiter signed up on the
+ * street", which is the axis per-recruiter analytics group by. `LeadStage`
+ * still tracks the full CRM pipeline independently, so `no_show`/`hired`
+ * appear in both types with deliberately different meanings: here they are the
+ * street outcome, there they are the interview outcome.
+ */
+export type StreetLeadStatus = 'planned' | 'no_show' | 'hired';
+
+export const STREET_LEAD_STATUSES: StreetLeadStatus[] = ['planned', 'no_show', 'hired'];
+
+export const STREET_LEAD_STATUS_LABELS: Record<StreetLeadStatus, string> = {
+  planned: 'Gepland',
+  no_show: 'Niet gekomen',
+  hired: 'Aangenomen',
+};
+
 export interface RecruitmentLead {
   leadId: string;
   officeId: string;
@@ -61,6 +83,12 @@ export interface RecruitmentLead {
    * for docs created before the field existed.
    */
   recruitedBy: string | null;
+  /**
+   * Street signup outcome — see `StreetLeadStatus`. Null when the lead wasn't
+   * street-recruited (no `recruitedBy`), when the outcome isn't known yet, and
+   * on docs written before the field existed.
+   */
+  streetStatus: StreetLeadStatus | null;
   createdBy: string;
   /** Epoch ms, client-stamped at create time — drives the "leads this week" bar. */
   createdAtMs: number;

@@ -10,9 +10,12 @@ import { useUiStore } from '@/stores/ui';
 import {
   LEAD_STAGE_LABELS,
   LEAD_STAGES,
+  STREET_LEAD_STATUS_LABELS,
+  STREET_LEAD_STATUSES,
   type LeadSource,
   type LeadStage,
   type RecruitmentLeadCreatePayload,
+  type StreetLeadStatus,
 } from '@/types/recruitmentLead';
 
 const auth = useAuth();
@@ -50,6 +53,7 @@ function makeEmptyForm(): LeadFormModel {
     stage: 'new',
     notes: null,
     recruitedBy: null,
+    streetStatus: null,
     createdBy: auth.user.value?.uid ?? '',
   };
 }
@@ -92,6 +96,24 @@ async function moveStage(leadId: string, stage: LeadStage): Promise<void> {
       action: 'recruitment_stage_changed',
       targetLabel: lead.name,
       details: `${fromStage ? LEAD_STAGE_LABELS[fromStage] : '?'} → ${LEAD_STAGE_LABELS[stage]}`,
+      createdAtMs: Date.now(),
+    });
+  }
+}
+
+/** Street outcome for a signed-up lead — independent of `stage`, see decisions/009. */
+async function moveStreetStatus(leadId: string, streetStatus: StreetLeadStatus | null): Promise<void> {
+  const lead = store.leads.find((l) => l.leadId === leadId);
+  const from = lead?.streetStatus;
+  const ok = await store.setStreetStatus(officeId.value, leadId, streetStatus);
+  ui.push(ok ? 'Straatstatus bijgewerkt.' : (store.error ?? 'Er ging iets mis.'), ok ? 'success' : 'error');
+  if (ok && lead && auth.user.value) {
+    auditLog.log(officeId.value, {
+      actorUid: auth.user.value.uid,
+      actorEmail: auth.user.value.email ?? '',
+      action: 'recruitment_street_status_changed',
+      targetLabel: lead.name,
+      details: `${from ? STREET_LEAD_STATUS_LABELS[from] : '—'} → ${streetStatus ? STREET_LEAD_STATUS_LABELS[streetStatus] : '—'}`,
       createdAtMs: Date.now(),
     });
   }
@@ -191,6 +213,49 @@ onUnmounted(() => {
       </div>
     </section>
 
+    <!-- Per-recruiter street performance — 2026-08-25 client callback §3.
+         Counts straatstatus, not the pipeline stage (decisions/009). -->
+    <section v-if="canManage" class="border border-black/5 bg-white p-5">
+      <h3 class="text-sm font-bold">Prestatie per werver</h3>
+      <p class="mt-1 text-xs text-neutral-mute">
+        Straatwervingen per medewerker. Percentage is aangenomen t.o.v. de besliste wervingen —
+        geplande en nog niet bepaalde tellen niet mee.
+      </p>
+      <div class="mt-4 overflow-x-auto">
+        <table class="w-full min-w-[560px] text-left text-xs">
+          <thead class="text-[10px] uppercase tracking-[0.16em] text-neutral-mute">
+            <tr>
+              <th class="py-2">Werver</th>
+              <th class="py-2">Geworven</th>
+              <th class="py-2">Aangenomen</th>
+              <th class="py-2">Niet gekomen</th>
+              <th class="py-2">Gepland</th>
+              <th class="py-2">Nog niet bepaald</th>
+              <th class="py-2 text-right">Aannamepercentage</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-black/5">
+            <tr v-for="row in store.byRecruiterPerformance" :key="row.recruiterId">
+              <td class="py-2.5 font-semibold">
+                {{ recruiterNames.get(row.recruiterId) ?? row.recruiterId }}
+              </td>
+              <td class="py-2.5">{{ row.total }}</td>
+              <td class="py-2.5 font-semibold text-emerald-600">{{ row.hired }}</td>
+              <td class="py-2.5 text-semantic-danger">{{ row.noShow }}</td>
+              <td class="py-2.5 text-neutral-mute">{{ row.planned }}</td>
+              <td class="py-2.5 text-neutral-mute">{{ row.pending }}</td>
+              <td class="py-2.5 text-right font-bold">
+                {{ row.hired + row.noShow ? `${row.hiredRate}%` : '—' }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-if="!store.byRecruiterPerformance.length" class="text-xs text-neutral-mute">
+          Nog geen straatwervingen — wijs een lead toe via “Geworven door”.
+        </p>
+      </div>
+    </section>
+
     <div class="flex gap-1 overflow-x-auto border-b border-black/10 pb-px">
       <button
         class="whitespace-nowrap border-b-2 px-4 py-3 text-xs font-bold"
@@ -217,6 +282,7 @@ onUnmounted(() => {
             <th class="px-5 py-4">Kandidaat</th>
             <th class="px-5 py-4">Bron</th>
             <th v-if="canManage" class="px-5 py-4">Geworven door</th>
+            <th v-if="canManage" class="px-5 py-4">Straatstatus</th>
             <th class="px-5 py-4">Fase</th>
             <th class="px-5 py-4">Contact</th>
             <th v-if="canManage" class="px-5 py-4"></th>
@@ -233,6 +299,22 @@ onUnmounted(() => {
               <!-- Falls back to the raw id so attribution to an employee who has
                    since left the roster isn't silently hidden. -->
               {{ lead.recruitedBy ? (recruiterNames.get(lead.recruitedBy) ?? lead.recruitedBy) : '—' }}
+            </td>
+            <td v-if="canManage" class="px-5 py-4 text-xs text-neutral-mute">
+              <!-- Only street signups carry a street outcome — a Website lead
+                   has no recruiter to attribute one to. -->
+              <select
+                v-if="lead.recruitedBy"
+                :value="lead.streetStatus ?? ''"
+                class="border-black/10 bg-[#faf9f7] text-xs"
+                @change="moveStreetStatus(lead.leadId, (($event.target as HTMLSelectElement).value || null) as StreetLeadStatus | null)"
+              >
+                <option value="">Nog niet bepaald</option>
+                <option v-for="s in STREET_LEAD_STATUSES" :key="s" :value="s">
+                  {{ STREET_LEAD_STATUS_LABELS[s] }}
+                </option>
+              </select>
+              <span v-else>—</span>
             </td>
             <td class="px-5 py-4">
               <span class="inline-block bg-primary-pink/10 px-2.5 py-1 text-xs font-bold text-primary-pink">

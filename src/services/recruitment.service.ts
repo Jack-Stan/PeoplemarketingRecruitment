@@ -42,6 +42,7 @@ export const recruitmentService = {
             // the boundary is the only place that has to know.
             age: data.age ?? null,
             recruitedBy: data.recruitedBy ?? null,
+            streetStatus: data.streetStatus ?? null,
           } as RecruitmentLead;
         });
         onChange(leads);

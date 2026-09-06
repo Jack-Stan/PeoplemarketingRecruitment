@@ -39,12 +39,15 @@ describe('recruitmentService.subscribe', () => {
   }
 
   it('stamps leadId and officeId onto each doc', () => {
-    const [lead] = capture([{ id: 'l1', data: { name: 'Fleur', age: 24, recruitedBy: 'emp-7' } }]);
+    const [lead] = capture([
+      { id: 'l1', data: { name: 'Fleur', age: 24, recruitedBy: 'emp-7', streetStatus: 'hired' } },
+    ]);
 
     expect(lead.leadId).toBe('l1');
     expect(lead.officeId).toBe('gent');
     expect(lead.age).toBe(24);
     expect(lead.recruitedBy).toBe('emp-7');
+    expect(lead.streetStatus).toBe('hired');
   });
 
   it('normalizes fields missing from legacy docs to null, not undefined', () => {
@@ -53,6 +56,7 @@ describe('recruitmentService.subscribe', () => {
 
     expect(lead.age).toBeNull();
     expect(lead.recruitedBy).toBeNull();
+    expect(lead.streetStatus).toBeNull();
   });
 
   it('preserves an explicit null rather than treating it as missing', () => {
