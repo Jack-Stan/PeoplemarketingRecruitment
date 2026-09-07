@@ -27,6 +27,7 @@ const LEAD_A: RecruitmentLead = {
   stage: 'new',
   notes: null,
   recruitedBy: null,
+  streetStatus: null,
   createdBy: 'admin-1',
   createdAtMs: NOW,
 };
@@ -88,6 +89,7 @@ describe('recruitment store', () => {
       stage: 'new',
       notes: null,
       recruitedBy: 'emp-7',
+      streetStatus: null,
       createdBy: 'admin-1',
     });
 
@@ -97,6 +99,86 @@ describe('recruitment store', () => {
       NOW,
       expect.objectContaining({ name: 'New Candidate', age: 30, recruitedBy: 'emp-7' }),
     );
+  });
+
+  it('byRecruiterPerformance groups street signups by recruiter and counts streetStatus', () => {
+    // Two recruiters, plus a Website lead with no recruiter that must be excluded.
+    const leads: RecruitmentLead[] = [
+      { ...LEAD_A, leadId: 's1', recruitedBy: 'emp-1', streetStatus: 'hired' },
+      { ...LEAD_A, leadId: 's2', recruitedBy: 'emp-1', streetStatus: 'no_show' },
+      { ...LEAD_A, leadId: 's3', recruitedBy: 'emp-1', streetStatus: 'planned' },
+      { ...LEAD_A, leadId: 's4', recruitedBy: 'emp-1', streetStatus: null },
+      { ...LEAD_A, leadId: 's5', recruitedBy: 'emp-2', streetStatus: 'hired' },
+      { ...LEAD_A, leadId: 'web', recruitedBy: null, streetStatus: null },
+    ];
+    vi.mocked(recruitmentService.subscribe).mockImplementationOnce((_officeId, onChange) => {
+      onChange(leads);
+      return () => {};
+    });
+
+    const store = useRecruitmentStore();
+    store.subscribe('gent');
+
+    expect(store.streetLeads).toHaveLength(5);
+    expect(store.byRecruiterPerformance).toEqual([
+      // Hires are tied at 1 here, so `total` decides the order — the
+      // hires-first key is covered by the next test.
+      { recruiterId: 'emp-1', total: 4, hired: 1, noShow: 1, planned: 1, pending: 1, hiredRate: 50 },
+      { recruiterId: 'emp-2', total: 1, hired: 1, noShow: 0, planned: 0, pending: 0, hiredRate: 100 },
+    ]);
+  });
+
+  it('byRecruiterPerformance ranks by hires before total', () => {
+    // emp-low has more signups but fewer hires, so it must sort second.
+    vi.mocked(recruitmentService.subscribe).mockImplementationOnce((_officeId, onChange) => {
+      onChange([
+        { ...LEAD_A, leadId: 'a1', recruitedBy: 'emp-low', streetStatus: 'no_show' },
+        { ...LEAD_A, leadId: 'a2', recruitedBy: 'emp-low', streetStatus: 'no_show' },
+        { ...LEAD_A, leadId: 'a3', recruitedBy: 'emp-low', streetStatus: 'hired' },
+        { ...LEAD_A, leadId: 'b1', recruitedBy: 'emp-high', streetStatus: 'hired' },
+        { ...LEAD_A, leadId: 'b2', recruitedBy: 'emp-high', streetStatus: 'hired' },
+      ]);
+      return () => {};
+    });
+
+    const store = useRecruitmentStore();
+    store.subscribe('gent');
+
+    expect(store.byRecruiterPerformance.map((r) => r.recruiterId)).toEqual(['emp-high', 'emp-low']);
+    expect(store.byRecruiterPerformance[0]).toMatchObject({ total: 2, hired: 2, hiredRate: 100 });
+  });
+
+  it('byRecruiterPerformance reports 0% rather than dividing by zero when nothing is decided', () => {
+    vi.mocked(recruitmentService.subscribe).mockImplementationOnce((_officeId, onChange) => {
+      onChange([{ ...LEAD_A, leadId: 's1', recruitedBy: 'emp-1', streetStatus: 'planned' }]);
+      return () => {};
+    });
+
+    const store = useRecruitmentStore();
+    store.subscribe('gent');
+
+    expect(store.byRecruiterPerformance[0]).toMatchObject({ hired: 0, noShow: 0, planned: 1, hiredRate: 0 });
+  });
+
+  it('setStreetStatus delegates to the service, clearing with null', async () => {
+    vi.mocked(recruitmentService.update).mockResolvedValue(undefined);
+
+    const store = useRecruitmentStore();
+
+    expect(await store.setStreetStatus('gent', 'l1', 'hired')).toBe(true);
+    expect(recruitmentService.update).toHaveBeenCalledWith('gent', 'l1', { streetStatus: 'hired' });
+
+    expect(await store.setStreetStatus('gent', 'l1', null)).toBe(true);
+    expect(recruitmentService.update).toHaveBeenLastCalledWith('gent', 'l1', { streetStatus: null });
+  });
+
+  it('setStage leaves streetStatus alone — the two axes are independent', async () => {
+    vi.mocked(recruitmentService.update).mockResolvedValueOnce(undefined);
+
+    const store = useRecruitmentStore();
+    await store.setStage('gent', 'l1', 'rejected');
+
+    expect(recruitmentService.update).toHaveBeenCalledWith('gent', 'l1', { stage: 'rejected' });
   });
 
   it('setStage delegates to the service', async () => {
@@ -124,6 +206,7 @@ describe('recruitment store', () => {
       stage: 'new',
       notes: null,
       recruitedBy: null,
+      streetStatus: null,
       createdBy: 'admin-1',
     });
 

@@ -113,13 +113,17 @@ GDPR is waiting on** — this is a policy decision, not a code task Claude shoul
   The view subscribes to the roster only when the viewer is allowed to list it, and hides the column
   otherwise. Lead reads now normalize `age`/`recruitedBy` to `null` in `recruitment.service.ts`, since
   Firestore omits those fields entirely on docs written before they existed.
-  **Not built: the per-recruiter analytics/leaderboard** — it groups by whatever status model wins the
-  question below, so building the view now risks redoing it.
+- **Item 3, status + analytics half** — done, after Stan settled the status question on 2026-09-06:
+  the client's `no show | planned | hired` is a **separate** status for street leads, not a
+  simplification of the seven-stage pipeline (`decisions/009`). Shipped as `StreetLeadStatus` /
+  `RecruitmentLead.streetStatus`, set from the leads table on any lead that has a recruiter, plus a
+  "Prestatie per werver" panel grouping by `recruitedBy`. Item 3 is now complete.
 - **Unrelated but adjacent** — a required `age` field on the lead form shipped in #1, from Michiel's
   2026-09-05 WhatsApp ask.
 
-Still open and unchanged: the status-model question in item 3 (three-state `no show | planned | hired` vs.
-the existing seven-stage pipeline) blocks both the analytics view and any funnel rework.
+The status-model question in item 3 is now **settled** — see `decisions/009`. Items 2, 4, 5, 6, 7, 9
+and 10 remain open and still need a question back to the client before any code is worth writing.
+Item 8 (possible planning regression) still needs Stan to confirm what the client actually meant.
 
 ## Summary for Stan
 
