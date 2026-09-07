@@ -10,6 +10,13 @@ export const FIXED_SHIFT_HOURS: Record<Exclude<ShiftType, 'Event'>, { start: str
 };
 
 /**
+ * The types a TeamMember may plan for themselves. Event is deliberately absent:
+ * it needs a free-text title and times an admin sets (decision 004), so it stays
+ * in PlanningView. Derived from FIXED_SHIFT_HOURS so the two can't drift.
+ */
+export const MEMBER_SHIFT_TYPES = Object.keys(FIXED_SHIFT_HOURS) as Exclude<ShiftType, 'Event'>[];
+
+/**
  * Monday of the ISO week containing `date` (yyyy-MM-dd in, yyyy-MM-dd out).
  * Uses toLocalISODate, NOT toISOString() — the latter converts to UTC,
  * which silently rolls local midnight back to the previous day for any

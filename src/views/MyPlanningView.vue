@@ -5,7 +5,14 @@ import { useAuth } from '@/composables/useAuth';
 import { useAvailabilityStore } from '@/stores/availability';
 import { useShiftsStore } from '@/stores/shifts';
 import { useUiStore } from '@/stores/ui';
-import { FIXED_SHIFT_HOURS, weekStartFor, type Shift, type ShiftCreatePayload } from '@/types/shift';
+import {
+  FIXED_SHIFT_HOURS,
+  MEMBER_SHIFT_TYPES,
+  weekStartFor,
+  type Shift,
+  type ShiftCreatePayload,
+  type ShiftType,
+} from '@/types/shift';
 import { toLocalISODate, todayLocalISO } from '@/utils/date';
 
 /**
@@ -47,6 +54,18 @@ function makeEmptyForm(): ShiftCreatePayload {
   };
 }
 const form = ref<ShiftCreatePayload>(makeEmptyForm());
+
+/**
+ * Hours follow from the type (decision 004) and members never enter them —
+ * the client plans by shift type, not by clock time. Event is not offered
+ * here, so FIXED_SHIFT_HOURS always has an entry.
+ */
+function onTypeChange(value: string): void {
+  const type = value as Exclude<ShiftType, 'Event'>;
+  form.value.type = type;
+  form.value.startTime = FIXED_SHIFT_HOURS[type].start;
+  form.value.endTime = FIXED_SHIFT_HOURS[type].end;
+}
 
 const statusLabels: Record<Shift['status'], string> = {
   draft: 'Concept',
@@ -206,7 +225,7 @@ onUnmounted(() => {
           </button>
           <div v-if="!day.shifts.length" class="flex-1"></div>
           <div v-for="shift in day.shifts" :key="shift.shiftId" class="border border-black/10 bg-white p-2 text-xs">
-            <p class="font-semibold">Ik werk deze dag</p>
+            <p class="font-semibold">{{ shift.type }}</p>
             <p v-if="shift.location" class="text-neutral-mute">{{ shift.location }}</p>
             <div class="mt-1 flex items-center justify-between">
               <span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-bold" :class="statusClasses(shift.status)">
@@ -237,6 +256,13 @@ onUnmounted(() => {
         <h3 class="text-lg font-bold">Dag toevoegen</h3>
         <form class="mt-4 space-y-3" @submit.prevent="submitForm">
           <input v-model="form.date" type="date" :min="currentWeekStart" class="w-full border-black/10 bg-[#faf9f7] text-sm" />
+          <select
+            :value="form.type"
+            class="w-full border-black/10 bg-[#faf9f7] text-sm"
+            @change="onTypeChange(($event.target as HTMLSelectElement).value)"
+          >
+            <option v-for="type in MEMBER_SHIFT_TYPES" :key="type" :value="type">{{ type }}</option>
+          </select>
           <input v-model="form.location" placeholder="Locatie (optioneel)" class="w-full border-black/10 bg-[#faf9f7] text-sm" />
           <p v-if="formError" class="text-xs font-semibold text-semantic-danger">{{ formError }}</p>
           <div class="flex justify-end gap-2 pt-2">
