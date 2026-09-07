@@ -11,7 +11,6 @@ import {
   weekStartFor,
   type Shift,
   type ShiftCreatePayload,
-  type ShiftType,
 } from '@/types/shift';
 import { toLocalISODate, todayLocalISO } from '@/utils/date';
 
@@ -61,7 +60,11 @@ const form = ref<ShiftCreatePayload>(makeEmptyForm());
  * here, so FIXED_SHIFT_HOURS always has an entry.
  */
 function onTypeChange(value: string): void {
-  const type = value as Exclude<ShiftType, 'Event'>;
+  // The select is populated from MEMBER_SHIFT_TYPES, so this only rejects a
+  // value the DOM was tampered with — but an unchecked cast here would index
+  // FIXED_SHIFT_HOURS with a key it may not have and throw.
+  const type = MEMBER_SHIFT_TYPES.find((t) => t === value);
+  if (!type) return;
   form.value.type = type;
   form.value.startTime = FIXED_SHIFT_HOURS[type].start;
   form.value.endTime = FIXED_SHIFT_HOURS[type].end;
