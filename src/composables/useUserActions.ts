@@ -13,12 +13,26 @@ import type { UserProfile } from '@/types/user';
  * injected so error messages can name the office; `ownOfficeId` is the
  * audit-log fallback for a pending user with no `primaryOfficeId` yet.
  */
-export function useUserActions(officeLabel: (officeId: string | null) => string, ownOfficeId: Ref<string | null>) {
+export function useUserActions(
+  officeLabel: (officeId: string | null) => string,
+  ownOfficeId: Ref<string | null>,
+) {
   const auth = useAuth();
   const store = useUsersStore();
   const auditLog = useAuditLogStore();
   const ui = useUiStore();
   const confirm = useConfirmStore();
+
+  /**
+   * Which office's audit log this action belongs in: the user's own office,
+   * falling back to the acting admin's. Can still come back empty for a
+   * pending user when the admin has no office either — `auditLog.record`
+   * skips and warns in that case rather than building `offices//auditLog`,
+   * an invalid path whose throw used to be swallowed silently.
+   */
+  function auditOfficeFor(u: UserProfile): string {
+    return u.primaryOfficeId ?? ownOfficeId.value ?? '';
+  }
 
   function isSelf(u: UserProfile): boolean {
     return auth.user.value?.uid === u.uid;
@@ -31,29 +45,35 @@ export function useUserActions(officeLabel: (officeId: string | null) => string,
 
   /** Same guard as demoting via role-assign — an office can't be left with zero Administrators. */
   function wouldRemoveLastAdminByStatus(u: UserProfile): boolean {
-    return u.role === 'Administrator' && isUserActive(u) && store.adminCountFor(u.primaryOfficeId ?? '') <= 1;
+    return (
+      u.role === 'Administrator' &&
+      isUserActive(u) &&
+      store.adminCountFor(u.primaryOfficeId ?? '') <= 1
+    );
   }
 
   async function toggleActive(u: UserProfile): Promise<void> {
     const nextActive = !isUserActive(u);
     if (!nextActive && wouldRemoveLastAdminByStatus(u)) {
-      ui.push(`${u.displayName || u.email} is de laatste beheerder van ${officeLabel(u.primaryOfficeId)} — wijs eerst iemand anders toe.`, 'error');
+      ui.push(
+        `${u.displayName || u.email} is de laatste beheerder van ${officeLabel(u.primaryOfficeId)} — wijs eerst iemand anders toe.`,
+        'error',
+      );
       return;
     }
     const ok = await store.setActive(u.uid, nextActive);
     ui.push(
-      ok ? `${u.displayName || u.email} is nu ${nextActive ? 'actief' : 'inactief'}.` : (store.error ?? 'Er ging iets mis.'),
+      ok
+        ? `${u.displayName || u.email} is nu ${nextActive ? 'actief' : 'inactief'}.`
+        : store.error ?? 'Er ging iets mis.',
       ok ? 'success' : 'error',
     );
-    if (ok && auth.user.value) {
-      auditLog.log(u.primaryOfficeId ?? ownOfficeId.value ?? '', {
-        actorUid: auth.user.value.uid,
-        actorEmail: auth.user.value.email ?? '',
-        action: nextActive ? 'user_reactivated' : 'user_deactivated',
-        targetLabel: u.displayName || u.email,
-        details: null,
-        createdAtMs: Date.now(),
-      });
+    if (ok) {
+      void auditLog.record(
+        auditOfficeFor(u),
+        nextActive ? 'user_reactivated' : 'user_deactivated',
+        u.displayName || u.email,
+      );
     }
   }
 
@@ -64,7 +84,10 @@ export function useUserActions(officeLabel: (officeId: string | null) => string,
       return false;
     }
     if (wouldRemoveLastAdminByStatus(u)) {
-      ui.push(`${u.displayName || u.email} is de laatste beheerder van ${officeLabel(u.primaryOfficeId)} — wijs eerst iemand anders toe.`, 'error');
+      ui.push(
+        `${u.displayName || u.email} is de laatste beheerder van ${officeLabel(u.primaryOfficeId)} — wijs eerst iemand anders toe.`,
+        'error',
+      );
       return false;
     }
     const sure = await confirm.ask(
@@ -73,16 +96,12 @@ export function useUserActions(officeLabel: (officeId: string | null) => string,
     );
     if (!sure) return false;
     const ok = await store.deleteUser(u.uid);
-    ui.push(ok ? `${u.displayName || u.email} verwijderd.` : (store.error ?? 'Er ging iets mis.'), ok ? 'success' : 'error');
-    if (ok && auth.user.value) {
-      auditLog.log(u.primaryOfficeId ?? ownOfficeId.value ?? '', {
-        actorUid: auth.user.value.uid,
-        actorEmail: auth.user.value.email ?? '',
-        action: 'user_deleted',
-        targetLabel: u.displayName || u.email,
-        details: null,
-        createdAtMs: Date.now(),
-      });
+    ui.push(
+      ok ? `${u.displayName || u.email} verwijderd.` : store.error ?? 'Er ging iets mis.',
+      ok ? 'success' : 'error',
+    );
+    if (ok) {
+      void auditLog.record(auditOfficeFor(u), 'user_deleted', u.displayName || u.email);
     }
     return ok;
   }

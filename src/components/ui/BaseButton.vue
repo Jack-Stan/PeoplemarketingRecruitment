@@ -48,18 +48,18 @@ const classes = computed(() => {
     danger: 'bg-semantic-danger text-neutral-white hover:opacity-90',
   };
 
-  return [
-    ...base,
-    sizes[props.size],
-    variants[props.variant],
-    props.block ? 'w-full' : '',
-  ].join(' ');
+  return [...base, sizes[props.size], variants[props.variant], props.block ? 'w-full' : ''].join(
+    ' ',
+  );
 });
 </script>
 
 <template>
   <button :type="type" :disabled="disabled || loading" :class="classes">
-    <span v-if="loading" class="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+    <span
+      v-if="loading"
+      class="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+    />
     <slot />
   </button>
 </template>

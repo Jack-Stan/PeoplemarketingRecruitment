@@ -40,7 +40,10 @@ async function savePhone(): Promise<void> {
   savingPhone.value = true;
   const ok = await store.setPhone(user.value.uid, phoneDraft.value.trim() || null);
   savingPhone.value = false;
-  ui.push(ok ? 'Telefoonnummer opgeslagen.' : (store.error ?? 'Er ging iets mis.'), ok ? 'success' : 'error');
+  ui.push(
+    ok ? 'Telefoonnummer opgeslagen.' : store.error ?? 'Er ging iets mis.',
+    ok ? 'success' : 'error',
+  );
   if (ok) isEditingPhone.value = false;
 }
 
@@ -72,7 +75,9 @@ onUnmounted(() => store.unsubscribe());
 
 <template>
   <div class="mx-auto max-w-4xl space-y-6">
-    <RouterLink to="/users" class="text-xs font-semibold text-neutral-mute hover:text-primary-pink">← Terug naar gebruikers</RouterLink>
+    <RouterLink to="/users" class="text-xs font-semibold text-neutral-mute hover:text-primary-pink"
+      >← Terug naar gebruikers</RouterLink
+    >
 
     <template v-if="user">
       <section class="flex items-center gap-4 border border-black/5 bg-white p-5">
@@ -83,9 +88,14 @@ onUnmounted(() => store.unsubscribe());
           {{ (user.displayName || user.email).slice(0, 2).toUpperCase() }}
         </span>
         <div class="min-w-0 flex-1">
-          <h2 class="truncate text-2xl font-bold tracking-tight">{{ user.displayName || user.email }}</h2>
+          <h2 class="truncate text-2xl font-bold tracking-tight">
+            {{ user.displayName || user.email }}
+          </h2>
           <span class="inline-flex items-center gap-2 text-xs text-neutral-mute">
-            <i class="h-2 w-2 rounded-full" :class="isUserActive(user) ? 'bg-emerald-500' : 'bg-neutral-300'"></i>
+            <i
+              class="h-2 w-2 rounded-full"
+              :class="isUserActive(user) ? 'bg-emerald-500' : 'bg-neutral-300'"
+            ></i>
             {{ isUserActive(user) ? 'Actief' : 'Inactief' }}
           </span>
         </div>
@@ -95,13 +105,19 @@ onUnmounted(() => store.unsubscribe());
         <h3 class="text-sm font-bold">Contact</h3>
         <div class="mt-4 space-y-5">
           <div class="border-b border-black/5 pb-5">
-            <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">E-mail</p>
+            <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">
+              E-mail
+            </p>
             <div class="mt-1.5 flex items-center gap-2">
               <p class="text-base">{{ user.email }}</p>
               <span
                 v-if="!skipVerification"
                 class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                :class="user.emailVerified ? 'bg-emerald-500/10 text-emerald-600' : 'bg-neutral-200 text-neutral-mute'"
+                :class="
+                  user.emailVerified
+                    ? 'bg-emerald-500/10 text-emerald-600'
+                    : 'bg-neutral-200 text-neutral-mute'
+                "
               >
                 {{ user.emailVerified ? 'Geverifieerd' : 'Niet geverifieerd' }}
               </span>
@@ -125,7 +141,9 @@ onUnmounted(() => store.unsubscribe());
           </div>
 
           <div v-if="!isEditingPhone">
-            <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">Telefoon</p>
+            <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">
+              Telefoon
+            </p>
             <p class="mt-1.5 text-base">{{ user.phone || 'Niet ingesteld' }}</p>
             <div class="mt-3 flex gap-2">
               <template v-if="user.phone">
@@ -154,7 +172,9 @@ onUnmounted(() => store.unsubscribe());
             </div>
           </div>
           <div v-else>
-            <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">Telefoon</p>
+            <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">
+              Telefoon
+            </p>
             <form class="mt-1.5 flex items-center gap-2" @submit.prevent="savePhone">
               <input
                 v-model="phoneDraft"
@@ -162,10 +182,18 @@ onUnmounted(() => store.unsubscribe());
                 placeholder="+32 4xx xx xx xx"
                 class="min-w-0 flex-1 border-black/10 bg-[#faf9f7] text-sm"
               />
-              <button type="submit" class="bg-primary-pink px-3 py-2 text-xs font-bold text-white disabled:opacity-50" :disabled="savingPhone">
+              <button
+                type="submit"
+                class="bg-primary-pink px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+                :disabled="savingPhone"
+              >
                 Opslaan
               </button>
-              <button type="button" class="px-3 py-2 text-xs font-semibold text-neutral-mute" @click="isEditingPhone = false">
+              <button
+                type="button"
+                class="px-3 py-2 text-xs font-semibold text-neutral-mute"
+                @click="isEditingPhone = false"
+              >
                 Annuleren
               </button>
             </form>
@@ -179,20 +207,32 @@ onUnmounted(() => store.unsubscribe());
           <div>
             <dt class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">Rol</dt>
             <dd class="mt-1.5">
-              <span v-if="user.role === null" class="rounded-full bg-primary-pink/10 px-2 py-1 text-xs font-semibold text-primary-pink">In afwachting</span>
+              <span
+                v-if="user.role === null"
+                class="rounded-full bg-primary-pink/10 px-2 py-1 text-xs font-semibold text-primary-pink"
+                >In afwachting</span
+              >
               <span v-else class="text-base font-semibold">{{ ROLE_LABELS[user.role] }}</span>
             </dd>
           </div>
           <div>
-            <dt class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">Kantoor</dt>
-            <dd class="mt-1.5 text-base">{{ officeLabel(user.primaryOfficeId ?? user.desiredOfficeId) }}</dd>
+            <dt class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">
+              Kantoor
+            </dt>
+            <dd class="mt-1.5 text-base">
+              {{ officeLabel(user.primaryOfficeId ?? user.desiredOfficeId) }}
+            </dd>
           </div>
           <div>
-            <dt class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">Teamleider</dt>
+            <dt class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">
+              Teamleider
+            </dt>
             <dd class="mt-1.5 text-base">{{ user.isTeamLeader ? 'Ja' : 'Nee' }}</dd>
           </div>
           <div>
-            <dt class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">Functie</dt>
+            <dt class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">
+              Functie
+            </dt>
             <dd class="mt-1.5 text-base">{{ user.functie || 'Niet toegewezen' }}</dd>
           </div>
         </dl>
@@ -235,7 +275,10 @@ onUnmounted(() => store.unsubscribe());
 
     <p v-else-if="store.isLoading" class="p-8 text-center text-sm text-neutral-mute">Laden…</p>
     <p v-else class="border border-black/5 bg-white p-8 text-center text-sm text-neutral-mute">
-      Gebruiker niet gevonden. <RouterLink to="/users" class="font-semibold text-primary-pink underline">Terug naar gebruikers</RouterLink>
+      Gebruiker niet gevonden.
+      <RouterLink to="/users" class="font-semibold text-primary-pink underline"
+        >Terug naar gebruikers</RouterLink
+      >
     </p>
   </div>
 </template>

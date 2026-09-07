@@ -5,7 +5,7 @@ This vault is the single source of truth for **where the CRM project is right no
 - **Claude Code** (reading from inside the repo on Windows)
 - **Claude Desktop** (reading from the same folder via its own Obsidian vault mount)
 
-Location: `C:\RFT\Projects\CRM\.obsidian-vault\` (in-repo so it's version-controlled).
+Location: `C:\RFT\Projects\Personal\CRM\.obsidian-vault\` (in-repo so it's version-controlled).
 
 ---
 
@@ -16,6 +16,8 @@ Location: `C:\RFT\Projects\CRM\.obsidian-vault\` (in-repo so it's version-contro
 ├── index.md                       ← you are here
 ├── project-status.md              ← live state: what's built, what's blocked, what's next
 ├── links-to-FRD.md                ← quick map from FRD §21 MVP items → tickets
+├── dev-plan.md                    ← original build sequence (historical)
+├── gdpr-data-inventory.md         ← what personal data lives where, and the gaps
 ├── decisions/
 │   ├── 001-three-roles-not-two.md ← why admin / team_manager / team_member
 │   ├── 002-firebase-not-supabase.md
@@ -24,16 +26,22 @@ Location: `C:\RFT\Projects\CRM\.obsidian-vault\` (in-repo so it's version-contro
 │   ├── 005-users-employees-datamodel.md
 │   ├── 006-firestore-roles-no-claims.md
 │   ├── 007-employee-doc-id-must-be-uid.md ← 🔴 latent prod bug
-│   └── 008-self-service-shift-signup.md   ← employee-authored, not open slots
-├── tickets/
+│   ├── 008-self-service-shift-signup.md   ← employee-authored, not open slots
+│   └── 009-coverage-viewer-teamleader-flag.md ← zone access via isTeamLeader flag, not a role
+├── tickets/                           ← 00-04 ✅ done · 05 🔴 re-scope · 06 🟡 partial
 │   ├── ticket-00-scaffold.md
 │   ├── ticket-01-rbac.md
 │   ├── ticket-02-employee-crud.md
-│   └── ticket-03-shift-create.md
+│   ├── ticket-03-shift-create.md
+│   ├── ticket-04-recruitment-crud.md
+│   ├── ticket-05-recruitment-automation.md
+│   └── ticket-06-dashboards-history.md
 ├── research/
 │   ├── mcp-recommendations.md     ← Firebase + GitHub MCPs for Claude Desktop
 │   ├── pink-hex-investigation.md
-│   └── 2026-09-01-app-review-and-briggs-gap.md ← full review + Briggs ("haggs") gap analysis
+│   ├── 2026-09-01-app-review-and-briggs-gap.md ← full review + Briggs ("haggs") gap analysis
+│   └── 2026-09-07-full-project-audit.md ← security · code · tests/tooling · docs/GDPR, top-10 ranked
+├── session-prompts/               ← kickoff prompts for past working sessions
 └── meetings/
     ├── 2026-08-24-stan-discovery.md
     ├── 2026-08-24-client-transcript-shifts-recruitment.md
@@ -49,4 +57,7 @@ Location: `C:\RFT\Projects\CRM\.obsidian-vault\` (in-repo so it's version-contro
 
 ## Status (one-liner)
 
-Phase 1 scaffold landed (`Ticket 00`). Next: hardening (Ticket 01), Employee CRUD (Ticket 02), Shifts (Ticket 03). See `project-status.md` for detail.
+Live in prod, FRD §5–§19 shipped except §11/§17 period reporting. Current blockers, risks and open
+client questions live in the **"Current state" block at the top of [[project-status]]** — that block
+is the single source of truth; everything below it in that file is dated history. Latest full
+assessment: [[2026-09-07-full-project-audit]].

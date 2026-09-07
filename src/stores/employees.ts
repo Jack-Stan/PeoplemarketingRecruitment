@@ -43,7 +43,11 @@ export const useEmployeesStore = defineStore('employees', () => {
   }
 
   /** `uid` is the employee doc ID — see decisions/007 and employeesService.create. */
-  async function create(officeId: string, uid: string, payload: EmployeeCreatePayload): Promise<boolean> {
+  async function create(
+    officeId: string,
+    uid: string,
+    payload: EmployeeCreatePayload,
+  ): Promise<boolean> {
     error.value = null;
     try {
       await employeesService.create(officeId, uid, payload);
@@ -54,7 +58,11 @@ export const useEmployeesStore = defineStore('employees', () => {
     }
   }
 
-  async function update(officeId: string, employeeId: string, patch: EmployeePatch): Promise<boolean> {
+  async function update(
+    officeId: string,
+    employeeId: string,
+    patch: EmployeePatch,
+  ): Promise<boolean> {
     error.value = null;
     try {
       await employeesService.update(officeId, employeeId, patch);
@@ -65,7 +73,11 @@ export const useEmployeesStore = defineStore('employees', () => {
     }
   }
 
-  async function setActive(officeId: string, employeeId: string, isActive: boolean): Promise<boolean> {
+  async function setActive(
+    officeId: string,
+    employeeId: string,
+    isActive: boolean,
+  ): Promise<boolean> {
     error.value = null;
     try {
       await employeesService.setActive(officeId, employeeId, isActive);

@@ -36,5 +36,9 @@ serviceAccountKey.json
 # Cache
 .eslintcache
 .cache/
+# Local Token Savior index — machine-specific, regenerated on demand (~60KB of churn)
+.token-savior-cache.json
+# Obsidian per-machine UI state (pane layout, open tabs) — not project content
+.obsidian-vault/.obsidian/workspace.json
 # Claude Code background-agent worktrees — local scratch state, not project code
 .claude/worktrees/

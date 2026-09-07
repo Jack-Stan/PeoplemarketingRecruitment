@@ -20,12 +20,17 @@
  * Usage (emulator):
  *   VITE_USE_EMULATORS=true tsx scripts/deleteUser.ts <email>
  *
- * Refuses to run against production unless FORCE_PROD=true is set explicitly —
- * same guard as grantRole.ts.
+ * Target guard: emulator by default, production only with FORCE_PROD=1 set to
+ * exactly "1" — same guard as grantRole.ts. This one HARD-DELETES a real Auth
+ * account, so the banner names the project before anything happens. For the
+ * GDPR erasure path the client actually wants, use anonymiseSubject.ts
+ * instead — it keeps historical/aggregate rows intact.
  */
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
+
+import { requireEmulatorOrForceProd, resolveProjectId } from './_guard';
 
 const [, , email] = process.argv;
 
@@ -34,18 +39,12 @@ if (!email) {
   process.exit(1);
 }
 
-const USE_EMULATORS = (process.env.VITE_USE_EMULATORS ?? 'true').toLowerCase() === 'true';
-const FORCE_PROD = (process.env.FORCE_PROD ?? 'false').toLowerCase() === 'true';
+requireEmulatorOrForceProd(
+  'deleteUser.ts',
+  `PERMANENTLY delete the Firebase Auth account and /users/{uid} doc for ${email}`,
+);
 
-if (!USE_EMULATORS && !FORCE_PROD) {
-  console.error(
-    '❌ Refusing to run against production without FORCE_PROD=true. ' +
-      'Set VITE_USE_EMULATORS=true to target the emulator, or FORCE_PROD=true if you really mean it.',
-  );
-  process.exit(1);
-}
-
-const PROJECT_ID = process.env.VITE_FIREBASE_PROJECT_ID ?? 'peoplemarketing-c5bfd';
+const PROJECT_ID = resolveProjectId();
 const app = initializeApp({ projectId: PROJECT_ID });
 const auth = getAuth(app);
 const db = getFirestore(app);

@@ -86,13 +86,15 @@ function compareUsers(a: UserProfile, b: UserProfile): number {
       cmp = (a.displayName || a.email).localeCompare(b.displayName || b.email);
       break;
     case 'role': {
-      const ar = a.role === null ? -1 : (ROLE_RANK[a.role] ?? 0);
-      const br = b.role === null ? -1 : (ROLE_RANK[b.role] ?? 0);
+      const ar = a.role === null ? -1 : ROLE_RANK[a.role] ?? 0;
+      const br = b.role === null ? -1 : ROLE_RANK[b.role] ?? 0;
       cmp = ar - br;
       break;
     }
     case 'office':
-      cmp = officeLabel(a.primaryOfficeId ?? a.desiredOfficeId).localeCompare(officeLabel(b.primaryOfficeId ?? b.desiredOfficeId));
+      cmp = officeLabel(a.primaryOfficeId ?? a.desiredOfficeId).localeCompare(
+        officeLabel(b.primaryOfficeId ?? b.desiredOfficeId),
+      );
       break;
     case 'teamleader':
       cmp = Number(a.isTeamLeader) - Number(b.isTeamLeader);
@@ -106,8 +108,14 @@ function compareUsers(a: UserProfile, b: UserProfile): number {
 
 /** Every office any listed user is tied to — not just active ones (loadOfficeNames only covers those). */
 const officeOptions = computed(() => {
-  const ids = new Set(store.users.map((u) => u.primaryOfficeId ?? u.desiredOfficeId).filter((id): id is string => !!id));
-  return [...ids].map((id) => ({ id, name: officeLabel(id) })).sort((a, b) => a.name.localeCompare(b.name));
+  const ids = new Set(
+    store.users
+      .map((u) => u.primaryOfficeId ?? u.desiredOfficeId)
+      .filter((id): id is string => !!id),
+  );
+  return [...ids]
+    .map((id) => ({ id, name: officeLabel(id) }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 });
 
 const sorted = computed(() =>
@@ -126,9 +134,19 @@ const sorted = computed(() =>
         (u.role ? ROLE_LABELS[u.role].toLowerCase().includes(q) : false)
       );
     })
-    .filter((u) => !filterOffice.value || (u.primaryOfficeId ?? u.desiredOfficeId) === filterOffice.value)
-    .filter((u) => !filterRole.value || (filterRole.value === 'pending' ? u.role === null : u.role === filterRole.value))
-    .filter((u) => !filterStatus.value || (filterStatus.value === 'active' ? isUserActive(u) : !isUserActive(u)))
+    .filter(
+      (u) => !filterOffice.value || (u.primaryOfficeId ?? u.desiredOfficeId) === filterOffice.value,
+    )
+    .filter(
+      (u) =>
+        !filterRole.value ||
+        (filterRole.value === 'pending' ? u.role === null : u.role === filterRole.value),
+    )
+    .filter(
+      (u) =>
+        !filterStatus.value ||
+        (filterStatus.value === 'active' ? isUserActive(u) : !isUserActive(u)),
+    )
     .sort(compareUsers),
 );
 
@@ -153,7 +171,9 @@ async function sendInvite(): Promise<void> {
   const ok = await auth.sendInvite(inviteEmail.value.trim(), ownOfficeId.value);
   inviting.value = false;
   ui.push(
-    ok ? `Uitnodiging verstuurd naar ${inviteEmail.value.trim()}.` : (auth.error.value ?? 'Kon de uitnodiging niet versturen.'),
+    ok
+      ? `Uitnodiging verstuurd naar ${inviteEmail.value.trim()}.`
+      : auth.error.value ?? 'Kon de uitnodiging niet versturen.',
     ok ? 'success' : 'error',
   );
   if (ok) inviteEmail.value = '';
@@ -183,7 +203,8 @@ onUnmounted(() => store.unsubscribe());
     <section class="border border-black/5 bg-white p-5">
       <h3 class="text-sm font-bold">Nieuwe medewerker uitnodigen</h3>
       <p class="mt-1 text-xs text-neutral-mute">
-        Stuurt een e-mail met een aanmeldlink naar {{ officeLabel(ownOfficeId) }} — geen wachtwoord nodig.
+        Stuurt een e-mail met een aanmeldlink naar {{ officeLabel(ownOfficeId) }} — geen wachtwoord
+        nodig.
       </p>
       <form class="mt-3 flex flex-col gap-2 sm:flex-row" @submit.prevent="sendInvite">
         <input
@@ -210,16 +231,25 @@ onUnmounted(() => store.unsubscribe());
         placeholder="Zoek gebruikers op naam, e-mail of rol"
         type="search"
       />
-      <select v-model="filterOffice" class="border-black/10 bg-[#faf9f7] text-sm focus:border-primary-pink focus:ring-primary-pink">
+      <select
+        v-model="filterOffice"
+        class="border-black/10 bg-[#faf9f7] text-sm focus:border-primary-pink focus:ring-primary-pink"
+      >
         <option value="">Alle kantoren</option>
         <option v-for="o in officeOptions" :key="o.id" :value="o.id">{{ o.name }}</option>
       </select>
-      <select v-model="filterRole" class="border-black/10 bg-[#faf9f7] text-sm focus:border-primary-pink focus:ring-primary-pink">
+      <select
+        v-model="filterRole"
+        class="border-black/10 bg-[#faf9f7] text-sm focus:border-primary-pink focus:ring-primary-pink"
+      >
         <option value="">Alle rollen</option>
         <option value="pending">In afwachting</option>
         <option v-for="(label, role) in ROLE_LABELS" :key="role" :value="role">{{ label }}</option>
       </select>
-      <select v-model="filterStatus" class="border-black/10 bg-[#faf9f7] text-sm focus:border-primary-pink focus:ring-primary-pink">
+      <select
+        v-model="filterStatus"
+        class="border-black/10 bg-[#faf9f7] text-sm focus:border-primary-pink focus:ring-primary-pink"
+      >
         <option value="">Alle statussen</option>
         <option value="active">Actief</option>
         <option value="inactive">Inactief</option>
@@ -228,7 +258,9 @@ onUnmounted(() => store.unsubscribe());
 
     <section class="overflow-x-auto border border-black/5 bg-white">
       <table class="w-full min-w-[900px] text-left text-sm">
-        <thead class="border-b border-black/5 bg-[#faf9f7] text-[10px] uppercase tracking-[0.16em] text-neutral-mute">
+        <thead
+          class="border-b border-black/5 bg-[#faf9f7] text-[10px] uppercase tracking-[0.16em] text-neutral-mute"
+        >
           <tr>
             <th v-for="col in sortColumns" :key="col.key" class="px-5 py-4">
               <button
@@ -236,7 +268,10 @@ onUnmounted(() => store.unsubscribe());
                 @click="setSort(col.key)"
               >
                 {{ col.label }}
-                <span class="text-[9px]" :class="sortKey === col.key ? 'text-primary-pink' : 'text-neutral-mute/50'">
+                <span
+                  class="text-[9px]"
+                  :class="sortKey === col.key ? 'text-primary-pink' : 'text-neutral-mute/50'"
+                >
                   {{ sortKey === col.key ? (sortDir === 'asc' ? '▲' : '▼') : '↕' }}
                 </span>
               </button>
@@ -249,7 +284,10 @@ onUnmounted(() => store.unsubscribe());
             v-for="(u, i) in sorted"
             :key="u.uid"
             class="cursor-pointer hover:bg-primary-pink/5"
-            :class="[i % 2 === 1 ? 'bg-[#faf9f7]/60' : 'bg-white', { 'opacity-50': !isUserActive(u) }]"
+            :class="[
+              i % 2 === 1 ? 'bg-[#faf9f7]/60' : 'bg-white',
+              { 'opacity-50': !isUserActive(u) },
+            ]"
             @click="openRow(u.uid)"
           >
             <td class="px-5 py-4">
@@ -268,7 +306,11 @@ onUnmounted(() => store.unsubscribe());
             <td class="px-5 py-4 text-xs text-neutral-mute">
               <span v-if="u.role === null">
                 Aangevraagd voor {{ officeLabel(u.desiredOfficeId) }}
-                <span v-if="wantsOtherOffice(u)" class="ml-1 font-semibold text-semantic-danger" title="Ander kantoor dan je nu beheert — schakel over via het kantoor-menu links.">
+                <span
+                  v-if="wantsOtherOffice(u)"
+                  class="ml-1 font-semibold text-semantic-danger"
+                  title="Ander kantoor dan je nu beheert — schakel over via het kantoor-menu links."
+                >
                   ⚠ ander kantoor
                 </span>
               </span>
@@ -277,7 +319,10 @@ onUnmounted(() => store.unsubscribe());
             <td class="px-5 py-4 text-xs text-neutral-mute">{{ u.isTeamLeader ? 'Ja' : 'Nee' }}</td>
             <td class="px-5 py-4">
               <span class="inline-flex items-center gap-2 text-xs">
-                <i class="h-2 w-2 rounded-full" :class="isUserActive(u) ? 'bg-emerald-500' : 'bg-neutral-300'"></i>
+                <i
+                  class="h-2 w-2 rounded-full"
+                  :class="isUserActive(u) ? 'bg-emerald-500' : 'bg-neutral-300'"
+                ></i>
                 {{ isUserActive(u) ? 'Actief' : 'Inactief' }}
               </span>
             </td>
@@ -293,7 +338,9 @@ onUnmounted(() => store.unsubscribe());
         </tbody>
       </table>
       <p v-if="store.isLoading" class="p-8 text-center text-sm text-neutral-mute">Laden…</p>
-      <p v-else-if="!sorted.length" class="p-8 text-center text-sm text-neutral-mute">Geen gebruikers gevonden.</p>
+      <p v-else-if="!sorted.length" class="p-8 text-center text-sm text-neutral-mute">
+        Geen gebruikers gevonden.
+      </p>
     </section>
 
     <!--
@@ -309,19 +356,31 @@ onUnmounted(() => store.unsubscribe());
           class="fixed z-50 w-44 border border-black/10 bg-white py-1 text-left shadow-lg"
           :style="{ top: `${menuPos.top}px`, left: `${menuPos.left}px` }"
         >
-          <button class="block w-full px-4 py-2 text-xs font-semibold hover:bg-[#faf9f7]" @click="closeMenu(); openEdit(menuUser)">
+          <button
+            class="block w-full px-4 py-2 text-xs font-semibold hover:bg-[#faf9f7]"
+            @click="
+              closeMenu();
+              openEdit(menuUser);
+            "
+          >
             {{ menuUser.role === null ? 'Rol toewijzen' : 'Bewerken' }}
           </button>
           <button
             v-if="menuUser.role !== null"
             class="block w-full px-4 py-2 text-xs font-semibold hover:bg-[#faf9f7]"
-            @click="closeMenu(); toggleActive(menuUser)"
+            @click="
+              closeMenu();
+              toggleActive(menuUser);
+            "
           >
             {{ isUserActive(menuUser) ? 'Deactiveren' : 'Heractiveren' }}
           </button>
           <button
             class="block w-full px-4 py-2 text-xs font-semibold text-semantic-danger hover:bg-[#faf9f7]"
-            @click="closeMenu(); removeUser(menuUser)"
+            @click="
+              closeMenu();
+              removeUser(menuUser);
+            "
           >
             Verwijderen
           </button>

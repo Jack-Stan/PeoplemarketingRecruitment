@@ -35,7 +35,9 @@ const { officeId } = useActiveOffice();
  * exactly: same tier both draws zones AND sees the coverage numbers, per
  * Stan ("teamleaders & admin can make zones" / "see how many times").
  */
-const canManage = computed(() => auth.hasRole('Administrator', 'TeamManager') || auth.isTeamLeader.value);
+const canManage = computed(
+  () => auth.hasRole('Administrator', 'TeamManager') || auth.isTeamLeader.value,
+);
 const canSeeCoverage = canManage;
 
 const statusFilter = ref<LocationStatus | 'all'>('all');
@@ -44,21 +46,34 @@ const filtered = computed(() =>
   store.locations.filter(
     (l) =>
       (statusFilter.value === 'all' || l.status === statusFilter.value) &&
-      `${l.name} ${l.neighbourhood ?? ''} ${l.address ?? ''}`.toLowerCase().includes(search.value.toLowerCase()),
+      `${l.name} ${l.neighbourhood ?? ''} ${l.address ?? ''}`
+        .toLowerCase()
+        .includes(search.value.toLowerCase()),
   ),
 );
 
 function formatDate(ms: number | null): string {
   if (!ms) return 'Nooit';
-  return new Date(ms).toLocaleDateString('nl-BE', { day: '2-digit', month: 'short', year: 'numeric' });
+  return new Date(ms).toLocaleDateString('nl-BE', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
 }
 function formatDateTime(ms: number): string {
-  return new Date(ms).toLocaleString('nl-BE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+  return new Date(ms).toLocaleString('nl-BE', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 // --- Selection / detail panel -------------------------------------------
 const selectedId = ref<string | null>(null);
-const selected = computed(() => store.locations.find((l) => l.locationId === selectedId.value) ?? null);
+const selected = computed(
+  () => store.locations.find((l) => l.locationId === selectedId.value) ?? null,
+);
 
 function selectLocation(l: Location): void {
   if (mode.value !== 'none') return; // ignore selection clicks while placing/reshaping
@@ -129,11 +144,14 @@ function renderLocations(): void {
     hasPoints = true;
     bounds.extend([l.lat, l.lng]);
     const isSelected = l.locationId === selectedId.value;
-    const marker = L.marker([l.lat, l.lng], { icon: pinIcon(STATUS_COLORS[l.status], isSelected) }).addTo(map);
+    const marker = L.marker([l.lat, l.lng], {
+      icon: pinIcon(STATUS_COLORS[l.status], isSelected),
+    }).addTo(map);
     marker.on('click', () => selectLocation(l));
     markers.push(marker);
   }
-  if (hasPoints && bounds.isValid() && mode.value !== 'reshape') map.fitBounds(bounds, { padding: [48, 48], maxZoom: 15 });
+  if (hasPoints && bounds.isValid() && mode.value !== 'reshape')
+    map.fitBounds(bounds, { padding: [48, 48], maxZoom: 15 });
 }
 
 onMounted(async () => {
@@ -141,7 +159,8 @@ onMounted(async () => {
   if (!mapEl.value) return;
   map = L.map(mapEl.value).setView([51.0538, 3.725], 12); // Ghent
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom: 19,
   }).addTo(map);
   map.on('click', onMapClick);
@@ -170,7 +189,9 @@ function toggleDrawArea(): void {
     drawPolygonHandler = null;
   } else {
     mode.value = 'area';
-    drawPolygonHandler = new L.Draw.Polygon(map as unknown as L.DrawMap, { shapeOptions: { color: '#ec4899' } });
+    drawPolygonHandler = new L.Draw.Polygon(map as unknown as L.DrawMap, {
+      shapeOptions: { color: '#ec4899' },
+    });
     drawPolygonHandler.enable();
   }
 }
@@ -179,7 +200,13 @@ function toggleAddPoint(): void {
 }
 
 function boundaryCentroid(boundary: LatLng[]): LatLng {
-  return boundary.reduce((acc, p) => ({ lat: acc.lat + p.lat / boundary.length, lng: acc.lng + p.lng / boundary.length }), { lat: 0, lng: 0 });
+  return boundary.reduce(
+    (acc, p) => ({
+      lat: acc.lat + p.lat / boundary.length,
+      lng: acc.lng + p.lng / boundary.length,
+    }),
+    { lat: 0, lng: 0 },
+  );
 }
 
 function onAreaDrawn(e: L.DrawEvents.Created): void {
@@ -210,7 +237,7 @@ async function saveReshape(): Promise<void> {
   const boundary: LatLng[] = latlngs.map((ll) => ({ lat: ll.lat, lng: ll.lng }));
   const centroid = boundaryCentroid(boundary);
   const ok = await store.update(officeId.value, reshapeTargetId.value, { boundary, ...centroid });
-  ui.push(ok ? 'Zone bijgewerkt.' : (store.error ?? 'Er ging iets mis.'), ok ? 'success' : 'error');
+  ui.push(ok ? 'Zone bijgewerkt.' : store.error ?? 'Er ging iets mis.', ok ? 'success' : 'error');
   cancelReshape();
 }
 function cancelReshape(): void {
@@ -287,7 +314,10 @@ async function quickSetStatus(l: Location, status: LocationStatus): Promise<void
 }
 async function removeLocation(l: Location): Promise<void> {
   const ok = await store.remove(officeId.value, l.locationId);
-  ui.push(ok ? 'Locatie verwijderd.' : (store.error ?? 'Er ging iets mis.'), ok ? 'success' : 'error');
+  ui.push(
+    ok ? 'Locatie verwijderd.' : store.error ?? 'Er ging iets mis.',
+    ok ? 'success' : 'error',
+  );
   if (ok) closePanel();
 }
 
@@ -296,11 +326,16 @@ async function logVisit(l: Location): Promise<void> {
   if (!auth.user.value) return;
   const ok = await store.logVisit(officeId.value, l.locationId, {
     employeeId: auth.user.value.uid,
-    employeeName: auth.user.value.email ?? 'Onbekend',
+    // Permanent snapshot on the visit log — the /users profile name, not the
+    // email (and never Auth's displayName, null for invited accounts).
+    employeeName: auth.actorLabel.value || 'Onbekend',
     visitedAt: Date.now(),
     notes: null,
   });
-  ui.push(ok ? `Bezoek aan ${l.name} gelogd.` : (store.error ?? 'Er ging iets mis.'), ok ? 'success' : 'error');
+  ui.push(
+    ok ? `Bezoek aan ${l.name} gelogd.` : store.error ?? 'Er ging iets mis.',
+    ok ? 'success' : 'error',
+  );
 }
 
 watch(
@@ -341,17 +376,30 @@ onBeforeUnmount(() => {
       </div>
     </section>
 
-    <p v-if="mode === 'point'" class="border border-primary-pink/30 bg-primary-pink/5 p-3 text-xs font-semibold text-primary-pink">
+    <p
+      v-if="mode === 'point'"
+      class="border border-primary-pink/30 bg-primary-pink/5 p-3 text-xs font-semibold text-primary-pink"
+    >
       Klik ergens op de kaart om daar een nieuwe locatie te plaatsen.
     </p>
-    <p v-if="mode === 'area'" class="border border-primary-pink/30 bg-primary-pink/5 p-3 text-xs font-semibold text-primary-pink">
+    <p
+      v-if="mode === 'area'"
+      class="border border-primary-pink/30 bg-primary-pink/5 p-3 text-xs font-semibold text-primary-pink"
+    >
       Klik op de kaart om een zone af te bakenen; dubbelklik om af te ronden.
     </p>
-    <div v-if="mode === 'reshape'" class="flex items-center justify-between border border-primary-pink/30 bg-primary-pink/5 p-3 text-xs font-semibold text-primary-pink">
+    <div
+      v-if="mode === 'reshape'"
+      class="flex items-center justify-between border border-primary-pink/30 bg-primary-pink/5 p-3 text-xs font-semibold text-primary-pink"
+    >
       <span>Sleep de punten om de zone aan te passen.</span>
       <span class="flex gap-2">
-        <button class="border border-primary-pink px-3 py-1.5" @click="cancelReshape">Annuleren</button>
-        <button class="bg-primary-pink px-3 py-1.5 text-white" @click="saveReshape">Zone opslaan</button>
+        <button class="border border-primary-pink px-3 py-1.5" @click="cancelReshape">
+          Annuleren
+        </button>
+        <button class="bg-primary-pink px-3 py-1.5 text-white" @click="saveReshape">
+          Zone opslaan
+        </button>
       </span>
     </div>
 
@@ -364,7 +412,9 @@ onBeforeUnmount(() => {
       />
       <select v-model="statusFilter" class="border-black/10 bg-[#faf9f7] text-sm">
         <option value="all">Alle statussen</option>
-        <option v-for="(label, key) in LOCATION_STATUS_LABELS" :key="key" :value="key">{{ label }}</option>
+        <option v-for="(label, key) in LOCATION_STATUS_LABELS" :key="key" :value="key">
+          {{ label }}
+        </option>
       </select>
     </div>
 
@@ -372,35 +422,53 @@ onBeforeUnmount(() => {
       <div ref="mapEl" class="h-[520px] flex-1 border border-black/5 bg-[#eee]"></div>
 
       <!-- Detail panel: opens on clicking a pin/zone on the map, or a row below. -->
-      <aside v-if="selected" class="w-full shrink-0 space-y-4 border border-black/5 bg-white p-5 lg:w-80">
+      <aside
+        v-if="selected"
+        class="w-full shrink-0 space-y-4 border border-black/5 bg-white p-5 lg:w-80"
+      >
         <div class="flex items-start justify-between">
           <div>
             <h3 class="text-lg font-bold">{{ selected.name }}</h3>
-            <p class="text-xs text-neutral-mute">{{ selected.neighbourhood ?? selected.address ?? '—' }}</p>
+            <p class="text-xs text-neutral-mute">
+              {{ selected.neighbourhood ?? selected.address ?? '—' }}
+            </p>
           </div>
           <button class="text-neutral-mute hover:text-neutral-ink" @click="closePanel">✕</button>
         </div>
 
         <div>
-          <label class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">Status</label>
+          <label class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute"
+            >Status</label
+          >
           <select
             v-if="canManage"
             :value="selected.status"
             class="mt-1 w-full border-black/10 bg-[#faf9f7] text-sm"
-            @change="quickSetStatus(selected, ($event.target as HTMLSelectElement).value as LocationStatus)"
+            @change="
+              quickSetStatus(selected, ($event.target as HTMLSelectElement).value as LocationStatus)
+            "
           >
-            <option v-for="(label, key) in LOCATION_STATUS_LABELS" :key="key" :value="key">{{ label }}</option>
+            <option v-for="(label, key) in LOCATION_STATUS_LABELS" :key="key" :value="key">
+              {{ label }}
+            </option>
           </select>
           <p v-else class="mt-1 inline-flex items-center gap-2 text-xs font-semibold">
-            <i class="h-2 w-2 rounded-full" :style="{ backgroundColor: STATUS_COLORS[selected.status] }"></i>
+            <i
+              class="h-2 w-2 rounded-full"
+              :style="{ backgroundColor: STATUS_COLORS[selected.status] }"
+            ></i>
             {{ LOCATION_STATUS_LABELS[selected.status] }}
           </p>
         </div>
 
-        <p v-if="selected.notes" class="border-l-2 border-black/10 pl-3 text-xs text-neutral-mute">{{ selected.notes }}</p>
+        <p v-if="selected.notes" class="border-l-2 border-black/10 pl-3 text-xs text-neutral-mute">
+          {{ selected.notes }}
+        </p>
 
         <div v-if="canSeeCoverage" class="border border-black/5 bg-[#faf9f7] p-3 text-xs">
-          <p class="font-bold">{{ selected.timesVisited }}x bezocht · laatst {{ formatDate(selected.lastVisitedAt) }}</p>
+          <p class="font-bold">
+            {{ selected.timesVisited }}x bezocht · laatst {{ formatDate(selected.lastVisitedAt) }}
+          </p>
           <ul v-if="store.visits.length" class="mt-2 max-h-32 space-y-1 overflow-y-auto">
             <li v-for="v in store.visits" :key="v.visitId" class="text-neutral-mute">
               {{ v.employeeName }} · {{ formatDateTime(v.visitedAt) }}
@@ -410,15 +478,30 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="flex flex-col gap-2 pt-2">
-          <button class="bg-primary-pink px-4 py-2.5 text-sm font-bold text-white" @click="logVisit(selected)">
+          <button
+            class="bg-primary-pink px-4 py-2.5 text-sm font-bold text-white"
+            @click="logVisit(selected)"
+          >
             Bezoek loggen
           </button>
           <template v-if="canManage">
-            <button v-if="selected.boundary" class="border border-black/10 px-4 py-2 text-sm font-semibold" @click="startReshape(selected)">
+            <button
+              v-if="selected.boundary"
+              class="border border-black/10 px-4 py-2 text-sm font-semibold"
+              @click="startReshape(selected)"
+            >
               Zone vorm aanpassen
             </button>
-            <button class="border border-black/10 px-4 py-2 text-sm font-semibold" @click="openEdit(selected)">Bewerken</button>
-            <button class="border border-black/10 px-4 py-2 text-sm font-semibold text-semantic-danger" @click="removeLocation(selected)">
+            <button
+              class="border border-black/10 px-4 py-2 text-sm font-semibold"
+              @click="openEdit(selected)"
+            >
+              Bewerken
+            </button>
+            <button
+              class="border border-black/10 px-4 py-2 text-sm font-semibold text-semantic-danger"
+              @click="removeLocation(selected)"
+            >
               Verwijderen
             </button>
           </template>
@@ -428,7 +511,9 @@ onBeforeUnmount(() => {
 
     <section class="overflow-x-auto border border-black/5 bg-white">
       <table class="w-full min-w-[760px] text-left text-sm">
-        <thead class="border-b border-black/5 bg-[#faf9f7] text-[10px] uppercase tracking-[0.16em] text-neutral-mute">
+        <thead
+          class="border-b border-black/5 bg-[#faf9f7] text-[10px] uppercase tracking-[0.16em] text-neutral-mute"
+        >
           <tr>
             <th class="px-5 py-4">Locatie</th>
             <th class="px-5 py-4">Status</th>
@@ -446,19 +531,31 @@ onBeforeUnmount(() => {
             @click="selectLocation(l)"
           >
             <td class="px-5 py-4">
-              <p class="font-bold">{{ l.name }} <span v-if="l.boundary" class="text-xs text-neutral-mute">(zone)</span></p>
+              <p class="font-bold">
+                {{ l.name }} <span v-if="l.boundary" class="text-xs text-neutral-mute">(zone)</span>
+              </p>
               <p class="text-xs text-neutral-mute">{{ l.neighbourhood ?? l.address ?? '—' }}</p>
             </td>
             <td class="px-5 py-4">
               <span class="inline-flex items-center gap-2 text-xs font-semibold">
-                <i class="h-2 w-2 rounded-full" :style="{ backgroundColor: STATUS_COLORS[l.status] }"></i>
+                <i
+                  class="h-2 w-2 rounded-full"
+                  :style="{ backgroundColor: STATUS_COLORS[l.status] }"
+                ></i>
                 {{ LOCATION_STATUS_LABELS[l.status] }}
               </span>
             </td>
-            <td v-if="canSeeCoverage" class="px-5 py-4 text-xs text-neutral-mute">{{ l.timesVisited }}x</td>
-            <td v-if="canSeeCoverage" class="px-5 py-4 text-xs text-neutral-mute">{{ formatDate(l.lastVisitedAt) }}</td>
+            <td v-if="canSeeCoverage" class="px-5 py-4 text-xs text-neutral-mute">
+              {{ l.timesVisited }}x
+            </td>
+            <td v-if="canSeeCoverage" class="px-5 py-4 text-xs text-neutral-mute">
+              {{ formatDate(l.lastVisitedAt) }}
+            </td>
             <td class="px-5 py-4 text-right">
-              <button class="text-xs font-semibold text-neutral-ink hover:text-primary-pink" @click.stop="logVisit(l)">
+              <button
+                class="text-xs font-semibold text-neutral-ink hover:text-primary-pink"
+                @click.stop="logVisit(l)"
+              >
                 Bezoek loggen
               </button>
             </td>
@@ -466,28 +563,74 @@ onBeforeUnmount(() => {
         </tbody>
       </table>
       <p v-if="store.isLoading" class="p-8 text-center text-sm text-neutral-mute">Laden…</p>
-      <p v-else-if="!filtered.length" class="p-8 text-center text-sm text-neutral-mute">Geen locaties gevonden.</p>
+      <p v-else-if="!filtered.length" class="p-8 text-center text-sm text-neutral-mute">
+        Geen locaties gevonden.
+      </p>
     </section>
 
-    <div v-if="isFormOpen" class="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4">
+    <div
+      v-if="isFormOpen"
+      class="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4"
+    >
       <div class="w-full max-w-md border border-black/10 bg-white p-6">
-        <h3 class="text-lg font-bold">{{ editingId ? 'Locatie bewerken' : 'Locatie toevoegen' }}</h3>
-        <p v-if="form.boundary" class="mt-1 text-xs text-neutral-mute">Zone getekend ({{ form.boundary.length }} punten).</p>
+        <h3 class="text-lg font-bold">
+          {{ editingId ? 'Locatie bewerken' : 'Locatie toevoegen' }}
+        </h3>
+        <p v-if="form.boundary" class="mt-1 text-xs text-neutral-mute">
+          Zone getekend ({{ form.boundary.length }} punten).
+        </p>
         <form class="mt-4 space-y-3" @submit.prevent="submitForm">
-          <input v-model="form.name" placeholder="Naam" class="w-full border-black/10 bg-[#faf9f7] text-sm" />
-          <input v-model="form.neighbourhood" placeholder="Wijk (optioneel)" class="w-full border-black/10 bg-[#faf9f7] text-sm" />
-          <input v-model="form.address" placeholder="Adres (optioneel)" class="w-full border-black/10 bg-[#faf9f7] text-sm" />
+          <input
+            v-model="form.name"
+            placeholder="Naam"
+            class="w-full border-black/10 bg-[#faf9f7] text-sm"
+          />
+          <input
+            v-model="form.neighbourhood"
+            placeholder="Wijk (optioneel)"
+            class="w-full border-black/10 bg-[#faf9f7] text-sm"
+          />
+          <input
+            v-model="form.address"
+            placeholder="Adres (optioneel)"
+            class="w-full border-black/10 bg-[#faf9f7] text-sm"
+          />
           <div v-if="!form.boundary" class="grid grid-cols-2 gap-3">
-            <input v-model.number="form.lat" type="number" step="any" placeholder="Latitude" class="border-black/10 bg-[#faf9f7] text-sm" />
-            <input v-model.number="form.lng" type="number" step="any" placeholder="Longitude" class="border-black/10 bg-[#faf9f7] text-sm" />
+            <input
+              v-model.number="form.lat"
+              type="number"
+              step="any"
+              placeholder="Latitude"
+              class="border-black/10 bg-[#faf9f7] text-sm"
+            />
+            <input
+              v-model.number="form.lng"
+              type="number"
+              step="any"
+              placeholder="Longitude"
+              class="border-black/10 bg-[#faf9f7] text-sm"
+            />
           </div>
-          <textarea v-model="form.notes" placeholder="Details / notities (optioneel)" rows="2" class="w-full border-black/10 bg-[#faf9f7] text-sm"></textarea>
+          <textarea
+            v-model="form.notes"
+            placeholder="Details / notities (optioneel)"
+            rows="2"
+            class="w-full border-black/10 bg-[#faf9f7] text-sm"
+          ></textarea>
           <select v-model="form.status" class="w-full border-black/10 bg-[#faf9f7] text-sm">
-            <option v-for="(label, key) in LOCATION_STATUS_LABELS" :key="key" :value="key">{{ label }}</option>
+            <option v-for="(label, key) in LOCATION_STATUS_LABELS" :key="key" :value="key">
+              {{ label }}
+            </option>
           </select>
           <p v-if="formError" class="text-xs font-semibold text-semantic-danger">{{ formError }}</p>
           <div class="flex justify-end gap-2 pt-2">
-            <button type="button" class="px-4 py-2 text-sm font-semibold text-neutral-mute" @click="closeForm">Annuleren</button>
+            <button
+              type="button"
+              class="px-4 py-2 text-sm font-semibold text-neutral-mute"
+              @click="closeForm"
+            >
+              Annuleren
+            </button>
             <button type="submit" class="bg-primary-pink px-4 py-2 text-sm font-bold text-white">
               {{ editingId ? 'Opslaan' : 'Toevoegen' }}
             </button>

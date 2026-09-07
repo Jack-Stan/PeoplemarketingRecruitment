@@ -3,8 +3,9 @@ import { ref } from 'vue';
 import type { Unsubscribe } from 'firebase/firestore';
 
 import { auditLogService } from '@/services/auditLog.service';
+import { useAuthStore } from '@/stores/auth';
 import { friendlyError } from '@/utils/errors';
-import type { AuditLogCreatePayload, AuditLogEntry } from '@/types/auditLog';
+import type { AuditAction, AuditLogCreatePayload, AuditLogEntry } from '@/types/auditLog';
 
 export const useAuditLogStore = defineStore('auditLog', () => {
   const entries = ref<AuditLogEntry[]>([]);
@@ -48,5 +49,41 @@ export const useAuditLogStore = defineStore('auditLog', () => {
     }
   }
 
-  return { entries, isLoading, error, subscribe, unsubscribe, log };
+  /**
+   * The one way call sites should write an audit entry. Stamps the actor from
+   * the auth store and `createdAtMs` here instead of making eight views
+   * repeat the same four fields — firestore.rules requires actorUid to equal
+   * the caller's uid, actorEmail their token email, officeId the path, and a
+   * fresh createdAtMs, so a hand-assembled payload is a rules rejection
+   * waiting to happen.
+   *
+   * Skips (and warns) on an empty officeId: `offices//auditLog` is an invalid
+   * document path, which throws inside `log`'s catch and vanishes silently —
+   * a dropped audit entry nobody can see is worse than a console warning.
+   */
+  async function record(
+    officeId: string,
+    action: AuditAction,
+    targetLabel: string,
+    details: string | null = null,
+  ): Promise<void> {
+    const auth = useAuthStore();
+    if (!officeId) {
+      // eslint-disable-next-line no-console -- see comment above; a silently
+      // dropped audit write is exactly what this replaces.
+      console.warn(`[auditLog] "${action}" on "${targetLabel}" not logged: no office in context.`);
+      return;
+    }
+    if (!auth.user) return;
+    await log(officeId, {
+      actorUid: auth.user.uid,
+      actorEmail: auth.user.email ?? '',
+      action,
+      targetLabel,
+      details,
+      createdAtMs: Date.now(),
+    });
+  }
+
+  return { entries, isLoading, error, subscribe, unsubscribe, log, record };
 });

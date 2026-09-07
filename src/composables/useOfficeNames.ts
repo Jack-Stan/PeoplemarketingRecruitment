@@ -16,9 +16,19 @@ export function useOfficeNames() {
     return officeNames.value[officeId] ?? officeId;
   }
 
+  /**
+   * Never rejects — office names are cosmetic (officeLabel falls back to the
+   * raw id), and every caller so far treated a failure as "carry on". Keeping
+   * the rejection in here rather than in six call sites avoids an unhandled
+   * promise rejection each time someone forgets the catch.
+   */
   async function loadOfficeNames(): Promise<void> {
-    const offices = await officesService.listActive();
-    officeNames.value = Object.fromEntries(offices.map((o) => [o.officeId, o.name]));
+    try {
+      const offices = await officesService.listActive();
+      officeNames.value = Object.fromEntries(offices.map((o) => [o.officeId, o.name]));
+    } catch {
+      // Labels stay as raw office ids until the next successful load.
+    }
   }
 
   return { officeNames, officeLabel, loadOfficeNames };

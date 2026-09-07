@@ -1,6 +1,6 @@
 # Ticket 03 — Shift creation + approval queue
 
-**Status:** 📋 Planned — re-scoped 2026-08-24 (third session, data-model pass)
+**Status:** ✅ Done — `PlanningView.vue` (month grid, staffing bar, draft/approve/reject) and `MyPlanningView.vue` (member self-signup) are live in prod. Known open defect: a manager can un-approve an approved shift (`approved → pending`); no rules test covered it until 2026-09-07. Originally planned 2026-08-24, re-scoped in the third session data-model pass.
 **Goal:** Employees plan their own week; admins/managers draft on their behalf; admin approves/rejects.
 **Depends on:** `decisions/007-employee-doc-id-must-be-uid.md` (blocker), `decisions/008-self-service-shift-signup.md`
 

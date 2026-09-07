@@ -31,16 +31,31 @@ service cloud.firestore {
       return isSignedIn() ? myProfile().primaryOfficeId : null;
     }
 
+    // 2026-09-07 review A1: `isActive` was written at signup and enforced
+    // ONLY client-side (authStore.hydrate treats false as a forced
+    // sign-out) — so a deactivated Administrator with a still-valid ID
+    // token kept full database access. Every role gate below now requires
+    // an active profile. Defaults to true via get(..., true) so docs
+    // written before the field existed keep working.
+    //
+    // Deliberately NOT applied to: the self-signup create path (no profile
+    // doc exists yet at that point) or selfProfileUpdateOnly() — a
+    // deactivated account must still be readable/updatable by an admin,
+    // and locking the owner out of their own doc gains nothing.
+    function isActiveUser() {
+      return myProfile().get('isActive', true) != false;
+    }
+
     function isAdmin() {
-      return isSignedIn() && myRole() == 'Administrator';
+      return isSignedIn() && myRole() == 'Administrator' && isActiveUser();
     }
 
     function isManager() {
-      return isSignedIn() && myRole() == 'TeamManager';
+      return isSignedIn() && myRole() == 'TeamManager' && isActiveUser();
     }
 
     function isMember() {
-      return isSignedIn() && myRole() == 'TeamMember';
+      return isSignedIn() && myRole() == 'TeamMember' && isActiveUser();
     }
 
     function sameOffice(officeId) {
@@ -60,7 +75,8 @@ service cloud.firestore {
     // by Location Manager: coverage stats (who visited where, how often)
     // are for leadership only, not the whole canvassing team.
     function isCoverageViewer(officeId) {
-      return isStaffOf(officeId) || (sameOffice(officeId) && myProfile().isTeamLeader == true);
+      return isStaffOf(officeId)
+        || (sameOffice(officeId) && isActiveUser() && myProfile().isTeamLeader == true);
     }
 
     match /users/{userId} {
@@ -71,11 +87,36 @@ service cloud.firestore {
       // with role/primaryOfficeId left null — granting either is a privilege
       // escalation. `desiredOfficeId` is just a hint for the approving admin
       // (which office they applied to) — it carries no authorization weight.
+      // 2026-09-01 review B2: isTeamLeader must be false (it gates
+      // isCoverageViewer, and the role modal pre-fills from it — a forged
+      // true would be granted by an admin approving with defaults), email
+      // must match the ID token, and emailVerified may not overstate the
+      // token (false is always fine — createProfile hardcodes it).
+      // 2026-09-07 review A5: exact field whitelist for the doc shape
+      // usersService.createProfile writes (types/user.ts UserProfile +
+      // createdAt/updatedAt) — hasOnly is a subset check, so a payload
+      // that omits an optional field still passes, but no caller can
+      // smuggle an unknown field (e.g. a future `permissions` map) into
+      // their own doc.
+      function userFieldsOnly() {
+        return request.resource.data.keys().hasOnly([
+          'uid', 'email', 'displayName', 'role', 'primaryOfficeId', 'desiredOfficeId',
+          'functie', 'isTeamLeader', 'isActive', 'phone', 'emailVerified',
+          'createdAt', 'updatedAt',
+        ]);
+      }
       allow create: if isAdmin()
         || (isSignedIn() && request.auth.uid == userId
+          && userFieldsOnly()
+          && request.resource.data.uid == userId
+          && request.resource.data.isActive == true
           && request.resource.data.role == null
           && request.resource.data.primaryOfficeId == null
           && request.resource.data.get('functie', null) == null
+          && request.resource.data.isTeamLeader == false
+          && request.resource.data.email == request.auth.token.email
+          && (request.resource.data.emailVerified == false
+            || request.resource.data.emailVerified == request.auth.token.email_verified)
           && request.resource.data.desiredOfficeId is string
           && request.resource.data.desiredOfficeId.size() > 0);
       // Role assignment: admin can grant role/office/isTeamLeader directly —
@@ -93,6 +134,7 @@ service cloud.firestore {
       // can't be self-attested to an arbitrary value.
       function selfProfileUpdateOnly() {
         return isSignedIn() && request.auth.uid == userId
+          && userFieldsOnly()
           && request.resource.data.role == resource.data.role
           && request.resource.data.primaryOfficeId == resource.data.primaryOfficeId
           && request.resource.data.desiredOfficeId == resource.data.desiredOfficeId
@@ -116,7 +158,27 @@ service cloud.firestore {
           || request.resource.data.get('functie', null) == null
           || request.resource.data.functie in ['Trainee', 'Werver', 'Topverkoper', 'Teamcaptain', 'Manager', 'Branch manager', 'Regio manager', 'Country manager'];
       }
-      allow update: if (isAdmin() && request.resource.data.role in ['Administrator', 'TeamManager', 'TeamMember'] && validFunctie())
+      // role: same changed-value scoping as validFunctie (2026-09-01 review
+      // B5) — an unchanged role always passes, so an admin can still edit
+      // phone/isActive on a pending (role null) user, and null is explicitly
+      // allowed as a NEW value too: revoking someone back to pending is a
+      // legitimate admin action, not a privilege escalation.
+      function validRole() {
+        return request.resource.data.role == resource.data.role
+          || request.resource.data.role == null
+          || request.resource.data.role in ['Administrator', 'TeamManager', 'TeamMember'];
+      }
+      // 2026-09-07 review A6: an Administrator may demote anyone EXCEPT
+      // themselves. Rules can't count the remaining admins (no aggregate
+      // query), so this is the cheap half of "never end up with zero
+      // admins": a second admin must do the demotion, and the last one
+      // standing physically cannot lock the org out by accident.
+      function noSelfDemotion() {
+        return !(request.auth.uid == userId
+          && resource.data.role == 'Administrator'
+          && request.resource.data.role != 'Administrator');
+      }
+      allow update: if (isAdmin() && validRole() && validFunctie() && noSelfDemotion())
         || selfProfileUpdateOnly();
       allow delete: if isAdmin();
     }
@@ -127,7 +189,11 @@ service cloud.firestore {
       // doesn't have an account yet, so they can say which office they're
       // applying to (see decisions/005). Sub-collections below stay fully
       // locked down regardless of this.
-      allow read: if true;
+      // 2026-09-07 review A8: still public, but only for offices that are
+      // actually open for signups — a closed/archived office shouldn't be
+      // enumerable by anonymous visitors. Any signed-in user keeps full
+      // directory access (the office switcher needs it).
+      allow read: if isSignedIn() || resource.data.isActive == true;
       // Multi-office: any Administrator may create/edit an office (e.g. a
       // second office going live); write is not office-scoped for admins.
       allow write: if isAdmin();
@@ -161,8 +227,31 @@ service cloud.firestore {
         function ownsShift() {
           return request.resource.data.assignedEmployeeId == request.auth.uid;
         }
-        allow create: if (isStaffOf(officeId) && request.resource.data.status in ['draft', 'pending'])
-          || (isMember() && sameOffice(officeId) && ownsShift() && request.resource.data.status in ['draft', 'pending']);
+        // 2026-09-07 review A3: attribution and shape were entirely
+        // unvalidated on create — `createdBy` (which FRD §9's
+        // self-approval question keys off) could name anyone, `date` could
+        // be any string (a malformed one silently breaks weekStartFor and
+        // every date-grouped view), and type/status were free text.
+        // Regex is a character class rather than \d — RE2 in rules takes
+        // both, this one just avoids double-escaping in the rules string.
+        function validShiftShape() {
+          return request.resource.data.createdBy == request.auth.uid
+            && request.resource.data.date is string
+            && request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+            && request.resource.data.type in ['D2D', 'Straat', 'Event']
+            && request.resource.data.status in ['draft', 'pending', 'approved', 'rejected'];
+        }
+        // Same point-in-time snapshot pin as the availability rules below:
+        // employeeIsTeamLeader drives the staffing bar's TL headcount, so a
+        // member must not be able to write a flag they don't carry.
+        function ownTeamLeaderFlagIsHonest() {
+          return request.resource.data.employeeIsTeamLeader == myProfile().isTeamLeader;
+        }
+        allow create: if validShiftShape()
+          && ((isStaffOf(officeId) && request.resource.data.status in ['draft', 'pending'])
+            || (isMember() && sameOffice(officeId) && ownsShift()
+                && ownTeamLeaderFlagIsHonest()
+                && request.resource.data.status in ['draft', 'pending']));
 
         // Update: admin can do anything in their office, including walking a
         // shift backwards (approved -> pending). A manager or member may only
@@ -171,7 +260,17 @@ service cloud.firestore {
         // (ticket-03 defect) let a manager silently un-approve a shift by
         // writing status: 'pending' over an already-approved doc. A member is
         // further restricted to their own shift, and can't reassign it.
-        allow update: if isAdmin()
+        //
+        // 2026-09-07 review A3: an approve/reject decision must be
+        // attributed to the caller — shiftsStore.approve/reject already
+        // pass the signed-in uid as `decidedBy`, so this only forbids
+        // forging someone else's signature on the decision.
+        function decisionAttributed() {
+          return !(request.resource.data.status in ['approved', 'rejected'])
+            || request.resource.data.decidedBy == request.auth.uid;
+        }
+        allow update: if decisionAttributed()
+          && (isAdmin()
           || (isManager() && sameOffice(officeId)
               && resource.data.status in ['draft', 'pending']
               && request.resource.data.status in ['draft', 'pending'])
@@ -179,7 +278,7 @@ service cloud.firestore {
               && resource.data.assignedEmployeeId == request.auth.uid
               && resource.data.status in ['draft', 'pending']
               && ownsShift()
-              && request.resource.data.status in ['draft', 'pending']);
+              && request.resource.data.status in ['draft', 'pending']));
 
         // Delete: admin, any office. A member may also delete their own
         // draft before ever submitting it (undo an accidental add).
@@ -203,8 +302,26 @@ service cloud.firestore {
 
       match /recruitmentLeads/{leadId} {
         // Members get read-only visibility per the client transcript; admin/manager write.
+        //
+        // TODO(B4): a member currently reads the FULL lead document —
+        // name, email, phone, notes — which is more candidate PII than a
+        // canvasser needs. The fix is a schema change out of scope here: a
+        // projection subdoc (e.g. recruitmentLeads/{id}/public/summary
+        // holding name + stage only) that members read instead, with the
+        // parent doc becoming staff-only. Not a rules-only fix.
         allow read: if isStaffOf(officeId) || (isMember() && sameOffice(officeId));
-        allow write: if isStaffOf(officeId);
+        // 2026-09-07 review A4: `allow write` lumped create/update/delete
+        // together — so any manager could hard-delete lead history, which
+        // the client explicitly asked to survive a recruiter leaving (see
+        // usersService.deleteUser's comment). Split, plus enum validation.
+        function validLeadShape() {
+          return request.resource.data.stage in ['new', 'contacted', 'interview_planned', 'attended', 'no_show', 'hired', 'rejected']
+            && request.resource.data.source in ['WhatsApp', 'Instagram', 'Website', 'Doorverwijzing', 'Anders'];
+        }
+        allow create: if isStaffOf(officeId) && validLeadShape()
+          && request.resource.data.createdBy == request.auth.uid;
+        allow update: if isStaffOf(officeId) && validLeadShape();
+        allow delete: if isAdmin();
       }
 
       match /auditLog/{entryId} {
@@ -213,8 +330,39 @@ service cloud.firestore {
         // an audit trail. Same visibility/write gate as staff actions
         // generally (isStaffOf already grants any Administrator access
         // office-agnostically, see the multi-office comment above).
+        // 2026-09-01 review B3: entries must be attributed to the caller —
+        // without the actorUid pin a TeamManager could append rows blaming
+        // the admin, and immutability just makes the forgery permanent. The
+        // action list mirrors AuditAction in types/auditLog.ts (keep in sync;
+        // an unknown action would render as undefined in AuditLogView anyway).
         allow read: if isStaffOf(officeId);
-        allow create: if isStaffOf(officeId);
+        //
+        // 2026-09-07 review A2: actorUid alone wasn't enough — the entry
+        // renders `actorEmail`, so pinning only the uid still let a
+        // manager write their own uid with the admin's email and have
+        // AuditLogView show the admin as the actor, permanently. Same for
+        // `officeId` (an entry filed under another office) and
+        // `createdAtMs` (which drives ordering — a far-future value pins a
+        // forged row to the top of the 200-entry window forever, a stale
+        // one buries a real action). Whitelist mirrors AuditLogEntry in
+        // types/auditLog.ts plus the officeId/createdAt that
+        // auditLogService.log adds. createdAt is get()-defaulted rather
+        // than required so a payload that omits it is still valid, but a
+        // client-chosen timestamp is not.
+        allow create: if isStaffOf(officeId)
+          && request.resource.data.keys().hasOnly([
+            'actorUid', 'actorEmail', 'action', 'targetLabel', 'details',
+            'createdAtMs', 'officeId', 'createdAt',
+          ])
+          && request.resource.data.actorUid == request.auth.uid
+          && request.resource.data.actorEmail == request.auth.token.email
+          && request.resource.data.officeId == officeId
+          && request.resource.data.createdAtMs >= request.time.toMillis() - 300000
+          && request.resource.data.createdAtMs <= request.time.toMillis() + 300000
+          && request.resource.data.get('createdAt', request.time) == request.time
+          && request.resource.data.action in ['shift_approved', 'shift_rejected', 'role_assigned', 'employee_created', 'employee_deactivated', 'employee_reactivated', 'user_deactivated', 'user_reactivated', 'user_deleted', 'recruitment_stage_changed']
+          && request.resource.data.targetLabel is string
+          && request.resource.data.createdAtMs is number;
         allow update, delete: if false;
       }
 
@@ -243,7 +391,15 @@ service cloud.firestore {
             && request.resource.data.boundary == resource.data.boundary
             && request.resource.data.notes == resource.data.notes
             && request.resource.data.status == resource.data.status
-            && request.resource.data.timesVisited == resource.data.timesVisited + 1;
+            && request.resource.data.timesVisited == resource.data.timesVisited + 1
+            // 2026-09-07 review A7: lastVisitedAt was the one field the
+            // member branch left completely free — a client could stamp a
+            // far-future value and pin their location to the top of every
+            // "recently visited" sort forever. It's client-clock stamped
+            // (locationsService.logVisit passes payload.visitedAt), so
+            // only the future is fenced off, not the past.
+            && request.resource.data.lastVisitedAt is number
+            && request.resource.data.lastVisitedAt <= request.time.toMillis();
         }
         allow update: if isCoverageViewer(officeId)
           || (isMember() && sameOffice(officeId) && onlyVisitCounterChanged());
@@ -254,8 +410,15 @@ service cloud.firestore {
           // model in decisions/008) — but only a Teamleider/admin may READ
           // the log back, per Stan: coverage stats are leadership-only.
           allow read: if isCoverageViewer(officeId);
+          // visitedAt is fenced to a ±5 minute window around server time
+          // (2026-09-07 review A7): it's self-attested client-clock data
+          // that drives the coverage stats, so a backdated/forward-dated
+          // entry is a cheap way to fake canvassing history.
           allow create: if (isStaffOf(officeId) || (isMember() && sameOffice(officeId)))
-            && request.resource.data.employeeId == request.auth.uid;
+            && request.resource.data.employeeId == request.auth.uid
+            && request.resource.data.visitedAt is number
+            && request.resource.data.visitedAt >= request.time.toMillis() - 300000
+            && request.resource.data.visitedAt <= request.time.toMillis() + 300000;
           allow update, delete: if false;
         }
       }

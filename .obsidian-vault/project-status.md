@@ -1,14 +1,101 @@
 # Project Status — CRM
 
-**Updated:** 2026-08-24 (third session — data-model pass + functional build-out)
-**Repo:** `C:\RFT\Projects\CRM`
-**Stack:** Vue 3 + TypeScript + Vite + Pinia + Tailwind + Firebase (Auth + Firestore + Emulator Suite — **no Cloud Functions**, see below)
+**Updated:** 2026-09-07 (full audit + remediation round)
+**Repo:** `C:\RFT\Projects\Personal\CRM` (personal, GitHub `Jack-Stan/PeoplemarketingRecruitment`)
+**Stack:** Vue 3 + TypeScript + Vite + Pinia + Tailwind + Firebase (Auth + Firestore) — **no Cloud Functions**, Spark plan, see [[006-firestore-roles-no-claims]]
+
+> **Reading order.** This top block is the only *current* state. Everything from "## Built" down is
+> an append-only chronology of dated sessions — useful as history, but any status line in it is
+> superseded by this block. See [[2026-09-07-full-project-audit]] for the latest full assessment.
 
 ---
 
-## TL;DR
+## Current state (2026-09-07)
 
-Ticket 0 (scaffold) shipped. Ticket 01 (RBAC) is now fully done **including** the self-signup/Users-page scope addition, deployed to prod and verified working (Stan signed up live, hit `/pending-approval`, and his own admin login was confirmed intact after a lockout scare — see below). Big pivot mid-session: role assignment was originally going to be a Cloud Function, but Stan ruled out ever upgrading off the free Spark plan, so **custom claims are gone entirely** — role/officeId/isTeamLeader live only in Firestore (`/users/{uid}`), checked via `get()` in `firestore.rules`. See `decisions/006-firestore-roles-no-claims.md` and the `project_spark_plan_no_blaze` memory. Typecheck clean, full `npm run build` succeeds, 27 unit tests passing. Ticket 02 (Employee CRUD) is code-complete from before. Ticket 03 (Shifts) is next, though the Dashboard already got a role-split ahead of schedule (see below).
+**Shipped and live in prod** (Netlify `peoplemarketing.netlify.app` + Firestore `peoplemarketing-c5bfd`):
+FRD §5–§19 except §11/§17 periods. Auth + self-signup + invite flow, RBAC (3 roles + `isTeamLeader`
+flag), multi-office with admin office switcher, Employee CRUD + `functie` ladder, Shift planning
+(admin drafts + member self-signup, draft→pending→approved/rejected), Recruitment pipeline + §15
+quality stats, Dashboard + History, Audit log, **Location Manager (Leaflet map, zones, visit
+logging)** and **availability marking** — the last two are documented nowhere else in this vault,
+see the 2026-09-07 audit note.
+
+**Health:** 40 unit tests pass, `vue-tsc` clean, prod build succeeds (main chunk 575 kB).
+
+**Blocked / open:**
+- **Firestore emulator cannot start on Stan's machine — diagnosed properly 2026-09-07.**
+  `java.io.IOException: Unable to establish loopback connection` from `Selector.open()`. Isolated it
+  with a 12-line Java probe: **raw TCP to 127.0.0.1 succeeds, but `java.nio.channels.Selector.open()`
+  fails**. On Windows that call builds an internal socket *pair*, and something on this machine
+  (EDR / VPN / firewall) blocks that specific pattern.
+  **This is not a JDK 21 bug and not a Firebase bug — so installing JDK 17 will NOT fix it.** The
+  vault previously said JDK 17 was the fix path; that was wrong, don't burn time on it again.
+  Also ruled out: `-Djava.net.preferIPv4Stack=true`, `preferIPv6Addresses=false`, `io.netty.noUnsafe`.
+  Real options: (a) an EDR/firewall exception for `java.exe` loopback, (b) run the emulator in
+  WSL2 or a Linux container (Docker Desktop is installed but would not start headless), (c) run rules
+  tests in CI only — a JDK 17 job is already wired in `.github/workflows/ci.yml`, and that is now the
+  intended verification path.
+  **Interim verification that DOES work:** `firebase deploy --only firestore:rules --dry-run`
+  (needs firebase-tools 14+, the pinned 13.x has no `--dry-run`) runs the real Google rules compiler
+  without releasing. Confirms syntax, not semantics. Blocks `rules:test`, `emulators`, `seed` locally.
+- **§11/§17 period reporting** needs a `/periods` snapshot writer that does not exist.
+- **GDPR:** no retention periods decided yet (product decision, not a code gap).
+- **Client callback items** 2, 4, 5, 6, 7-scope, 9, 10 still unanswered — see
+  [[2026-08-25-client-callback-new-asks]].
+- **Self-signup limbo (needs Stan's call).** [[2026-08-25-admin-user-creation-invite-email]] records
+  the client saying they do **not** want public self-signup and that `/signup` should be removed. The
+  route, `authService.signUp()` and the self-create rule are all still live, and no outcome was ever
+  recorded. Either remove it or record the reversal — right now a URL-reachable signup path exists
+  that the client believes is gone. (Keeping it is also the only remaining justification for the
+  public `/offices` read.)
+
+**Ticket status:** 00 ✅ · 01 ✅ · 02 ✅ · 03 ✅ · 04 ✅ · 05 🔴 re-scope (Cloud Function banned) ·
+06 🟡 partial (§11/§17 blocked).
+
+---
+
+## Update — audit remediation round (2026-09-07, same day as the audit)
+
+Four parallel fix passes against [[2026-09-07-full-project-audit]], partitioned by file so nothing
+collided: rules+rules-tests, tooling/config/deps, `src/` code quality, scripts+unit tests.
+
+**Landed:**
+- `isActive` now enforced in rules (was client-only); audit log, shifts, recruitment leads, users
+  self-write, locations/visits all tightened; last-admin self-demotion blocked; ~50 new rules tests
+  incl. first-ever coverage of `isCoverageViewer` and `selfProfileUpdateOnly()`.
+- `hydrate()` listener race fixed; `employeeName`/`actorLabel` no longer sourced from the often-null
+  Auth `displayName`; office-wide subscriptions bounded (month/week windows, no composite index
+  needed — verified); invite-completion stranding fixed + self-healing retry; UTC date parsing
+  consolidated into `parseLocalISODate`; unhandled promise rejections caught; Dutch i18n across
+  error messages and route titles; dead code removed.
+- ESLint/Prettier configs created from nothing (`npm run lint`/`format` were both broken before this);
+  CI added (`.github/workflows/ci.yml`, GitHub Actions, JDK 17 rules-test job); `postcss`/`vite`/
+  `vitest` patched — **npm audit 40→36 vulns, 4→2 critical**; dead deps removed; README rewritten;
+  `.mcp.json` path fixed.
+- Seed/grantRole/deleteUser scripts no longer fail open into production (were: default-pass guard on
+  a client-only env var); added `scripts/exportSubject.ts` (GDPR Art. 15) and
+  `scripts/anonymiseSubject.ts` (Art. 17 via anonymisation, not deletion — dry-run by default).
+- Unit tests: 40 → **222 passing**. Typecheck clean, lint 0 errors/37 warnings (Tailwind shorthand
+  only), prod build succeeds, `firestore.rules` compiles via `firebase deploy --dry-run` (real
+  compiler, nothing released).
+
+**Diagnosed but not fixed (needs Stan or infra, not code):**
+- The Firestore emulator loopback failure is **not JDK 21** — a 12-line Java probe proved raw TCP
+  loopback works but `Selector.open()` specifically fails, which points at EDR/firewall/VPN
+  interference with the socket-pair pattern Java's NIO selector uses on Windows. Installing JDK 17
+  will not fix this. See the updated entry above under "Current state". Rules are verified by
+  `firebase deploy --only firestore:rules --dry-run` (syntax only) and by CI's JDK 17 job (once that
+  runs on GitHub's runners, which don't have this machine's network stack).
+- GDPR scripts (`exportSubject.ts`/`anonymiseSubject.ts`) are typechecked and guard-tested but their
+  actual Firestore reads/writes are unexecuted — same emulator blocker. Run `anonymiseSubject.ts`
+  dry-run first against a working emulator before ever pointing either at prod.
+- Retention periods are still an open product decision, not a code gap.
+- Not touched (deliberately out of scope / needs a schema or product decision): recruitmentLeads
+  member-PII read split (B4, left as a `TODO` in the rules), `/periods` snapshot writer for §11/§17,
+  the self-signup removal question, major dependency bumps (firebase/vue/pinia/vue-router/tailwind/
+  eslint 9), accessibility pass on modals, `BaseModal.vue` extraction.
+
+**Not committed.** All changes are in the working tree for Stan to review and commit himself.
 
 ## Built (✅)
 
@@ -252,9 +339,11 @@ Independent FRD-vs-app audit (no vault claims trusted blind), then fixes, then p
 
 ## Risks
 
-- **Bash classifier unavailable** in this session — couldn't run `npm install`, `npm run build`, or `npm test`. To verify scaffold locally: run those commands and paste any errors back.
-- **No production deploy target yet** — `firebase.json` exists but no hosting setup. Add in a later ticket.
-- **Firestore rules in Ticket 0 are wide-open** for any signed-in user. Tighten before any non-local use.
+**Resolved** (kept for history): Bash classifier unavailable · no production deploy target · Ticket 0
+wide-open rules. All three were fixed by 2026-08-25 (Netlify live, rules deployed and tightened
+repeatedly). Do not act on them.
+
+**Current risks live in the top "Current state" block and in [[2026-09-07-full-project-audit]].**
 
 ## Update — functionality pass (2026-08-25, same day as the audit round above)
 

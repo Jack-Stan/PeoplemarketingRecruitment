@@ -14,10 +14,22 @@ import {
 
 import { db } from '@/services/firebase';
 import type { Shift, ShiftCreatePayload, ShiftPatch } from '@/types/shift';
-import { weekStartFor } from '@/types/shift';
+import { weekStartFor } from '@/utils/date';
 
 function shiftsCollection(officeId: string) {
   return collection(db, 'offices', officeId, 'shifts');
+}
+
+/**
+ * Half-open yyyy-MM-dd window `[from, toExclusive)` used to bound the
+ * office-wide subscriptions. Deliberately a range on the SINGLE `date` field
+ * with no other filter and no orderBy — that shape is served by Firestore's
+ * automatic single-field index, so it needs nothing in
+ * `firestore.indexes.json` (which is empty, and has no deploy step).
+ */
+export interface DateWindow {
+  from: string;
+  toExclusive: string;
 }
 
 /**
@@ -26,15 +38,30 @@ function shiftsCollection(officeId: string) {
  * lives in the store, this layer stays dumb on purpose.
  */
 export const shiftsService = {
+  /**
+   * Office-wide shifts. `window` bounds the read to a date range — always
+   * pass one from a view: an unbounded collection subscription re-reads every
+   * shift the office has ever had on each mount/office switch, which is a
+   * real Spark-quota (50k reads/day) risk as the history grows.
+   */
   subscribe(
     officeId: string,
     onChange: (shifts: Shift[]) => void,
     onError: (err: unknown) => void,
+    window?: DateWindow,
   ): Unsubscribe {
     return onSnapshot(
-      shiftsCollection(officeId),
+      window
+        ? query(
+            shiftsCollection(officeId),
+            where('date', '>=', window.from),
+            where('date', '<', window.toExclusive),
+          )
+        : shiftsCollection(officeId),
       (snapshot) => {
-        const shifts = snapshot.docs.map((d) => ({ shiftId: d.id, officeId, ...d.data() }) as Shift);
+        const shifts = snapshot.docs.map(
+          (d) => ({ shiftId: d.id, officeId, ...d.data() }) as Shift,
+        );
         onChange(shifts);
       },
       onError,
@@ -59,7 +86,9 @@ export const shiftsService = {
     return onSnapshot(
       query(shiftsCollection(officeId), where('assignedEmployeeId', '==', employeeId)),
       (snapshot) => {
-        const shifts = snapshot.docs.map((d) => ({ shiftId: d.id, officeId, ...d.data() }) as Shift);
+        const shifts = snapshot.docs.map(
+          (d) => ({ shiftId: d.id, officeId, ...d.data() }) as Shift,
+        );
         onChange(shifts);
       },
       onError,
@@ -81,7 +110,9 @@ export const shiftsService = {
         where('weekStart', '==', weekStart),
       ),
       (snapshot) => {
-        const shifts = snapshot.docs.map((d) => ({ shiftId: d.id, officeId, ...d.data() }) as Shift);
+        const shifts = snapshot.docs.map(
+          (d) => ({ shiftId: d.id, officeId, ...d.data() }) as Shift,
+        );
         onChange(shifts);
       },
       onError,

@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Typecheck, lint, unit tests, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx vue-tsc --noEmit
+
+      # NOTE: the `lint` script runs eslint with `--fix`, so it may rewrite
+      # files inside the runner's checkout. That is harmless here (nothing is
+      # committed or pushed from CI) — it still fails the job on any remaining
+      # unfixable error.
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  rules:
+    name: Firestore security rules
+    runs-on: ubuntu-latest
+    # This job boots the Firestore emulator via `firebase emulators:exec`, and
+    # the emulator is a Java process — hence the JDK step below. It is a real
+    # gate: a rules regression must fail the build, so no continue-on-error.
+    continue-on-error: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # JDK 17 specifically — the Firestore emulator fails to bind its loopback
+      # listener under JDK 21 (see README, Prerequisites).
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Firestore rules tests
+        run: npm run rules:test

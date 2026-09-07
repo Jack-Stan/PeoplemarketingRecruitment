@@ -5,6 +5,7 @@ import { authService } from '@/services/auth.service';
 import { usersService } from '@/services/users.service';
 import { useAuthStore } from '@/stores/auth';
 import { Roles } from '@/types/user';
+import { friendlyError } from '@/utils/errors';
 
 describe('auth store', () => {
   beforeEach(() => {
@@ -29,7 +30,7 @@ describe('auth store', () => {
     const store = useAuthStore();
     const ok = await store.signIn('a@b.nl', 'badpw');
     expect(ok).toBe(false);
-    expect(store.error).toMatch(/Email or password is incorrect/i);
+    expect(store.error).toBe(friendlyError({ code: 'auth/wrong-password' }));
   });
 
   it('signIn returns true on success', async () => {
@@ -91,7 +92,7 @@ describe('auth store', () => {
     const store = useAuthStore();
     const ok = await store.signUp('taken@peoplemarketing.nl', 'goodpw', 'Someone', 'office-gent');
     expect(ok).toBe(false);
-    expect(store.error).toMatch(/already exists/i);
+    expect(store.error).toBe(friendlyError({ code: 'auth/email-already-in-use' }));
   });
 
   it('hydrate stays live: a role change pushed via subscribeOwn updates the store without a re-login', async () => {

@@ -13,6 +13,7 @@ vi.mock('@/services/shifts.service', () => ({
 
 import { shiftsService } from '@/services/shifts.service';
 import { useShiftsStore } from '@/stores/shifts';
+import { friendlyError } from '@/utils/errors';
 import type { Shift } from '@/types/shift';
 
 const SHIFT_A: Shift = {
@@ -185,6 +186,6 @@ describe('shifts store', () => {
     const ok = await store.approve('gent', 's2', 'admin-1', 1_724_500_000_000);
 
     expect(ok).toBe(false);
-    expect(store.error).toMatch(/permission/i);
+    expect(store.error).toBe(friendlyError({ code: 'permission-denied' }));
   });
 });

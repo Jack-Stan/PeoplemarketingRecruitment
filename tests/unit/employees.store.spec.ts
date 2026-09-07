@@ -12,6 +12,7 @@ vi.mock('@/services/employees.service', () => ({
 
 import { employeesService } from '@/services/employees.service';
 import { useEmployeesStore } from '@/stores/employees';
+import { friendlyError } from '@/utils/errors';
 import type { Employee } from '@/types/employee';
 
 const EMP_ADMIN: Employee = {
@@ -74,7 +75,7 @@ describe('employees store', () => {
     const store = useEmployeesStore();
     store.subscribe('office-main');
 
-    expect(store.error).toMatch(/permission/i);
+    expect(store.error).toBe(friendlyError({ code: 'permission-denied' }));
   });
 
   it('create keys the employee doc by the Auth uid (decisions/007)', async () => {

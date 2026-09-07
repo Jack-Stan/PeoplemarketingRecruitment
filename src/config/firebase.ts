@@ -9,8 +9,7 @@ import type { FirebaseOptions } from 'firebase/app';
  */
 export const firebaseConfig: FirebaseOptions = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY ?? 'AIzaSyB-dUrj5tg3X5y-9PdJcO7NPWcTyFohF7Q',
-  authDomain:
-    import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ?? 'peoplemarketing-c5bfd.firebaseapp.com',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ?? 'peoplemarketing-c5bfd.firebaseapp.com',
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID ?? 'peoplemarketing-c5bfd',
   storageBucket:
     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ?? 'peoplemarketing-c5bfd.firebasestorage.app',
@@ -48,6 +47,25 @@ export function getAppBaseUrl(): string {
 
 export const useEmulators =
   (import.meta.env.VITE_USE_EMULATORS ?? '').toString().toLowerCase() === 'true';
+
+/**
+ * The one deliberate `console.*` in `src/` — everything else routes through
+ * the toast store on purpose, but this has to be visible in the dev terminal/
+ * devtools before any UI exists. The config above falls back to the REAL
+ * People Marketing project when no `.env.local` is present, so a bare
+ * `npm run dev` writes to live client data; that has actually happened. The
+ * fallback stays (deleting it breaks the Netlify build, which has no env
+ * vars set) — this just makes it impossible to do by accident unnoticed.
+ */
+export function warnIfProduction(): void {
+  if (useEmulators) return;
+  // eslint-disable-next-line no-console -- deliberate, see comment above.
+  console.warn(
+    `%c⚠ LIVE FIREBASE — project "${firebaseConfig.projectId}"`,
+    'background:#b91c1c;color:#fff;font-weight:bold;padding:2px 6px',
+    '\nEvery read and write hits real client data. Set VITE_USE_EMULATORS=true in .env.local to use the emulators instead.',
+  );
+}
 
 export const emulatorHosts = {
   auth: '127.0.0.1',

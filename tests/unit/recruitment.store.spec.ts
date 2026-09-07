@@ -11,6 +11,7 @@ vi.mock('@/services/recruitment.service', () => ({
 
 import { recruitmentService } from '@/services/recruitment.service';
 import { useRecruitmentStore } from '@/stores/recruitment';
+import { friendlyError } from '@/utils/errors';
 import type { RecruitmentLead } from '@/types/recruitmentLead';
 
 const NOW = Date.parse('2026-08-25T10:00:00Z'); // Tuesday of the week starting 2026-08-24
@@ -122,6 +123,6 @@ describe('recruitment store', () => {
     });
 
     expect(ok).toBe(false);
-    expect(store.error).toMatch(/permission/i);
+    expect(store.error).toBe(friendlyError({ code: 'permission-denied' }));
   });
 });

@@ -6,17 +6,44 @@
  * This script reports, per office, which employee docs are keyed by a real
  * Auth uid and which are orphans that no signed-in user can ever read.
  *
- * Writes nothing. Safe to run against prod.
+ * Writes nothing. Safe to run against prod — no emulator/FORCE_PROD guard is
+ * needed here precisely because it is read-only.
  *
- * Usage:
- *   GOOGLE_APPLICATION_CREDENTIALS=./peoplemarketing-c5bfd-firebase-adminsdk-fbsvc-b4092c4705.json \
+ * Credentials: reads GOOGLE_APPLICATION_CREDENTIALS if set, so the
+ * service-account key can live OUTSIDE this repo. Falls back to the legacy
+ * in-repo filename only when that env var is unset, and says so loudly —
+ * a private key checked into a git working tree is a liability.
+ *
+ * Usage (preferred — key outside the repo):
+ *   GOOGLE_APPLICATION_CREDENTIALS=/secure/path/peoplemarketing-adminsdk.json \
  *     tsx scripts/auditEmployeeIds.ts
  */
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 
-const PROJECT_ID = process.env.VITE_FIREBASE_PROJECT_ID ?? 'peoplemarketing-c5bfd';
+import { resolveProjectId } from './_guard';
+
+const LEGACY_KEY_PATH = './peoplemarketing-c5bfd-firebase-adminsdk-fbsvc-b4092c4705.json';
+
+if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+  const legacy = resolve(process.cwd(), LEGACY_KEY_PATH);
+  if (existsSync(legacy)) {
+    console.warn(
+      `⚠  GOOGLE_APPLICATION_CREDENTIALS is unset — falling back to the in-repo key at\n` +
+        `   ${legacy}\n` +
+        '   Move that key outside the repo and set GOOGLE_APPLICATION_CREDENTIALS instead.',
+    );
+    process.env.GOOGLE_APPLICATION_CREDENTIALS = legacy;
+  }
+  // Otherwise leave it unset: the Admin SDK still resolves gcloud ADC or the
+  // emulator hosts on its own, and its error message is clearer than ours.
+}
+
+const PROJECT_ID = resolveProjectId();
 const app = initializeApp({ projectId: PROJECT_ID });
 const auth = getAuth(app);
 const db = getFirestore(app);

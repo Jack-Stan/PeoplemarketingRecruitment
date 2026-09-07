@@ -22,7 +22,12 @@ const submitting = ref(false);
 
 async function onSubmit(): Promise<void> {
   submitting.value = true;
-  const ok = await auth.signUp(email.value.trim(), password.value, displayName.value.trim(), officeId.value);
+  const ok = await auth.signUp(
+    email.value.trim(),
+    password.value,
+    displayName.value.trim(),
+    officeId.value,
+  );
   submitting.value = false;
   if (ok) {
     ui.push('Account aangemaakt — wachten op goedkeuring door een beheerder.', 'success');

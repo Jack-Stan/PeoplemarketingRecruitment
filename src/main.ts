@@ -2,10 +2,12 @@ import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 
 import App from './App.vue';
+import { warnIfProduction } from './config/firebase';
 import { createAppRouter } from './router';
 import { authService } from './services/auth.service';
 import { auth } from './services/firebase';
 import { useAuthStore } from './stores/auth';
+import { useUiStore } from './stores/ui';
 
 import './assets/tailwind.css';
 
@@ -32,7 +34,17 @@ app.use(router);
 // settled," which sidesteps this entirely.
 const authStore = useAuthStore();
 
+// Last-resort safety net. Every store action already catches its own errors;
+// this catches the ones nobody awaited (a fire-and-forget write, a listener
+// callback) so the user at least sees that something failed instead of the
+// UI silently doing nothing.
+window.addEventListener('unhandledrejection', (event) => {
+  event.preventDefault();
+  useUiStore().push('Er ging iets mis. Probeer het opnieuw.', 'error');
+});
+
 async function bootstrap(): Promise<void> {
+  warnIfProduction();
   await auth.authStateReady();
   await authStore.hydrate(auth.currentUser);
   authService.onAuthStateChanged((fbUser) => void authStore.hydrate(fbUser));

@@ -1,6 +1,6 @@
 # Ticket 06 — Admin dashboard + historical reporting
 
-**Status:** 📋 Planned
+**Status:** 🟡 Partial — `DashboardView.vue` (live KPIs, funnel, staffing) and `HistoryView.vue` (TL trend) both ship from `/shifts`. **Blocked half:** FRD §11 and §17 period/snapshot reporting need a `/periods` collection that has rules reserved but **no type, no service and no write path** — not deliverable as specified without a snapshot writer. Needs a decision.
 **Goal:** Cross-module KPI dashboard (FRD §16) + historical trend views (FRD §11, §17), including the client's team-leader-headcount-over-time ask from the transcript.
 
 ## Scope

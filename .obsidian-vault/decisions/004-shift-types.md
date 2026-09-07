@@ -1,7 +1,7 @@
 # Decision 004 — Three fixed shift types (D2D / Straat / Event)
 
 **Date:** 2026-08-24
-**Status:** Proposed (pending Ticket 03 implementation)
+**Status:** Implemented — the three types ship in `src/types/shift.ts` and are used by PlanningView/MyPlanningView.
 **Deciders:** Client (Michiel De Block), via transcript — see `meetings/2026-08-24-client-transcript-shifts-recruitment.md`
 
 ## Context

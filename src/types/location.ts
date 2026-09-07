@@ -35,7 +35,10 @@ export interface Location {
   lastVisitedAt: number | null;
 }
 
-export type LocationCreatePayload = Omit<Location, 'locationId' | 'officeId' | 'timesVisited' | 'lastVisitedAt'>;
+export type LocationCreatePayload = Omit<
+  Location,
+  'locationId' | 'officeId' | 'timesVisited' | 'lastVisitedAt'
+>;
 export type LocationPatch = Partial<
   Omit<Location, 'locationId' | 'officeId' | 'timesVisited' | 'lastVisitedAt'>
 >;

@@ -1,7 +1,7 @@
 # Decision 003 — Pink placeholder hex
 
 **Date:** 2026-08-24
-**Status:** Provisional
+**Status:** Accepted (2026-08-25) — resolved to **`#e6007e`**, sourced from the live client site; the `#EC4899` placeholder below is historical. Logo at `src/assets/logo.svg`.
 **Owner:** Stan (to confirm with client)
 
 ## Context

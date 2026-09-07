@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import type { Unsubscribe } from 'firebase/firestore';
 
-import { shiftsService } from '@/services/shifts.service';
+import { shiftsService, type DateWindow } from '@/services/shifts.service';
 import { friendlyError } from '@/utils/errors';
 import { timesOverlap, type Shift, type ShiftCreatePayload } from '@/types/shift';
 
@@ -19,7 +19,9 @@ export const useShiftsStore = defineStore('shifts', () => {
   let unsub: Unsubscribe | null = null;
 
   const pending = computed(() => shifts.value.filter((s) => s.status === 'pending'));
-  const draftIds = computed(() => shifts.value.filter((s) => s.status === 'draft').map((s) => s.shiftId));
+  const draftIds = computed(() =>
+    shifts.value.filter((s) => s.status === 'draft').map((s) => s.shiftId),
+  );
   const byDate = computed(() => {
     const grouped = new Map<string, Shift[]>();
     for (const shift of [...shifts.value].sort((a, b) => a.startTime.localeCompare(b.startTime))) {
@@ -32,26 +34,38 @@ export const useShiftsStore = defineStore('shifts', () => {
 
   /** Staffing overview bar totals — client transcript's "40 shifts, 5 TL, 7 non-TL". */
   const staffingTotals = computed(() => {
-    const tlIds = new Set(shifts.value.filter((s) => s.employeeIsTeamLeader).map((s) => s.assignedEmployeeId));
-    const nonTlIds = new Set(shifts.value.filter((s) => !s.employeeIsTeamLeader).map((s) => s.assignedEmployeeId));
+    const tlIds = new Set(
+      shifts.value.filter((s) => s.employeeIsTeamLeader).map((s) => s.assignedEmployeeId),
+    );
+    const nonTlIds = new Set(
+      shifts.value.filter((s) => !s.employeeIsTeamLeader).map((s) => s.assignedEmployeeId),
+    );
     return { shifts: shifts.value.length, teamLeaders: tlIds.size, nonTeamLeaders: nonTlIds.size };
   });
 
-  function subscribe(officeId: string): void {
+  /**
+   * Office-wide shifts, bounded to `window` (see shiftsService.subscribe for
+   * why an unbounded read is a quota problem). Every aggregate in this store
+   * — staffingTotals included — therefore describes the loaded window, not
+   * all time; views must label them accordingly.
+   */
+  function subscribe(officeId: string, window?: DateWindow): void {
     unsubscribe();
     isLoading.value = true;
-    unsub = shiftsService.subscribe(
-      officeId,
-      (list) => {
-        shifts.value = list;
-        isLoading.value = false;
-        error.value = null;
-      },
-      (err) => {
-        error.value = friendlyError(err);
-        isLoading.value = false;
-      },
-    );
+    const onData = (list: Shift[]) => {
+      shifts.value = list;
+      isLoading.value = false;
+      error.value = null;
+    };
+    const onErr = (err: unknown) => {
+      error.value = friendlyError(err);
+      isLoading.value = false;
+    };
+    // Only forward the window when there is one — an explicit `undefined`
+    // would change the call arity for no reason.
+    unsub = window
+      ? shiftsService.subscribe(officeId, onData, onErr, window)
+      : shiftsService.subscribe(officeId, onData, onErr);
   }
 
   /** A TeamMember's own dashboard/history — see shiftsService.subscribeForEmployee. */
@@ -122,7 +136,11 @@ export const useShiftsStore = defineStore('shifts', () => {
     );
   }
 
-  async function create(officeId: string, createdBy: string, payload: ShiftCreatePayload): Promise<boolean> {
+  async function create(
+    officeId: string,
+    createdBy: string,
+    payload: ShiftCreatePayload,
+  ): Promise<boolean> {
     error.value = null;
     try {
       await shiftsService.create(officeId, createdBy, payload);
@@ -160,7 +178,12 @@ export const useShiftsStore = defineStore('shifts', () => {
     return transition(officeId, shiftId, { status: 'pending' });
   }
 
-  async function approve(officeId: string, shiftId: string, decidedBy: string, nowMs: number): Promise<boolean> {
+  async function approve(
+    officeId: string,
+    shiftId: string,
+    decidedBy: string,
+    nowMs: number,
+  ): Promise<boolean> {
     return transition(officeId, shiftId, {
       status: 'approved',
       rejectionReason: null,

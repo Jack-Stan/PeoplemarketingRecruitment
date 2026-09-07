@@ -42,12 +42,16 @@ Source: `src/types/user.ts` (`UserProfile`), `src/services/users.service.ts`.
 | `desiredOfficeId` | No (indirect) | office applied to at signup |
 | `isTeamLeader` | No | app metadata |
 | `isActive` | No | app metadata |
+| `functie` | No (employment context) | job ladder rung, admin-assigned (added 2026-09-01) |
+| `phone` | **Yes** | self-editable in Settings (added post-inventory) |
+| `emailVerified` | No | mirrors the Auth token |
 | `createdAt`/`updatedAt` | No | timestamps |
 
 - **Data subject:** any account holder (admin, manager, member, or pending signup).
 - **Read:** own doc always; an Administrator can read any `/users` doc (needed to see pending signups) — `firestore.rules` lines 58-79.
 - **Write:** a signed-in user may only *create* their own doc, and only with `role`/`primaryOfficeId` left null (self-signup, no privilege escalation possible). Only an Administrator can `update` (assign role/office/isTeamLeader) or `delete`.
-- **Persistence:** **no delete mechanism exists in application code.** `firestore.rules` permits an Administrator to `delete` a `/users/{uid}` doc, but no service method or UI control calls it anywhere in `src/services/users.service.ts` or the views (confirmed via grep — no `deleteDoc` call against `users`, no delete button in `UsersView.vue`). In practice this means a user record persists indefinitely once created, and there is no in-app "remove me" or admin "delete this account" action.
+- **Persistence (corrected 2026-09-07):** a delete mechanism **does** now exist — `usersService.deleteUser()` (`src/services/users.service.ts`) is called from `useUserActions.removeUser()` with a confirm dialog, and writes a `user_deleted` audit entry. **But it deletes the `/users` doc only** — the Firebase Auth account, the roster doc, every shift, availability row, visit and audit entry survive, including the denormalised `employeeName`/`actorEmail` copies. It is therefore not an Art. 17 erasure. As of the 2026-09-07 remediation round, `scripts/anonymiseSubject.ts` performs the real cross-collection anonymisation (and disables the Auth account); it is a manual Admin-SDK script, not an in-app action.
+- **Historical note (superseded):** this entry previously read: `firestore.rules` permits an Administrator to `delete` a `/users/{uid}` doc, but no service method or UI control calls it anywhere in `src/services/users.service.ts` or the views (confirmed via grep — no `deleteDoc` call against `users`, no delete button in `UsersView.vue`). In practice this means a user record persists indefinitely once created, and there is no in-app "remove me" or admin "delete this account" action.
 
 ### `/offices/{officeId}/employees/{employeeId}` — staff roster
 Source: `src/types/employee.ts`, `src/services/employees.service.ts`. Doc ID is the account's Auth UID (`decisions/007`).
@@ -127,6 +131,48 @@ Source: `src/types/auditLog.ts`, `src/services/auditLog.service.ts`.
 - **Read/create:** staff only (`isStaffOf`); **update/delete denied to everyone, including admins**, by design — `firestore.rules` line 163: `allow update, delete: if false`.
 - **Persistence:** **this is the one collection in the app that is explicitly, permanently undeletable by design** — not a gap, a deliberate architectural choice ("an audit log that can be edited after the fact isn't one," per the code comment). It contains personal names/emails with **no deletion path whatsoever**, not even for an Administrator through legitimate means (only a direct Admin-SDK/console operation outside the app could remove an entry).
 
+### `/offices/{officeId}/availability/{uid_date}` — employee availability marks
+**Added to this inventory 2026-09-07 — this collection shipped 2026-08-28 and was missing entirely.**
+Source: `src/types/availability.ts`, `src/services/availability.service.ts`.
+
+| Field | Personal data? | Notes |
+|---|---|---|
+| `employeeId` | Yes (identifier) | the member's uid |
+| `employeeName` | **Yes** | denormalised name copy |
+| `employeeIsTeamLeader` | No | app metadata, rules-pinned to the profile |
+| `date` / `weekStart` | No (indirect) | when this person said they are free |
+
+- **Data subject:** staff members.
+- **Read:** staff of the office, plus `isTeamLeader`-flagged members ([[009-coverage-viewer-teamleader-flag]]).
+- **Write:** create own only (`employeeId == uid`); update always denied; delete own or admin.
+- **Purpose note:** this is availability *planning* data, not monitoring. Low sensitivity, but it is
+  still an employee record and belongs in the Art. 30 register.
+
+### `/offices/{officeId}/locations/{locationId}/visits/{visitId}` — canvassing visit log
+**Added to this inventory 2026-09-07 — this collection shipped 2026-08-28 and was missing entirely.
+It is the highest-sensitivity gap found in the 2026-09-07 audit.**
+Source: `src/types/location.ts`, `src/services/locations.service.ts`.
+
+| Field | Personal data? | Notes |
+|---|---|---|
+| `employeeId` | Yes (identifier) | who visited |
+| `employeeName` | **Yes** | denormalised name copy |
+| `visitedAt` | **Yes, in combination** | when |
+| `notes` | **Yes, potentially** | free text about the visit |
+
+- **Data subject:** staff members (the *visitor*, not the resident).
+- **What this actually is:** a per-employee record of **which geographic zone a named person was in,
+  and when**. Combined with the parent location's coordinates that is location/movement tracking of
+  an employee — a **distinct processing purpose** ("employee monitoring") that is not covered by the
+  employment-administration basis used for the rest of this system.
+- **Read:** staff of the office, plus any `isTeamLeader`-flagged member of that office.
+- **Why it matters in Belgium:** employee monitoring typically requires prior information to the
+  worker and, depending on scale, consultation of the works council / CPBW and a DPIA. None of that
+  has happened, and the purpose is not documented anywhere.
+- **Action:** raise explicitly with the client before this is used for performance management.
+  Consider whether per-visit *attribution* is needed at all, or whether an anonymous per-zone counter
+  would satisfy the coverage KPI.
+
 ### `/offices/{officeId}/periods/{periodId}` — historical snapshots
 Source: `firestore.rules` lines 166-171 only — **no type file, no service file exists for this collection.**
 
@@ -139,6 +185,19 @@ Source: `src/services/auth.service.ts`.
 - This is data held by Firebase Auth (a Google-operated service), not in a Firestore document this app's rules govern. No in-app code calls Firebase Auth's user-deletion API (`deleteUser`) anywhere — confirmed via grep, no matches for `deleteUser` in `src/`.
 
 ---
+
+## 2b. Processors (added 2026-09-07 — §5 previously listed Google/Firebase only)
+
+Beyond Google/Firebase, personal data also reaches:
+- **Netlify** — hosting and access logs (URLs include the invite `?email=` parameter, so invitee
+  emails land in third-party logs; see the 2026-09-07 audit item L6).
+- **The Leaflet map tile provider** — receives every map viewer's IP address and viewport, i.e. which
+  canvassing areas are being looked at. Not staff PII in itself, but a third-party disclosure.
+- **Firebase Auth mail relay** — sends invite / verification / reset mail.
+
+None of these are in the Art. 30 record yet. Also unconfirmed: the Firestore **region**. If the
+database sits in `nam5`/`us-central` rather than `europe-west1`, that is a Chapter V transfer
+question for Belgian candidate data. Check the Firebase console.
 
 ## 3. Neutral observations relevant to a GDPR conversation
 

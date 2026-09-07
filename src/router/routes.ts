@@ -29,13 +29,13 @@ export const routes: RouteRecordRaw[] = [
     path: '/login',
     name: 'login',
     component: () => import('@/views/auth/LoginView.vue'),
-    meta: { title: 'Login' },
+    meta: { title: 'Aanmelden' },
   },
   {
     path: '/signup',
     name: 'signup',
     component: () => import('@/views/auth/SignupView.vue'),
-    meta: { title: 'Create account' },
+    meta: { title: 'Account aanmaken' },
   },
   {
     path: '/complete-invite',
@@ -47,7 +47,7 @@ export const routes: RouteRecordRaw[] = [
     path: '/pending-approval',
     name: 'pending-approval',
     component: () => import('@/views/auth/PendingApprovalView.vue'),
-    meta: { requiresAuth: true, noShell: true, title: 'Pending approval' },
+    meta: { requiresAuth: true, noShell: true, title: 'Wacht op goedkeuring' },
   },
   {
     path: '/',
@@ -90,7 +90,7 @@ export const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       roles: [Roles.Administrator, Roles.TeamManager],
-      title: 'Employees',
+      title: 'Medewerkers',
     },
   },
   {
@@ -102,7 +102,7 @@ export const routes: RouteRecordRaw[] = [
       // TeamMember gets read-only visibility per the client transcript —
       // `firestore.rules` already only allows a member to read, not write.
       roles: [Roles.Administrator, Roles.TeamManager, Roles.TeamMember],
-      title: 'Recruitment',
+      title: 'Rekrutering',
     },
   },
   {
@@ -122,7 +122,7 @@ export const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       roles: [Roles.Administrator, Roles.TeamManager, Roles.TeamMember],
-      title: 'History',
+      title: 'Geschiedenis',
     },
   },
   {
@@ -132,7 +132,7 @@ export const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       roles: [Roles.Administrator],
-      title: 'Users',
+      title: 'Gebruikers',
     },
   },
   {
@@ -169,15 +169,12 @@ export const routes: RouteRecordRaw[] = [
     path: '/unauthorized',
     name: 'unauthorized',
     component: () => import('@/views/UnauthorizedView.vue'),
-    meta: { title: 'Not allowed' },
+    meta: { title: 'Geen toegang' },
   },
   {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
     component: () => import('@/views/NotFoundView.vue'),
-    meta: { title: 'Not found' },
+    meta: { title: 'Pagina niet gevonden' },
   },
 ];
-
-/** All roles — convenience for views that want to render role-conditional UI. */
-export const allRoles: Role[] = [Roles.Administrator, Roles.TeamManager, Roles.TeamMember];

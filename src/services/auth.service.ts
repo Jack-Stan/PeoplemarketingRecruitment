@@ -37,9 +37,10 @@ export const authService = {
    * N days" on its own, hence the extra bookkeeping in the auth store.
    */
   signIn(email: string, password: string, rememberMe: boolean): Promise<User> {
-    return setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence).then(() =>
-      signInWithEmailAndPassword(auth, email, password).then((cred) => cred.user),
-    );
+    return setPersistence(
+      auth,
+      rememberMe ? browserLocalPersistence : browserSessionPersistence,
+    ).then(() => signInWithEmailAndPassword(auth, email, password).then((cred) => cred.user));
   },
 
   /**

@@ -5,8 +5,8 @@ import { useAuth } from '@/composables/useAuth';
 import { useAvailabilityStore } from '@/stores/availability';
 import { useShiftsStore } from '@/stores/shifts';
 import { useUiStore } from '@/stores/ui';
-import { FIXED_SHIFT_HOURS, weekStartFor, type Shift, type ShiftCreatePayload } from '@/types/shift';
-import { toLocalISODate, todayLocalISO } from '@/utils/date';
+import { FIXED_SHIFT_HOURS, type Shift, type ShiftCreatePayload } from '@/types/shift';
+import { parseLocalISODate, toLocalISODate, todayLocalISO, weekStartFor } from '@/utils/date';
 
 /**
  * TeamMember self-service planning — decision 008. Employee-authored: the
@@ -38,7 +38,9 @@ function makeEmptyForm(): ShiftCreatePayload {
     endTime: FIXED_SHIFT_HOURS.D2D.end,
     status: 'draft',
     rejectionReason: null,
-    employeeName: auth.user.value?.displayName || auth.user.value?.email || '',
+    // Denormalised permanently onto the shift — use the /users profile name,
+    // never Auth's displayName (null for every invite-completed account).
+    employeeName: auth.actorLabel.value,
     employeeIsTeamLeader: auth.isTeamLeader.value,
     eventTitle: null,
     location: null,
@@ -63,10 +65,12 @@ function statusClasses(status: Shift['status']): string {
   }[status];
 }
 
-const sortedShifts = computed(() => [...shiftsStore.shifts].sort((a, b) => a.date.localeCompare(b.date)));
+const sortedShifts = computed(() =>
+  [...shiftsStore.shifts].sort((a, b) => a.date.localeCompare(b.date)),
+);
 const draftCount = computed(() => shiftsStore.draftIds.length);
 const weekLabel = computed(() => {
-  const start = new Date(`${currentWeekStart.value}T00:00:00`);
+  const start = parseLocalISODate(currentWeekStart.value);
   const end = new Date(start);
   end.setDate(end.getDate() + 6);
   const fmt = (d: Date) => d.toLocaleDateString('nl-BE', { day: 'numeric', month: 'long' });
@@ -75,7 +79,7 @@ const weekLabel = computed(() => {
 
 /** Weekly agenda grid — client + Stan both asked to see the week as a calendar, not a flat list. */
 const weekDays = computed(() => {
-  const start = new Date(`${currentWeekStart.value}T00:00:00`);
+  const start = parseLocalISODate(currentWeekStart.value);
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(start);
     d.setDate(d.getDate() + i);
@@ -106,7 +110,9 @@ async function submitForm(): Promise<void> {
     formError.value = 'Kies een datum in de huidige week.';
     return;
   }
-  if (shiftsStore.hasOverlap(uid.value, form.value.date, form.value.startTime, form.value.endTime)) {
+  if (
+    shiftsStore.hasOverlap(uid.value, form.value.date, form.value.startTime, form.value.endTime)
+  ) {
     formError.value = 'Je hebt die dag al een overlappende shift.';
     return;
   }
@@ -122,13 +128,16 @@ async function submitForm(): Promise<void> {
 
 async function removeDraft(shift: Shift): Promise<void> {
   const ok = await shiftsStore.remove(officeId.value, shift.shiftId);
-  ui.push(ok ? 'Concept verwijderd.' : (shiftsStore.error ?? 'Er ging iets mis.'), ok ? 'success' : 'error');
+  ui.push(
+    ok ? 'Concept verwijderd.' : shiftsStore.error ?? 'Er ging iets mis.',
+    ok ? 'success' : 'error',
+  );
 }
 
 async function submitWeek(): Promise<void> {
   const ok = await shiftsStore.submitWeek(officeId.value, Date.now());
   ui.push(
-    ok ? 'Je week is ingediend ter goedkeuring.' : (shiftsStore.error ?? 'Er ging iets mis.'),
+    ok ? 'Je week is ingediend ter goedkeuring.' : shiftsStore.error ?? 'Er ging iets mis.',
     ok ? 'success' : 'error',
   );
 }
@@ -136,7 +145,8 @@ async function submitWeek(): Promise<void> {
 function subscribe(): void {
   if (officeId.value && uid.value) {
     shiftsStore.subscribeMineForWeek(officeId.value, uid.value, currentWeekStart.value);
-    availabilityStore.subscribeMine(officeId.value, uid.value);
+    // Bounded to the week on screen, same as the shift subscription above.
+    availabilityStore.subscribeMine(officeId.value, uid.value, currentWeekStart.value);
   }
 }
 
@@ -146,7 +156,9 @@ async function toggleAvailable(date: string): Promise<void> {
     ? await availabilityStore.unmark(officeId.value, existing.availabilityId)
     : await availabilityStore.mark(officeId.value, {
         employeeId: uid.value,
-        employeeName: auth.user.value?.displayName || auth.user.value?.email || '',
+        // Denormalised permanently onto the shift — use the /users profile name,
+        // never Auth's displayName (null for every invite-completed account).
+        employeeName: auth.actorLabel.value,
         employeeIsTeamLeader: auth.isTeamLeader.value,
         date,
       });
@@ -167,7 +179,10 @@ onUnmounted(() => {
         <p class="text-sm text-neutral-mute">Mijn planning · week van {{ weekLabel }}</p>
         <h2 class="mt-1 text-3xl font-bold tracking-tight">Plan jouw week</h2>
       </div>
-      <button class="bg-primary-pink px-4 py-2.5 text-sm font-bold text-white" @click="openCreate()">
+      <button
+        class="bg-primary-pink px-4 py-2.5 text-sm font-bold text-white"
+        @click="openCreate()"
+      >
         + Dag toevoegen
       </button>
     </section>
@@ -179,10 +194,17 @@ onUnmounted(() => {
           v-for="day in weekDays"
           :key="day.iso"
           class="flex min-h-32 flex-col gap-2 border p-3"
-          :class="day.isToday ? 'border-primary-pink/40 bg-primary-pink/5' : 'border-black/10 bg-[#faf9f7]'"
+          :class="
+            day.isToday
+              ? 'border-primary-pink/40 bg-primary-pink/5'
+              : 'border-black/10 bg-[#faf9f7]'
+          "
         >
           <div class="flex items-center justify-between">
-            <p class="text-xs font-bold uppercase tracking-[0.1em]" :class="day.isToday ? 'text-primary-pink' : 'text-neutral-mute'">
+            <p
+              class="text-xs font-bold uppercase tracking-[0.1em]"
+              :class="day.isToday ? 'text-primary-pink' : 'text-neutral-mute'"
+            >
               {{ day.weekday }} {{ day.dayNumber }}
             </p>
             <button
@@ -205,11 +227,18 @@ onUnmounted(() => {
             {{ availabilityStore.isMarked(uid, day.iso) ? '✓ Beschikbaar' : 'Beschikbaar?' }}
           </button>
           <div v-if="!day.shifts.length" class="flex-1"></div>
-          <div v-for="shift in day.shifts" :key="shift.shiftId" class="border border-black/10 bg-white p-2 text-xs">
+          <div
+            v-for="shift in day.shifts"
+            :key="shift.shiftId"
+            class="border border-black/10 bg-white p-2 text-xs"
+          >
             <p class="font-semibold">Ik werk deze dag</p>
             <p v-if="shift.location" class="text-neutral-mute">{{ shift.location }}</p>
             <div class="mt-1 flex items-center justify-between">
-              <span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-bold" :class="statusClasses(shift.status)">
+              <span
+                class="inline-block rounded px-1.5 py-0.5 text-[10px] font-bold"
+                :class="statusClasses(shift.status)"
+              >
                 {{ statusLabels[shift.status] }}
               </span>
               <button
@@ -224,26 +253,52 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <div v-if="draftCount" class="mt-6 flex items-center justify-between border-t border-black/5 pt-4">
-        <p class="text-xs text-neutral-mute">{{ draftCount }} concept-shift{{ draftCount === 1 ? '' : 's' }} klaar om in te dienen.</p>
-        <button class="bg-neutral-ink px-4 py-2 text-xs font-bold text-white hover:bg-black" @click="submitWeek">
+      <div
+        v-if="draftCount"
+        class="mt-6 flex items-center justify-between border-t border-black/5 pt-4"
+      >
+        <p class="text-xs text-neutral-mute">
+          {{ draftCount }} concept-shift{{ draftCount === 1 ? '' : 's' }} klaar om in te dienen.
+        </p>
+        <button
+          class="bg-neutral-ink px-4 py-2 text-xs font-bold text-white hover:bg-black"
+          @click="submitWeek"
+        >
           Week indienen
         </button>
       </div>
     </section>
 
-    <div v-if="isFormOpen" class="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4">
+    <div
+      v-if="isFormOpen"
+      class="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4"
+    >
       <div class="w-full max-w-md border border-black/10 bg-white p-6">
         <h3 class="text-lg font-bold">Dag toevoegen</h3>
         <form class="mt-4 space-y-3" @submit.prevent="submitForm">
-          <input v-model="form.date" type="date" :min="currentWeekStart" class="w-full border-black/10 bg-[#faf9f7] text-sm" />
-          <input v-model="form.location" placeholder="Locatie (optioneel)" class="w-full border-black/10 bg-[#faf9f7] text-sm" />
+          <input
+            v-model="form.date"
+            type="date"
+            :min="currentWeekStart"
+            class="w-full border-black/10 bg-[#faf9f7] text-sm"
+          />
+          <input
+            v-model="form.location"
+            placeholder="Locatie (optioneel)"
+            class="w-full border-black/10 bg-[#faf9f7] text-sm"
+          />
           <p v-if="formError" class="text-xs font-semibold text-semantic-danger">{{ formError }}</p>
           <div class="flex justify-end gap-2 pt-2">
-            <button type="button" class="px-4 py-2 text-sm font-semibold text-neutral-mute" @click="isFormOpen = false">
+            <button
+              type="button"
+              class="px-4 py-2 text-sm font-semibold text-neutral-mute"
+              @click="isFormOpen = false"
+            >
               Annuleren
             </button>
-            <button type="submit" class="bg-primary-pink px-4 py-2 text-sm font-bold text-white">Toevoegen</button>
+            <button type="submit" class="bg-primary-pink px-4 py-2 text-sm font-bold text-white">
+              Toevoegen
+            </button>
           </div>
         </form>
       </div>

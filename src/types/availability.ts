@@ -1,7 +1,3 @@
-import { weekStartFor } from '@/types/shift';
-
-export { weekStartFor };
-
 /**
  * Self-attested availability — separate from Shift on purpose. A shift is
  * "assigned to work"; availability is "could work" before anyone assigns
@@ -19,4 +15,7 @@ export interface Availability {
   weekStart: string; // Monday of the ISO week, mirrors Shift.weekStart
 }
 
-export type AvailabilityCreatePayload = Omit<Availability, 'availabilityId' | 'officeId' | 'weekStart'>;
+export type AvailabilityCreatePayload = Omit<
+  Availability,
+  'availabilityId' | 'officeId' | 'weekStart'
+>;

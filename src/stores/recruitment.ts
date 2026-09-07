@@ -11,8 +11,7 @@ import {
   type RecruitmentLead,
   type RecruitmentLeadCreatePayload,
 } from '@/types/recruitmentLead';
-import { weekStartFor } from '@/types/shift';
-import { todayLocalISO, toLocalISODate } from '@/utils/date';
+import { todayLocalISO, toLocalISODate, weekStartFor } from '@/utils/date';
 
 /**
  * Recruitment leads store. Same shape as employees/shifts stores: a live
@@ -51,7 +50,9 @@ export const useRecruitmentStore = defineStore('recruitment', () => {
     ).length;
   });
 
-  const openCount = computed(() => leads.value.filter((l) => OPEN_LEAD_STAGES.includes(l.stage)).length);
+  const openCount = computed(
+    () => leads.value.filter((l) => OPEN_LEAD_STAGES.includes(l.stage)).length,
+  );
 
   /**
    * FRD §15 — attendance rate / no-show rate / conversion / source
@@ -62,14 +63,20 @@ export const useRecruitmentStore = defineStore('recruitment', () => {
    * them would water down the rate with leads that haven't been decided.
    */
   const qualityStats = computed(() => {
-    const invited = leads.value.filter((l) => l.stage === 'attended' || l.stage === 'no_show' || l.stage === 'hired' || l.stage === 'rejected');
+    const invited = leads.value.filter(
+      (l) =>
+        l.stage === 'attended' ||
+        l.stage === 'no_show' ||
+        l.stage === 'hired' ||
+        l.stage === 'rejected',
+    );
     const attended = invited.filter((l) => l.stage !== 'no_show');
     const total = Math.max(1, leads.value.length);
     const invitedTotal = Math.max(1, invited.length);
     return {
       attendanceRate: Math.round((attended.length / invitedTotal) * 100),
       noShowRate: Math.round(((invited.length - attended.length) / invitedTotal) * 100),
-      conversionRate: Math.round((byStage.value.get('hired')?.length ?? 0) / total * 100),
+      conversionRate: Math.round(((byStage.value.get('hired')?.length ?? 0) / total) * 100),
       invitedCount: invited.length,
     };
   });
@@ -94,21 +101,26 @@ export const useRecruitmentStore = defineStore('recruitment', () => {
       .sort((a, b) => b.total - a.total);
   });
 
-  function subscribe(officeId: string): void {
+  /**
+   * Newest `max` leads only — see recruitmentService.RECENT_LEADS_LIMIT for
+   * why it's capped. Left undefined here so the cap has exactly one home (the
+   * service's own default) rather than being duplicated in the store.
+   */
+  function subscribe(officeId: string, max?: number): void {
     unsubscribe();
     isLoading.value = true;
-    unsub = recruitmentService.subscribe(
-      officeId,
-      (list) => {
-        leads.value = list;
-        isLoading.value = false;
-        error.value = null;
-      },
-      (err) => {
-        error.value = friendlyError(err);
-        isLoading.value = false;
-      },
-    );
+    const onData = (list: RecruitmentLead[]) => {
+      leads.value = list;
+      isLoading.value = false;
+      error.value = null;
+    };
+    const onErr = (err: unknown) => {
+      error.value = friendlyError(err);
+      isLoading.value = false;
+    };
+    unsub = max
+      ? recruitmentService.subscribe(officeId, onData, onErr, max)
+      : recruitmentService.subscribe(officeId, onData, onErr);
   }
 
   function unsubscribe(): void {
@@ -116,7 +128,11 @@ export const useRecruitmentStore = defineStore('recruitment', () => {
     unsub = null;
   }
 
-  async function create(officeId: string, nowMs: number, payload: RecruitmentLeadCreatePayload): Promise<boolean> {
+  async function create(
+    officeId: string,
+    nowMs: number,
+    payload: RecruitmentLeadCreatePayload,
+  ): Promise<boolean> {
     error.value = null;
     try {
       await recruitmentService.create(officeId, nowMs, payload);

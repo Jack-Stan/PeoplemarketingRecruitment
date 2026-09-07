@@ -163,14 +163,11 @@ async function submitForm(): Promise<void> {
   if (ok) {
     ui.push(editingId.value ? 'Medewerker bijgewerkt.' : 'Medewerker toegevoegd.', 'success');
     if (!editingId.value && auth.user.value) {
-      auditLog.log(officeId.value, {
-        actorUid: auth.user.value.uid,
-        actorEmail: auth.user.value.email ?? '',
-        action: 'employee_created',
-        targetLabel: `${form.value.firstName} ${form.value.lastName}`,
-        details: null,
-        createdAtMs: Date.now(),
-      });
+      void auditLog.record(
+        officeId.value,
+        'employee_created',
+        `${form.value.firstName} ${form.value.lastName}`,
+      );
     }
     isFormOpen.value = false;
   } else {
@@ -182,18 +179,17 @@ async function toggleActive(e: Employee): Promise<void> {
   const nextActive = !e.isActive;
   const ok = await store.setActive(officeId.value, e.employeeId, nextActive);
   ui.push(
-    ok ? `${e.firstName} is nu ${nextActive ? 'actief' : 'inactief'}.` : (store.error ?? 'Er ging iets mis.'),
+    ok
+      ? `${e.firstName} is nu ${nextActive ? 'actief' : 'inactief'}.`
+      : store.error ?? 'Er ging iets mis.',
     ok ? 'success' : 'error',
   );
   if (ok && auth.user.value) {
-    auditLog.log(officeId.value, {
-      actorUid: auth.user.value.uid,
-      actorEmail: auth.user.value.email ?? '',
-      action: nextActive ? 'employee_reactivated' : 'employee_deactivated',
-      targetLabel: `${e.firstName} ${e.lastName}`,
-      details: null,
-      createdAtMs: Date.now(),
-    });
+    void auditLog.record(
+      officeId.value,
+      nextActive ? 'employee_reactivated' : 'employee_deactivated',
+      `${e.firstName} ${e.lastName}`,
+    );
   }
 }
 
@@ -221,7 +217,9 @@ onUnmounted(() => {
   <div class="mx-auto max-w-7xl space-y-6">
     <section class="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
       <div>
-        <p class="text-sm text-neutral-mute">Kantoor · {{ store.activeEmployees.length }} actieve medewerkers</p>
+        <p class="text-sm text-neutral-mute">
+          Kantoor · {{ store.activeEmployees.length }} actieve medewerkers
+        </p>
         <h2 class="mt-1 text-3xl font-bold tracking-tight">Medewerkers</h2>
       </div>
       <button
@@ -241,14 +239,20 @@ onUnmounted(() => {
         type="search"
       />
       <label class="flex items-center gap-2 px-2 text-xs font-semibold">
-        <input v-model="showInactive" type="checkbox" class="border-black/20 text-primary-pink focus:ring-primary-pink" />
+        <input
+          v-model="showInactive"
+          type="checkbox"
+          class="border-black/20 text-primary-pink focus:ring-primary-pink"
+        />
         Toon inactieve
       </label>
     </div>
 
     <section class="overflow-x-auto border border-black/5 bg-white">
       <table class="w-full min-w-[700px] text-left text-sm">
-        <thead class="border-b border-black/5 bg-[#faf9f7] text-[10px] uppercase tracking-[0.16em] text-neutral-mute">
+        <thead
+          class="border-b border-black/5 bg-[#faf9f7] text-[10px] uppercase tracking-[0.16em] text-neutral-mute"
+        >
           <tr>
             <th class="px-5 py-4">Medewerker</th>
             <th class="px-5 py-4">Rol</th>
@@ -274,13 +278,19 @@ onUnmounted(() => {
               </div>
             </td>
             <td class="px-5 py-4">
-              <span class="text-xs font-semibold" :class="e.isTeamLeader ? 'text-primary-pink' : 'text-neutral-mute'">
+              <span
+                class="text-xs font-semibold"
+                :class="e.isTeamLeader ? 'text-primary-pink' : 'text-neutral-mute'"
+              >
                 {{ e.isTeamLeader ? 'Teamleider' : 'Teamlid' }}
               </span>
             </td>
             <td class="px-5 py-4">
               <span class="inline-flex items-center gap-2 text-xs">
-                <i class="h-2 w-2 rounded-full" :class="e.isActive ? 'bg-emerald-500' : 'bg-neutral-300'"></i>
+                <i
+                  class="h-2 w-2 rounded-full"
+                  :class="e.isActive ? 'bg-emerald-500' : 'bg-neutral-300'"
+                ></i>
                 {{ e.isActive ? 'Actief' : 'Inactief' }}
               </span>
             </td>
@@ -288,10 +298,16 @@ onUnmounted(() => {
               {{ e.weeklyContractHours ? `${e.weeklyContractHours}u / week` : '—' }}
             </td>
             <td v-if="isAdmin" class="px-5 py-4 text-right">
-              <button class="mr-3 text-xs font-semibold text-neutral-ink hover:text-primary-pink" @click="openEdit(e)">
+              <button
+                class="mr-3 text-xs font-semibold text-neutral-ink hover:text-primary-pink"
+                @click="openEdit(e)"
+              >
                 Bewerken
               </button>
-              <button class="text-xs font-semibold text-neutral-mute hover:text-semantic-danger" @click="toggleActive(e)">
+              <button
+                class="text-xs font-semibold text-neutral-mute hover:text-semantic-danger"
+                @click="toggleActive(e)"
+              >
                 {{ e.isActive ? 'Deactiveren' : 'Heractiveren' }}
               </button>
             </td>
@@ -299,12 +315,19 @@ onUnmounted(() => {
         </tbody>
       </table>
       <p v-if="store.isLoading" class="p-8 text-center text-sm text-neutral-mute">Laden…</p>
-      <p v-else-if="!filtered.length" class="p-8 text-center text-sm text-neutral-mute">Geen medewerkers gevonden.</p>
+      <p v-else-if="!filtered.length" class="p-8 text-center text-sm text-neutral-mute">
+        Geen medewerkers gevonden.
+      </p>
     </section>
 
-    <div v-if="isFormOpen" class="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4">
+    <div
+      v-if="isFormOpen"
+      class="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4"
+    >
       <div class="w-full max-w-md border border-black/10 bg-white p-6">
-        <h3 class="text-lg font-bold">{{ editingId ? 'Medewerker bewerken' : 'Medewerker toevoegen' }}</h3>
+        <h3 class="text-lg font-bold">
+          {{ editingId ? 'Medewerker bewerken' : 'Medewerker toevoegen' }}
+        </h3>
         <!--
           Create mode picks an existing account: the employee doc ID is the
           Auth uid (decisions/007), so there is nothing to add here for a
@@ -312,7 +335,9 @@ onUnmounted(() => {
         -->
         <form class="mt-4 space-y-3" @submit.prevent="submitForm">
           <div v-if="!editingId">
-            <label class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">Account</label>
+            <label class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute"
+              >Account</label
+            >
             <select
               :value="selectedUid"
               class="mt-1 w-full border-black/10 bg-[#faf9f7] text-sm"
@@ -325,12 +350,21 @@ onUnmounted(() => {
             </select>
             <p v-if="!eligibleAccounts.length" class="mt-1 text-xs text-neutral-mute">
               Geen niet-toegewezen accounts voor dit kantoor. Keur eerst iemand goed op de
-              <RouterLink to="/users" class="font-semibold underline">Gebruikers</RouterLink>-pagina.
+              <RouterLink to="/users" class="font-semibold underline">Gebruikers</RouterLink
+              >-pagina.
             </p>
           </div>
           <div class="grid grid-cols-2 gap-3">
-            <input v-model="form.firstName" placeholder="Voornaam" class="border-black/10 bg-[#faf9f7] text-sm" />
-            <input v-model="form.lastName" placeholder="Achternaam" class="border-black/10 bg-[#faf9f7] text-sm" />
+            <input
+              v-model="form.firstName"
+              placeholder="Voornaam"
+              class="border-black/10 bg-[#faf9f7] text-sm"
+            />
+            <input
+              v-model="form.lastName"
+              placeholder="Achternaam"
+              class="border-black/10 bg-[#faf9f7] text-sm"
+            />
           </div>
           <input
             v-model="form.email"
@@ -339,17 +373,27 @@ onUnmounted(() => {
             :disabled="!editingId"
             class="w-full border-black/10 bg-[#faf9f7] text-sm disabled:opacity-60"
           />
-          <input v-model="form.phone" placeholder="Telefoon (optioneel)" class="w-full border-black/10 bg-[#faf9f7] text-sm" />
+          <input
+            v-model="form.phone"
+            placeholder="Telefoon (optioneel)"
+            class="w-full border-black/10 bg-[#faf9f7] text-sm"
+          />
           <div class="border border-black/10 bg-[#faf9f7] px-3 py-2 text-xs text-neutral-mute">
-            Rol: <strong class="text-neutral-ink">{{ ROLE_LABELS[form.role] }}</strong>
-            · Teamleider: <strong class="text-neutral-ink">{{ form.isTeamLeader ? 'Ja' : 'Nee' }}</strong>
+            Rol: <strong class="text-neutral-ink">{{ ROLE_LABELS[form.role] }}</strong> ·
+            Teamleider:
+            <strong class="text-neutral-ink">{{ form.isTeamLeader ? 'Ja' : 'Nee' }}</strong>
             <span v-if="editingId">
-              — wijzig via <RouterLink to="/users" class="font-semibold underline">Gebruikers</RouterLink>
+              — wijzig via
+              <RouterLink to="/users" class="font-semibold underline">Gebruikers</RouterLink>
             </span>
           </div>
           <p v-if="formError" class="text-xs font-semibold text-semantic-danger">{{ formError }}</p>
           <div class="flex justify-end gap-2 pt-2">
-            <button type="button" class="px-4 py-2 text-sm font-semibold text-neutral-mute" @click="closeForm">
+            <button
+              type="button"
+              class="px-4 py-2 text-sm font-semibold text-neutral-mute"
+              @click="closeForm"
+            >
               Annuleren
             </button>
             <button type="submit" class="bg-primary-pink px-4 py-2 text-sm font-bold text-white">

@@ -22,7 +22,12 @@ export function createAppRouter() {
     // Signed in but no role claim yet — self-signed-up, waiting on an admin
     // to grant access via the Users page. Distinct from /unauthorized, which
     // means "signed in, has a role, but not one allowed on this route."
-    const isPending = isLoggedIn && auth.role === null;
+    // Signed in, role still null, but only because the profile READ failed —
+    // not because an admin hasn't approved them. Telling an approved user to
+    // "wait for approval" they already have is a dead end, so these go to a
+    // retry screen instead.
+    const profileUnreadable = isLoggedIn && auth.role === null && auth.profileLoadFailed;
+    const isPending = isLoggedIn && auth.role === null && !profileUnreadable;
     const allowedRoles = to.matched
       .flatMap((r) => r.meta.roles ?? [])
       .filter((role, index, all) => all.indexOf(role) === index);
@@ -35,6 +40,9 @@ export function createAppRouter() {
     }
     if (to.name === 'pending-approval') {
       return isPending ? true : { name: 'dashboard' };
+    }
+    if (requiresAuth && profileUnreadable) {
+      return { name: 'unauthorized', query: { reason: 'profile' } };
     }
     if (requiresAuth && isPending) {
       return { name: 'pending-approval' };

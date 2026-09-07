@@ -29,8 +29,16 @@ async function loadProfile(): Promise<void> {
 }
 
 onMounted(async () => {
-  await Promise.all([loadProfile(), loadOfficeNames()]);
-  isLoading.value = false;
+  // try/finally, not a bare await: a rejected profile fetch used to leave
+  // `isLoading` true forever (permanent "Laden…") plus an unhandled rejection.
+  try {
+    await Promise.all([loadProfile(), loadOfficeNames()]);
+  } catch {
+    profile.value = null;
+    ui.push('Kon je gegevens niet laden — probeer het zo opnieuw.', 'error');
+  } finally {
+    isLoading.value = false;
+  }
   // Auth's `emailVerified` can be stale if the link was clicked in another
   // tab/session — refresh it and mirror the result onto the profile so the
   // badge below (and the admin's view in Gebruikers) both stay current.
@@ -44,7 +52,12 @@ async function resendVerification(): Promise<void> {
   sendingVerification.value = true;
   const ok = await auth.resendVerificationEmail();
   sendingVerification.value = false;
-  ui.push(ok ? 'Verificatiemail verstuurd — check je inbox.' : (auth.error.value ?? 'Kon de mail niet versturen.'), ok ? 'success' : 'error');
+  ui.push(
+    ok
+      ? 'Verificatiemail verstuurd — check je inbox.'
+      : auth.error.value ?? 'Kon de mail niet versturen.',
+    ok ? 'success' : 'error',
+  );
 }
 
 // --- Email address change ------------------------------------------------
@@ -68,7 +81,9 @@ async function submitChangeEmail(): Promise<void> {
   const ok = await auth.changeEmail(newEmail.value.trim(), emailPassword.value);
   changingEmail.value = false;
   ui.push(
-    ok ? `Bevestigingslink verstuurd naar ${newEmail.value.trim()} — klik erop om de wijziging af te ronden.` : (auth.error.value ?? 'Er ging iets mis.'),
+    ok
+      ? `Bevestigingslink verstuurd naar ${newEmail.value.trim()} — klik erop om de wijziging af te ronden.`
+      : auth.error.value ?? 'Er ging iets mis.',
     ok ? 'success' : 'error',
   );
   if (ok) isChangingEmail.value = false;
@@ -135,14 +150,22 @@ function toggleFaq(i: number): void {
     <div class="flex gap-1 border-b border-black/5">
       <button
         class="border-b-2 px-4 py-2 text-sm font-semibold"
-        :class="tab === 'profile' ? 'border-primary-pink text-primary-pink' : 'border-transparent text-neutral-mute hover:text-neutral-ink'"
+        :class="
+          tab === 'profile'
+            ? 'border-primary-pink text-primary-pink'
+            : 'border-transparent text-neutral-mute hover:text-neutral-ink'
+        "
         @click="tab = 'profile'"
       >
         Mijn gegevens
       </button>
       <button
         class="border-b-2 px-4 py-2 text-sm font-semibold"
-        :class="tab === 'faq' ? 'border-primary-pink text-primary-pink' : 'border-transparent text-neutral-mute hover:text-neutral-ink'"
+        :class="
+          tab === 'faq'
+            ? 'border-primary-pink text-primary-pink'
+            : 'border-transparent text-neutral-mute hover:text-neutral-ink'
+        "
         @click="tab = 'faq'"
       >
         FAQ
@@ -150,21 +173,32 @@ function toggleFaq(i: number): void {
     </div>
 
     <section v-if="tab === 'profile'" class="space-y-4">
-      <p v-if="isLoading" class="border border-black/5 bg-white py-6 text-center text-sm text-neutral-mute">Laden…</p>
+      <p
+        v-if="isLoading"
+        class="border border-black/5 bg-white py-6 text-center text-sm text-neutral-mute"
+      >
+        Laden…
+      </p>
 
       <template v-else-if="profile">
         <div class="border border-black/5 bg-white p-5">
           <dl class="grid grid-cols-2 gap-4 text-sm">
             <div class="col-span-2">
-              <dt class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">Naam</dt>
+              <dt class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">
+                Naam
+              </dt>
               <dd class="mt-0.5">{{ profile.displayName || '—' }}</dd>
             </div>
             <div>
-              <dt class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">Rol</dt>
+              <dt class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">
+                Rol
+              </dt>
               <dd class="mt-0.5">{{ profile.role ? ROLE_LABELS[profile.role] : '—' }}</dd>
             </div>
             <div>
-              <dt class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">Kantoor</dt>
+              <dt class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">
+                Kantoor
+              </dt>
               <dd class="mt-0.5">{{ officeLabel(profile.primaryOfficeId) }}</dd>
             </div>
           </dl>
@@ -175,13 +209,19 @@ function toggleFaq(i: number): void {
           <div class="mt-3 space-y-3">
             <div class="flex items-center justify-between gap-3 border-b border-black/5 pb-3">
               <div class="min-w-0">
-                <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">E-mail</p>
+                <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">
+                  E-mail
+                </p>
                 <p class="flex items-center gap-2 truncate text-sm">
                   {{ profile.email }}
                   <span
                     v-if="!skipVerification"
                     class="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
-                    :class="profile.emailVerified ? 'bg-emerald-500/10 text-emerald-600' : 'bg-neutral-200 text-neutral-mute'"
+                    :class="
+                      profile.emailVerified
+                        ? 'bg-emerald-500/10 text-emerald-600'
+                        : 'bg-neutral-200 text-neutral-mute'
+                    "
                   >
                     {{ profile.emailVerified ? 'Geverifieerd' : 'Niet geverifieerd' }}
                   </span>
@@ -196,47 +236,103 @@ function toggleFaq(i: number): void {
                 >
                   Verificatiemail versturen
                 </button>
-                <button class="border border-black/10 px-3 py-1.5 text-xs font-semibold text-neutral-mute hover:border-primary-pink hover:text-primary-pink" @click="startChangeEmail">
+                <button
+                  class="border border-black/10 px-3 py-1.5 text-xs font-semibold text-neutral-mute hover:border-primary-pink hover:text-primary-pink"
+                  @click="startChangeEmail"
+                >
                   Wijzigen
                 </button>
               </div>
             </div>
 
-            <form v-if="isChangingEmail" class="space-y-2 border-b border-black/5 pb-3" @submit.prevent="submitChangeEmail">
-              <input v-model="newEmail" type="email" required placeholder="nieuw@adres.be" class="w-full border-black/10 bg-[#faf9f7] text-sm" />
-              <input v-model="emailPassword" type="password" required placeholder="Huidig wachtwoord (ter bevestiging)" class="w-full border-black/10 bg-[#faf9f7] text-sm" />
+            <form
+              v-if="isChangingEmail"
+              class="space-y-2 border-b border-black/5 pb-3"
+              @submit.prevent="submitChangeEmail"
+            >
+              <input
+                v-model="newEmail"
+                type="email"
+                required
+                placeholder="nieuw@adres.be"
+                class="w-full border-black/10 bg-[#faf9f7] text-sm"
+              />
+              <input
+                v-model="emailPassword"
+                type="password"
+                required
+                placeholder="Huidig wachtwoord (ter bevestiging)"
+                class="w-full border-black/10 bg-[#faf9f7] text-sm"
+              />
               <div class="flex gap-2">
-                <button type="submit" class="bg-primary-pink px-3 py-2 text-xs font-bold text-white disabled:opacity-50" :disabled="changingEmail">
+                <button
+                  type="submit"
+                  class="bg-primary-pink px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+                  :disabled="changingEmail"
+                >
                   Bevestigingslink versturen
                 </button>
-                <button type="button" class="px-3 py-2 text-xs font-semibold text-neutral-mute" @click="isChangingEmail = false">Annuleren</button>
+                <button
+                  type="button"
+                  class="px-3 py-2 text-xs font-semibold text-neutral-mute"
+                  @click="isChangingEmail = false"
+                >
+                  Annuleren
+                </button>
               </div>
             </form>
 
             <div v-if="!isEditingPhone" class="flex items-center justify-between gap-3">
               <div class="min-w-0">
-                <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">Telefoon</p>
+                <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">
+                  Telefoon
+                </p>
                 <p class="truncate text-sm">{{ profile.phone || 'Niet ingesteld' }}</p>
               </div>
-              <button class="shrink-0 border border-black/10 px-3 py-1.5 text-xs font-semibold text-neutral-mute hover:border-primary-pink hover:text-primary-pink" @click="startEditPhone">
+              <button
+                class="shrink-0 border border-black/10 px-3 py-1.5 text-xs font-semibold text-neutral-mute hover:border-primary-pink hover:text-primary-pink"
+                @click="startEditPhone"
+              >
                 {{ profile.phone ? 'Bewerken' : '+ Toevoegen' }}
               </button>
             </div>
             <form v-else class="flex items-center gap-2" @submit.prevent="savePhone">
-              <input v-model="phoneDraft" type="tel" placeholder="+32 4xx xx xx xx" class="min-w-0 flex-1 border-black/10 bg-[#faf9f7] text-sm" />
-              <button type="submit" class="bg-primary-pink px-3 py-2 text-xs font-bold text-white disabled:opacity-50" :disabled="savingPhone">Opslaan</button>
-              <button type="button" class="px-3 py-2 text-xs font-semibold text-neutral-mute" @click="isEditingPhone = false">Annuleren</button>
+              <input
+                v-model="phoneDraft"
+                type="tel"
+                placeholder="+32 4xx xx xx xx"
+                class="min-w-0 flex-1 border-black/10 bg-[#faf9f7] text-sm"
+              />
+              <button
+                type="submit"
+                class="bg-primary-pink px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+                :disabled="savingPhone"
+              >
+                Opslaan
+              </button>
+              <button
+                type="button"
+                class="px-3 py-2 text-xs font-semibold text-neutral-mute"
+                @click="isEditingPhone = false"
+              >
+                Annuleren
+              </button>
             </form>
           </div>
         </div>
       </template>
 
-      <p v-else class="border border-black/5 bg-white py-6 text-center text-sm text-neutral-mute">Kon je gegevens niet laden.</p>
+      <p v-else class="border border-black/5 bg-white py-6 text-center text-sm text-neutral-mute">
+        Kon je gegevens niet laden.
+      </p>
     </section>
 
     <section v-else class="divide-y divide-black/5 border border-black/5 bg-white">
       <div v-for="(item, i) in faqs" :key="item.q">
-        <button class="flex w-full items-center justify-between gap-3 px-5 py-4 text-left text-sm font-semibold" @click="toggleFaq(i)">
+        <button
+          class="flex w-full items-center justify-between gap-3 px-5 py-4 text-left text-sm font-semibold"
+          @click="toggleFaq(i)"
+        >
           {{ item.q }}
           <span class="text-neutral-mute">{{ openFaq === i ? '−' : '+' }}</span>
         </button>

@@ -17,13 +17,16 @@
  * Example:
  *   tsx scripts/grantRole.ts maria@peoplemarketing.nl TeamManager office-main true
  *
- * Refuses to run against production unless FORCE_PROD=true is set explicitly —
- * mirrors the emulator-only guard in seed.ts, but allows an opt-out since this
- * script (unlike seed.ts) is a legitimate thing to run against prod later.
+ * Target guard: emulator by default, production only with FORCE_PROD=1 set to
+ * exactly "1" (loud banner naming the project first). Unlike seed.ts this is a
+ * legitimate thing to run against prod — granting the very first live
+ * Administrator — so the escape hatch stays, but it is explicit now.
  */
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
+
+import { requireEmulatorOrForceProd, resolveProjectId } from './_guard';
 
 const ROLES = ['Administrator', 'TeamManager', 'TeamMember'] as const;
 type Role = (typeof ROLES)[number];
@@ -41,18 +44,12 @@ if (!ROLES.includes(role as Role)) {
   process.exit(1);
 }
 
-const USE_EMULATORS = (process.env.VITE_USE_EMULATORS ?? 'true').toLowerCase() === 'true';
-const FORCE_PROD = (process.env.FORCE_PROD ?? 'false').toLowerCase() === 'true';
+requireEmulatorOrForceProd(
+  'grantRole.ts',
+  `set role="${role}", primaryOfficeId="${officeId}", isTeamLeader=${isTeamLeaderArg === 'true'} on /users/{uid} for ${email}`,
+);
 
-if (!USE_EMULATORS && !FORCE_PROD) {
-  console.error(
-    '❌ Refusing to run against production without FORCE_PROD=true. ' +
-      'Set VITE_USE_EMULATORS=true to target the emulator, or FORCE_PROD=true if you really mean it.',
-  );
-  process.exit(1);
-}
-
-const PROJECT_ID = process.env.VITE_FIREBASE_PROJECT_ID ?? 'peoplemarketing-c5bfd';
+const PROJECT_ID = resolveProjectId();
 const app = initializeApp({ projectId: PROJECT_ID });
 const auth = getAuth(app);
 const db = getFirestore(app);

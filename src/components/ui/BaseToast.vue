@@ -15,7 +15,7 @@ const items = computed(() => ui.toasts);
 </script>
 
 <template>
-  <div class="pointer-events-none fixed top-4 right-4 z-50 flex flex-col gap-2">
+  <div class="pointer-events-none fixed right-4 top-4 z-50 flex flex-col gap-2">
     <div
       v-for="toast in items"
       :key="toast.id"

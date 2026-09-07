@@ -132,7 +132,10 @@ export const usersService = {
    * an arbitrary value.
    */
   async syncOwnEmailVerified(uid: string, verified: boolean): Promise<void> {
-    await updateDoc(doc(db, 'users', uid), { emailVerified: verified, updatedAt: serverTimestamp() });
+    await updateDoc(doc(db, 'users', uid), {
+      emailVerified: verified,
+      updatedAt: serverTimestamp(),
+    });
   },
 
   /**

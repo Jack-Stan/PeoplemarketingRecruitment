@@ -5,6 +5,7 @@ import { useAuth } from '@/composables/useAuth';
 import { useActiveOffice } from '@/composables/useActiveOffice';
 import { useShiftsStore } from '@/stores/shifts';
 import type { Shift } from '@/types/shift';
+import { addMonthsISO, parseLocalISODate, todayLocalISO } from '@/utils/date';
 
 /**
  * Real Firestore-backed shift history — replaces the earlier static mock.
@@ -18,14 +19,29 @@ import type { Shift } from '@/types/shift';
  * record, so a live client-side aggregate is honest and good enough. Revisit
  * with a real `/periods` design only if an actual immutability requirement
  * shows up.
+ *
+ * The office-wide read is bounded to the last HISTORY_MONTHS months: an
+ * unbounded subscription re-reads every shift the office ever had on each
+ * mount, which is a genuine Spark-quota (50k reads/day) risk, and nothing on
+ * this page looks further back than the trend chart anyway.
  */
+const HISTORY_MONTHS = 6;
 const auth = useAuth();
 const shiftsStore = useShiftsStore();
 const { officeId } = useActiveOffice();
 const isMember = computed(() => auth.role.value === 'TeamMember');
 
 const monthLabel = (yyyymm: string) =>
-  new Date(`${yyyymm}-01T00:00:00`).toLocaleDateString('nl-BE', { month: 'long', year: 'numeric' });
+  parseLocalISODate(`${yyyymm}-01`).toLocaleDateString('nl-BE', { month: 'long', year: 'numeric' });
+
+/** Half-open window: [first day of the oldest month shown, first day of next month). */
+const historyWindow = (() => {
+  const firstOfThisMonth = `${todayLocalISO().slice(0, 7)}-01`;
+  return {
+    from: addMonthsISO(firstOfThisMonth, -(HISTORY_MONTHS - 1)),
+    toExclusive: addMonthsISO(firstOfThisMonth, 1),
+  };
+})();
 
 const monthlyRows = computed(() => {
   const byMonth = new Map<string, Shift[]>();
@@ -39,7 +55,9 @@ const monthlyRows = computed(() => {
     .sort(([a], [b]) => b.localeCompare(a))
     .map(([month, shifts]) => {
       const approved = shifts.filter((s) => s.status === 'approved');
-      const tlIds = new Set(approved.filter((s) => s.employeeIsTeamLeader).map((s) => s.assignedEmployeeId));
+      const tlIds = new Set(
+        approved.filter((s) => s.employeeIsTeamLeader).map((s) => s.assignedEmployeeId),
+      );
       return {
         month,
         label: monthLabel(month),
@@ -68,7 +86,7 @@ watch(
     if (isMember.value) {
       shiftsStore.subscribeMine(id, auth.user.value.uid);
     } else {
-      shiftsStore.subscribe(id);
+      shiftsStore.subscribe(id, historyWindow);
     }
   },
   { immediate: true },
@@ -79,7 +97,13 @@ onUnmounted(() => shiftsStore.unsubscribe());
 <template>
   <div class="mx-auto max-w-7xl space-y-6">
     <section>
-      <p class="text-sm text-neutral-mute">{{ isMember ? 'Jouw shiftgeschiedenis' : 'Shiftgeschiedenis per maand' }}</p>
+      <p class="text-sm text-neutral-mute">
+        {{
+          isMember
+            ? 'Jouw shiftgeschiedenis'
+            : `Shiftgeschiedenis per maand · laatste ${HISTORY_MONTHS} maanden`
+        }}
+      </p>
       <h2 class="mt-1 text-3xl font-bold tracking-tight">Geschiedenis</h2>
     </section>
 
@@ -88,8 +112,14 @@ onUnmounted(() => shiftsStore.unsubscribe());
         <h3 class="text-lg font-bold">Teamleiders per maand</h3>
         <p class="mt-1 text-xs text-neutral-mute">Waar win of verlies je teamleiders?</p>
       </div>
-      <div class="mt-8 flex h-40 items-end justify-between gap-3 overflow-x-auto border-b border-black/10 px-2">
-        <div v-for="row in teamLeaderTrend" :key="row.month" class="flex flex-1 flex-col items-center gap-2">
+      <div
+        class="mt-8 flex h-40 items-end justify-between gap-3 overflow-x-auto border-b border-black/10 px-2"
+      >
+        <div
+          v-for="row in teamLeaderTrend"
+          :key="row.month"
+          class="flex flex-1 flex-col items-center gap-2"
+        >
           <span class="flex items-center gap-1 text-xs font-bold">
             {{ row.teamLeaders }}
             <span
@@ -99,17 +129,24 @@ onUnmounted(() => shiftsStore.unsubscribe());
               {{ row.delta > 0 ? '▲' : '▼' }}{{ Math.abs(row.delta) }}
             </span>
           </span>
-          <div class="flex w-full max-w-12 flex-col justify-end bg-primary-pink/15" :style="{ height: `${row.fill}%` }">
+          <div
+            class="flex w-full max-w-12 flex-col justify-end bg-primary-pink/15"
+            :style="{ height: `${row.fill}%` }"
+          >
             <div class="h-2 bg-primary-pink"></div>
           </div>
-          <span class="whitespace-nowrap text-[11px] capitalize text-neutral-mute">{{ row.label }}</span>
+          <span class="whitespace-nowrap text-[11px] capitalize text-neutral-mute">{{
+            row.label
+          }}</span>
         </div>
       </div>
     </section>
 
     <section class="overflow-x-auto border border-black/5 bg-white">
       <table class="w-full min-w-[650px] text-left text-sm">
-        <thead class="border-b border-black/5 bg-[#faf9f7] text-[10px] uppercase tracking-[0.16em] text-neutral-mute">
+        <thead
+          class="border-b border-black/5 bg-[#faf9f7] text-[10px] uppercase tracking-[0.16em] text-neutral-mute"
+        >
           <tr>
             <th class="px-5 py-4">Maand</th>
             <th class="px-5 py-4">Shifts</th>
@@ -127,11 +164,14 @@ onUnmounted(() => shiftsStore.unsubscribe());
         </tbody>
       </table>
       <p v-if="shiftsStore.isLoading" class="p-8 text-center text-sm text-neutral-mute">Laden…</p>
-      <p v-else-if="!monthlyRows.length" class="p-8 text-center text-sm text-neutral-mute">Nog geen geschiedenis.</p>
+      <p v-else-if="!monthlyRows.length" class="p-8 text-center text-sm text-neutral-mute">
+        Nog geen geschiedenis.
+      </p>
     </section>
 
     <p v-if="!isMember" class="text-xs text-neutral-mute">
-      Rekruteringsgeschiedenis volgt nog — dat wordt meegenomen zodra de rekruteringsmodule langer meedraait.
+      Rekruteringsgeschiedenis volgt nog — dat wordt meegenomen zodra de rekruteringsmodule langer
+      meedraait.
     </p>
   </div>
 </template>

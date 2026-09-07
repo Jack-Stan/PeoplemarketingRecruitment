@@ -1,6 +1,6 @@
 # Ticket 05 — Recruitment auto-messaging (Cloud Function)
 
-**Status:** 📋 Planned — needs an open question resolved first
+**Status:** 🔴 Re-scope needed — the Cloud Function approach in this ticket is **banned by [[006-firestore-roles-no-claims]]** (Spark plan, no Blaze). The live candidate is external automation (n8n / SMS gateway), raised as item 9 in [[2026-08-25-client-callback-new-asks]] and still unanswered by the client. Do not build from this ticket as written.
 **Goal:** One-click templated messages from the lead detail view: solicitation invite, "je bent aangenomen", "je bent niet aangenomen" (transcript, Michiel De Block WhatsApp 2026-08-24).
 
 ## Why this is the one ticket that needs a real backend

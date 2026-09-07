@@ -1,5 +1,6 @@
 /**
- * Maps Firebase / app errors to a short, user-facing message.
+ * Maps Firebase / app errors to a short, user-facing message. Dutch: this is
+ * the only error text a user ever sees, and the rest of the UI is Dutch.
  * Falls back to a generic message so we never leak SDK details into the UI.
  *
  * Checks for a `.code` string rather than `instanceof FirebaseError` — the
@@ -13,23 +14,25 @@ export function friendlyError(err: unknown): string {
       case 'auth/invalid-credential':
       case 'auth/wrong-password':
       case 'auth/user-not-found':
-        return 'Email or password is incorrect.';
+        return 'E-mailadres of wachtwoord is onjuist.';
       case 'auth/too-many-requests':
-        return 'Too many attempts. Try again in a minute.';
+        return 'Te veel pogingen. Probeer het over een minuut opnieuw.';
       case 'auth/network-request-failed':
-        return 'Network problem. Check your connection.';
+        return 'Netwerkprobleem. Controleer je verbinding.';
       case 'auth/email-already-in-use':
-        return 'An account with that email already exists.';
+        return 'Er bestaat al een account met dit e-mailadres.';
       case 'auth/weak-password':
-        return 'Password must be at least 6 characters.';
+        return 'Het wachtwoord moet minstens 6 tekens lang zijn.';
       case 'auth/invalid-email':
-        return 'Enter a valid email address.';
+        return 'Geef een geldig e-mailadres op.';
       case 'permission-denied':
-        return "You don't have permission to do that.";
+        return 'Je hebt geen rechten om dit te doen.';
       default:
-        return 'Something went wrong. Please try again.';
+        return 'Er ging iets mis. Probeer het opnieuw.';
     }
   }
+  // No `.code`: this is one of our own thrown Errors (e.g. the employees
+  // store's duplicate-roster guard), whose message is already user copy.
   if (err instanceof Error) return err.message;
-  return 'Unknown error.';
+  return 'Onbekende fout.';
 }

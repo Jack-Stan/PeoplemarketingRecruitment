@@ -12,22 +12,21 @@
  *        - /offices/office-main
  *        - /offices/office-main/employees/{uid}  (mirrors the Auth account)
  *
- * Refuses to run when not pointing at emulators — this script must NEVER
- * run against production. Add a guard if you ever need to.
+ * Refuses to run when not pointing at emulators — this script must NEVER run
+ * against production, and deliberately has NO escape hatch (no FORCE_PROD):
+ * it creates an account with a hardcoded weak password. The guard reads the
+ * Admin SDK's own emulator signal and fails closed — see scripts/_guard.ts
+ * for why the previous VITE_USE_EMULATORS check was worse than useless.
  */
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
-const PROJECT_ID = process.env.VITE_FIREBASE_PROJECT_ID ?? 'peoplemarketing-c5bfd';
-const USE_EMULATORS = (process.env.VITE_USE_EMULATORS ?? 'true').toLowerCase() === 'true';
+import { requireEmulator, resolveProjectId } from './_guard';
 
-if (!USE_EMULATORS) {
-  console.error(
-    '❌ Refusing to seed: VITE_USE_EMULATORS is not "true". This script is emulator-only.',
-  );
-  process.exit(1);
-}
+requireEmulator('seed.ts');
+
+const PROJECT_ID = resolveProjectId();
 
 const app = initializeApp({
   projectId: PROJECT_ID,

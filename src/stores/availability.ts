@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import type { Unsubscribe } from 'firebase/firestore';
 
 import { availabilityService } from '@/services/availability.service';
+import type { DateWindow } from '@/services/shifts.service';
 import { friendlyError } from '@/utils/errors';
 import type { Availability, AvailabilityCreatePayload } from '@/types/availability';
 
@@ -22,39 +23,42 @@ export const useAvailabilityStore = defineStore('availability', () => {
     return grouped;
   });
 
-  function subscribe(officeId: string): void {
+  /** Office-wide, bounded to `window` — see availabilityService.subscribe. */
+  function subscribe(officeId: string, window?: DateWindow): void {
     unsubscribe();
     isLoading.value = true;
-    unsub = availabilityService.subscribe(
-      officeId,
-      (list) => {
-        rows.value = list;
-        isLoading.value = false;
-        error.value = null;
-      },
-      (err) => {
-        error.value = friendlyError(err);
-        isLoading.value = false;
-      },
-    );
+    const onData = (list: Availability[]) => {
+      rows.value = list;
+      isLoading.value = false;
+      error.value = null;
+    };
+    const onErr = (err: unknown) => {
+      error.value = friendlyError(err);
+      isLoading.value = false;
+    };
+    unsub = window
+      ? availabilityService.subscribe(officeId, onData, onErr, window)
+      : availabilityService.subscribe(officeId, onData, onErr);
   }
 
-  function subscribeMine(officeId: string, employeeId: string): void {
+  /** The caller's own marks, optionally bounded to one ISO week. */
+  function subscribeMine(officeId: string, employeeId: string, weekStart?: string): void {
     unsubscribe();
     isLoading.value = true;
-    unsub = availabilityService.subscribeForEmployee(
-      officeId,
-      employeeId,
-      (list) => {
-        rows.value = list;
-        isLoading.value = false;
-        error.value = null;
-      },
-      (err) => {
-        error.value = friendlyError(err);
-        isLoading.value = false;
-      },
-    );
+    const onData = (list: Availability[]) => {
+      rows.value = list;
+      isLoading.value = false;
+      error.value = null;
+    };
+    const onErr = (err: unknown) => {
+      error.value = friendlyError(err);
+      isLoading.value = false;
+    };
+    // Only forward `weekStart` when there is one — passing an explicit
+    // `undefined` would change the call arity for no reason.
+    unsub = weekStart
+      ? availabilityService.subscribeForEmployee(officeId, employeeId, onData, onErr, weekStart)
+      : availabilityService.subscribeForEmployee(officeId, employeeId, onData, onErr);
   }
 
   function unsubscribe(): void {
@@ -88,5 +92,16 @@ export const useAvailabilityStore = defineStore('availability', () => {
     }
   }
 
-  return { rows, isLoading, error, byDate, subscribe, subscribeMine, unsubscribe, isMarked, mark, unmark };
+  return {
+    rows,
+    isLoading,
+    error,
+    byDate,
+    subscribe,
+    subscribeMine,
+    unsubscribe,
+    isMarked,
+    mark,
+    unmark,
+  };
 });

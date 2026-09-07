@@ -22,7 +22,11 @@ import type {
 } from '@/types/location';
 
 export const locationsService = {
-  subscribe(officeId: string, onChange: (list: Location[]) => void, onError: (err: unknown) => void): Unsubscribe {
+  subscribe(
+    officeId: string,
+    onChange: (list: Location[]) => void,
+    onError: (err: unknown) => void,
+  ): Unsubscribe {
     return onSnapshot(
       collection(db, 'offices', officeId, 'locations'),
       (snapshot) =>
@@ -56,9 +60,14 @@ export const locationsService = {
     onError: (err: unknown) => void,
   ): Unsubscribe {
     return onSnapshot(
-      query(collection(db, 'offices', officeId, 'locations', locationId, 'visits'), orderBy('visitedAt', 'desc')),
+      query(
+        collection(db, 'offices', officeId, 'locations', locationId, 'visits'),
+        orderBy('visitedAt', 'desc'),
+      ),
       (snapshot) =>
-        onChange(snapshot.docs.map((d) => ({ visitId: d.id, locationId, ...d.data() }) as LocationVisit)),
+        onChange(
+          snapshot.docs.map((d) => ({ visitId: d.id, locationId, ...d.data() }) as LocationVisit),
+        ),
       onError,
     );
   },
@@ -68,7 +77,11 @@ export const locationsService = {
    * `timesVisited`/`lastVisitedAt` counters in one batch, so the list view
    * never has to fan out a read per location to show "visited 4x".
    */
-  async logVisit(officeId: string, locationId: string, payload: LocationVisitCreatePayload): Promise<void> {
+  async logVisit(
+    officeId: string,
+    locationId: string,
+    payload: LocationVisitCreatePayload,
+  ): Promise<void> {
     const batch = writeBatch(db);
     const visitRef = doc(collection(db, 'offices', officeId, 'locations', locationId, 'visits'));
     batch.set(visitRef, payload);

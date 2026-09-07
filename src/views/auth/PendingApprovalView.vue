@@ -19,8 +19,8 @@ async function signOut(): Promise<void> {
       <p class="text-sm font-semibold uppercase tracking-wide text-primary-pink">Bijna zover</p>
       <h1 class="mt-2 text-3xl font-bold text-neutral-ink">Wachten op goedkeuring</h1>
       <p class="mt-2 text-neutral-mute">
-        Je account ({{ auth.user.value?.email }}) is aangemeld, maar een beheerder moet je nog
-        een rol en kantoor toewijzen voor je de app kan gebruiken.
+        Je account ({{ auth.user.value?.email }}) is aangemeld, maar een beheerder moet je nog een
+        rol en kantoor toewijzen voor je de app kan gebruiken.
       </p>
       <div class="mt-6">
         <BaseButton variant="ghost" @click="signOut">Afmelden</BaseButton>

@@ -3,14 +3,27 @@ import { computed, onUnmounted, ref, watch } from 'vue';
 
 import { useAuth } from '@/composables/useAuth';
 import { useActiveOffice } from '@/composables/useActiveOffice';
+import { useOfficeNames } from '@/composables/useOfficeNames';
+import type { DateWindow } from '@/services/shifts.service';
 import { useAuditLogStore } from '@/stores/auditLog';
 import { useAvailabilityStore } from '@/stores/availability';
 import { useEmployeesStore } from '@/stores/employees';
 import { useShiftsStore } from '@/stores/shifts';
 import { useUiStore } from '@/stores/ui';
-import { weekStartFor } from '@/types/availability';
-import { FIXED_SHIFT_HOURS, type Shift, type ShiftCreatePayload, type ShiftType } from '@/types/shift';
-import { toLocalISODate, todayLocalISO } from '@/utils/date';
+import {
+  FIXED_SHIFT_HOURS,
+  type Shift,
+  type ShiftCreatePayload,
+  type ShiftType,
+} from '@/types/shift';
+import {
+  addDaysISO,
+  addMonthsISO,
+  parseLocalISODate,
+  toLocalISODate,
+  todayLocalISO,
+  weekStartFor,
+} from '@/utils/date';
 
 const auth = useAuth();
 const employeesStore = useEmployeesStore();
@@ -20,8 +33,11 @@ const auditLog = useAuditLogStore();
 const ui = useUiStore();
 
 const { officeId } = useActiveOffice();
+const { officeLabel, loadOfficeNames } = useOfficeNames();
 const isAdmin = computed(() => auth.role.value === 'Administrator');
-const canDraft = computed(() => auth.role.value === 'Administrator' || auth.role.value === 'TeamManager');
+const canDraft = computed(
+  () => auth.role.value === 'Administrator' || auth.role.value === 'TeamManager',
+);
 const canSeeAvailability = computed(() => canDraft.value || auth.isTeamLeader.value);
 
 const isFormOpen = ref(false);
@@ -71,7 +87,9 @@ function onEmployeePicked(id: string): void {
 const dateFilter = ref<string | null>(null);
 const dayGroups = computed(() => {
   const entries = [...shiftsStore.byDate.entries()];
-  const filtered = dateFilter.value ? entries.filter(([date]) => date === dateFilter.value) : entries;
+  const filtered = dateFilter.value
+    ? entries.filter(([date]) => date === dateFilter.value)
+    : entries;
   return filtered.sort(([a], [b]) => a.localeCompare(b));
 });
 
@@ -82,9 +100,23 @@ const viewMode = ref<'lijst' | 'maand' | 'beschikbaarheid'>('lijst');
 const today = todayLocalISO();
 const selectedMonth = ref(today.slice(0, 7));
 
+/**
+ * The shift subscription is bounded to the month on screen — an unbounded
+ * office-wide read grows without limit against a 50k reads/day Spark quota.
+ * Everything on this page (the list, the month grid, the totals bar) is
+ * therefore scoped to this window, which is why the counters say "deze maand".
+ */
+const monthWindow = computed<DateWindow>(() => {
+  const from = `${selectedMonth.value}-01`;
+  return { from, toExclusive: addMonthsISO(from, 1) };
+});
+
 const monthLabel = computed(() => {
   const [year, month] = selectedMonth.value.split('-').map(Number);
-  return new Date(year, month - 1, 1).toLocaleDateString('nl-BE', { month: 'long', year: 'numeric' });
+  return new Date(year, month - 1, 1).toLocaleDateString('nl-BE', {
+    month: 'long',
+    year: 'numeric',
+  });
 });
 
 function shiftMonth(delta: number): void {
@@ -120,7 +152,9 @@ const monthCells = computed<(MonthCell | null)[]>(() => {
       isToday: iso === today,
       shiftCount: dayShifts.length,
       pendingCount: dayShifts.filter((s) => s.status === 'pending').length,
-      tlCount: new Set(dayShifts.filter((s) => s.employeeIsTeamLeader).map((s) => s.assignedEmployeeId)).size,
+      tlCount: new Set(
+        dayShifts.filter((s) => s.employeeIsTeamLeader).map((s) => s.assignedEmployeeId),
+      ).size,
     });
   }
   return cells;
@@ -130,20 +164,23 @@ const weekdayLabels = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo'];
 
 /** Beschikbaarheid tab — same week-grid shape as MyPlanningView, but office-wide. */
 const availabilityWeekStart = ref(weekStartFor(today));
+/** Same quota reasoning as monthWindow — availability is read one week at a time. */
+const availabilityWindow = computed<DateWindow>(() => ({
+  from: availabilityWeekStart.value,
+  toExclusive: addDaysISO(availabilityWeekStart.value, 7),
+}));
 const availabilityWeekLabel = computed(() => {
-  const start = new Date(`${availabilityWeekStart.value}T00:00:00`);
+  const start = parseLocalISODate(availabilityWeekStart.value);
   const end = new Date(start);
   end.setDate(end.getDate() + 6);
   const fmt = (d: Date) => d.toLocaleDateString('nl-BE', { day: 'numeric', month: 'long' });
   return `${fmt(start)} – ${fmt(end)}`;
 });
 function shiftAvailabilityWeek(deltaDays: number): void {
-  const d = new Date(`${availabilityWeekStart.value}T00:00:00`);
-  d.setDate(d.getDate() + deltaDays);
-  availabilityWeekStart.value = weekStartFor(toLocalISODate(d));
+  availabilityWeekStart.value = weekStartFor(addDaysISO(availabilityWeekStart.value, deltaDays));
 }
 const availabilityWeekDays = computed(() => {
-  const start = new Date(`${availabilityWeekStart.value}T00:00:00`);
+  const start = parseLocalISODate(availabilityWeekStart.value);
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(start);
     d.setDate(d.getDate() + i);
@@ -153,7 +190,9 @@ const availabilityWeekDays = computed(() => {
       weekday: d.toLocaleDateString('nl-BE', { weekday: 'short' }),
       dayNumber: d.getDate(),
       isToday: iso === today,
-      people: (availabilityStore.byDate.get(iso) ?? []).sort((a, b) => a.employeeName.localeCompare(b.employeeName)),
+      people: (availabilityStore.byDate.get(iso) ?? []).sort((a, b) =>
+        a.employeeName.localeCompare(b.employeeName),
+      ),
     };
   });
 });
@@ -203,7 +242,14 @@ async function submitForm(): Promise<void> {
     formError.value = 'Starttijd moet voor eindtijd liggen.';
     return;
   }
-  if (shiftsStore.hasOverlap(form.value.assignedEmployeeId, form.value.date, form.value.startTime, form.value.endTime)) {
+  if (
+    shiftsStore.hasOverlap(
+      form.value.assignedEmployeeId,
+      form.value.date,
+      form.value.startTime,
+      form.value.endTime,
+    )
+  ) {
     formError.value = `${form.value.employeeName} heeft die dag al een overlappende shift.`;
     return;
   }
@@ -220,22 +266,30 @@ async function submitForm(): Promise<void> {
 
 async function submitShift(shift: Shift): Promise<void> {
   const ok = await shiftsStore.submitForApproval(officeId.value, shift.shiftId);
-  ui.push(ok ? 'Ingediend ter goedkeuring.' : (shiftsStore.error ?? 'Er ging iets mis.'), ok ? 'success' : 'error');
+  ui.push(
+    ok ? 'Ingediend ter goedkeuring.' : shiftsStore.error ?? 'Er ging iets mis.',
+    ok ? 'success' : 'error',
+  );
 }
 
 async function approveShift(shift: Shift): Promise<void> {
   if (!auth.user.value) return;
-  const ok = await shiftsStore.approve(officeId.value, shift.shiftId, auth.user.value.uid, Date.now());
-  ui.push(ok ? 'Shift goedgekeurd.' : (shiftsStore.error ?? 'Er ging iets mis.'), ok ? 'success' : 'error');
+  const ok = await shiftsStore.approve(
+    officeId.value,
+    shift.shiftId,
+    auth.user.value.uid,
+    Date.now(),
+  );
+  ui.push(
+    ok ? 'Shift goedgekeurd.' : shiftsStore.error ?? 'Er ging iets mis.',
+    ok ? 'success' : 'error',
+  );
   if (ok) {
-    auditLog.log(officeId.value, {
-      actorUid: auth.user.value.uid,
-      actorEmail: auth.user.value.email ?? '',
-      action: 'shift_approved',
-      targetLabel: `${shift.employeeName} · ${shift.date} (${shift.type})`,
-      details: null,
-      createdAtMs: Date.now(),
-    });
+    void auditLog.record(
+      officeId.value,
+      'shift_approved',
+      `${shift.employeeName} · ${shift.date} (${shift.type})`,
+    );
   }
 }
 
@@ -255,16 +309,17 @@ async function confirmReject(): Promise<void> {
     auth.user.value.uid,
     Date.now(),
   );
-  ui.push(ok ? 'Shift afgewezen.' : (shiftsStore.error ?? 'Er ging iets mis.'), ok ? 'success' : 'error');
+  ui.push(
+    ok ? 'Shift afgewezen.' : shiftsStore.error ?? 'Er ging iets mis.',
+    ok ? 'success' : 'error',
+  );
   if (ok && rejectingShift.value) {
-    auditLog.log(officeId.value, {
-      actorUid: auth.user.value.uid,
-      actorEmail: auth.user.value.email ?? '',
-      action: 'shift_rejected',
-      targetLabel: `${rejectingShift.value.employeeName} · ${rejectingShift.value.date} (${rejectingShift.value.type})`,
-      details: reason,
-      createdAtMs: Date.now(),
-    });
+    void auditLog.record(
+      officeId.value,
+      'shift_rejected',
+      `${rejectingShift.value.employeeName} · ${rejectingShift.value.date} (${rejectingShift.value.type})`,
+      reason,
+    );
   }
   rejectingId.value = null;
   rejectingShift.value = null;
@@ -272,21 +327,33 @@ async function confirmReject(): Promise<void> {
 
 async function deleteDraft(shift: Shift): Promise<void> {
   const ok = await shiftsStore.remove(officeId.value, shift.shiftId);
-  ui.push(ok ? 'Concept verwijderd.' : (shiftsStore.error ?? 'Er ging iets mis.'), ok ? 'success' : 'error');
+  ui.push(
+    ok ? 'Concept verwijderd.' : shiftsStore.error ?? 'Er ging iets mis.',
+    ok ? 'success' : 'error',
+  );
 }
 
 // Re-subscribes whenever the active office changes — an Administrator
-// switching offices should see that office's shifts/roster, not Gent's.
+// switching offices should see that office's shifts/roster, not Gent's — and
+// whenever the visible month/week changes, since both reads are bounded to it.
 watch(
-  officeId,
-  (id) => {
+  [officeId, monthWindow],
+  ([id, window]) => {
     if (!id) return;
-    shiftsStore.subscribe(id);
+    shiftsStore.subscribe(id, window);
     employeesStore.subscribe(id);
-    if (canSeeAvailability.value) availabilityStore.subscribe(id);
   },
   { immediate: true },
 );
+watch(
+  [officeId, availabilityWindow, canSeeAvailability],
+  ([id, window, allowed]) => {
+    if (!id || !allowed) return;
+    availabilityStore.subscribe(id, window);
+  },
+  { immediate: true },
+);
+void loadOfficeNames();
 onUnmounted(() => {
   shiftsStore.unsubscribe();
   employeesStore.unsubscribe();
@@ -298,10 +365,14 @@ onUnmounted(() => {
   <div class="mx-auto max-w-7xl space-y-6">
     <section class="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
       <div>
-        <p class="text-sm text-neutral-mute">Kantoor · {{ officeId }}</p>
+        <p class="text-sm text-neutral-mute">Kantoor · {{ officeLabel(officeId) }}</p>
         <h2 class="mt-1 text-3xl font-bold tracking-tight">Planning</h2>
       </div>
-      <button v-if="canDraft" class="bg-primary-pink px-4 py-2.5 text-sm font-bold text-white" @click="openCreate()">
+      <button
+        v-if="canDraft"
+        class="bg-primary-pink px-4 py-2.5 text-sm font-bold text-white"
+        @click="openCreate()"
+      >
         + Nieuwe shift
       </button>
     </section>
@@ -310,14 +381,22 @@ onUnmounted(() => {
     <div class="flex gap-1 border-b border-black/10 pb-px">
       <button
         class="border-b-2 px-4 py-2 text-xs font-bold"
-        :class="viewMode === 'lijst' ? 'border-primary-pink text-primary-pink' : 'border-transparent text-neutral-mute'"
+        :class="
+          viewMode === 'lijst'
+            ? 'border-primary-pink text-primary-pink'
+            : 'border-transparent text-neutral-mute'
+        "
         @click="viewMode = 'lijst'"
       >
         Lijst
       </button>
       <button
         class="border-b-2 px-4 py-2 text-xs font-bold"
-        :class="viewMode === 'maand' ? 'border-primary-pink text-primary-pink' : 'border-transparent text-neutral-mute'"
+        :class="
+          viewMode === 'maand'
+            ? 'border-primary-pink text-primary-pink'
+            : 'border-transparent text-neutral-mute'
+        "
         @click="viewMode = 'maand'"
       >
         Maand
@@ -325,7 +404,11 @@ onUnmounted(() => {
       <button
         v-if="canSeeAvailability"
         class="border-b-2 px-4 py-2 text-xs font-bold"
-        :class="viewMode === 'beschikbaarheid' ? 'border-primary-pink text-primary-pink' : 'border-transparent text-neutral-mute'"
+        :class="
+          viewMode === 'beschikbaarheid'
+            ? 'border-primary-pink text-primary-pink'
+            : 'border-transparent text-neutral-mute'
+        "
         @click="viewMode = 'beschikbaarheid'"
       >
         Beschikbaarheid
@@ -337,11 +420,23 @@ onUnmounted(() => {
       <div class="flex items-center justify-between">
         <h3 class="text-lg font-bold capitalize">{{ monthLabel }}</h3>
         <div class="flex gap-2">
-          <button class="border border-black/10 px-2.5 py-1 text-sm font-bold hover:bg-[#faf9f7]" @click="shiftMonth(-1)">‹</button>
-          <button class="border border-black/10 px-2.5 py-1 text-sm font-bold hover:bg-[#faf9f7]" @click="shiftMonth(1)">›</button>
+          <button
+            class="border border-black/10 px-2.5 py-1 text-sm font-bold hover:bg-[#faf9f7]"
+            @click="shiftMonth(-1)"
+          >
+            ‹
+          </button>
+          <button
+            class="border border-black/10 px-2.5 py-1 text-sm font-bold hover:bg-[#faf9f7]"
+            @click="shiftMonth(1)"
+          >
+            ›
+          </button>
         </div>
       </div>
-      <div class="mt-5 grid grid-cols-7 gap-1.5 text-center text-[10px] font-bold uppercase tracking-[0.1em] text-neutral-mute">
+      <div
+        class="mt-5 grid grid-cols-7 gap-1.5 text-center text-[10px] font-bold uppercase tracking-[0.1em] text-neutral-mute"
+      >
         <span v-for="wd in weekdayLabels" :key="wd">{{ wd }}</span>
       </div>
       <div class="mt-1.5 grid grid-cols-7 gap-1.5">
@@ -351,17 +446,35 @@ onUnmounted(() => {
           class="flex min-h-24 flex-col gap-1 border p-2 text-left"
           :class="[
             cell ? 'cursor-pointer hover:border-primary-pink/50' : 'border-transparent',
-            cell?.isToday ? 'border-primary-pink/40 bg-primary-pink/5' : cell?.isWeekend ? 'border-black/10 bg-[#faf9f7]' : 'border-black/10 bg-white',
+            cell?.isToday
+              ? 'border-primary-pink/40 bg-primary-pink/5'
+              : cell?.isWeekend
+                ? 'border-black/10 bg-[#faf9f7]'
+                : 'border-black/10 bg-white',
           ]"
           @click="cell && openDayFromMonth(cell.iso)"
         >
           <template v-if="cell">
-            <span class="text-xs font-bold" :class="cell.isToday ? 'text-primary-pink' : 'text-neutral-ink'">{{ cell.dayNumber }}</span>
+            <span
+              class="text-xs font-bold"
+              :class="cell.isToday ? 'text-primary-pink' : 'text-neutral-ink'"
+              >{{ cell.dayNumber }}</span
+            >
             <div v-if="cell.shiftCount" class="mt-auto space-y-1">
-              <p class="text-[11px] font-semibold text-neutral-mute">{{ cell.shiftCount }} shift{{ cell.shiftCount === 1 ? '' : 's' }}</p>
+              <p class="text-[11px] font-semibold text-neutral-mute">
+                {{ cell.shiftCount }} shift{{ cell.shiftCount === 1 ? '' : 's' }}
+              </p>
               <div class="flex flex-wrap gap-1">
-                <span v-if="cell.tlCount" class="rounded bg-primary-pink/10 px-1.5 py-0.5 text-[10px] font-bold text-primary-pink">{{ cell.tlCount }} TL</span>
-                <span v-if="cell.pendingCount" class="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">{{ cell.pendingCount }} wacht</span>
+                <span
+                  v-if="cell.tlCount"
+                  class="rounded bg-primary-pink/10 px-1.5 py-0.5 text-[10px] font-bold text-primary-pink"
+                  >{{ cell.tlCount }} TL</span
+                >
+                <span
+                  v-if="cell.pendingCount"
+                  class="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700"
+                  >{{ cell.pendingCount }} wacht</span
+                >
               </div>
             </div>
           </template>
@@ -374,8 +487,18 @@ onUnmounted(() => {
       <div class="flex items-center justify-between">
         <h3 class="text-sm font-bold text-neutral-mute">Week van {{ availabilityWeekLabel }}</h3>
         <div class="flex gap-2">
-          <button class="border border-black/10 px-2.5 py-1 text-sm font-bold hover:bg-[#faf9f7]" @click="shiftAvailabilityWeek(-7)">‹</button>
-          <button class="border border-black/10 px-2.5 py-1 text-sm font-bold hover:bg-[#faf9f7]" @click="shiftAvailabilityWeek(7)">›</button>
+          <button
+            class="border border-black/10 px-2.5 py-1 text-sm font-bold hover:bg-[#faf9f7]"
+            @click="shiftAvailabilityWeek(-7)"
+          >
+            ‹
+          </button>
+          <button
+            class="border border-black/10 px-2.5 py-1 text-sm font-bold hover:bg-[#faf9f7]"
+            @click="shiftAvailabilityWeek(7)"
+          >
+            ›
+          </button>
         </div>
       </div>
       <p v-if="availabilityStore.isLoading" class="mt-4 text-sm text-neutral-mute">Laden…</p>
@@ -384,16 +507,33 @@ onUnmounted(() => {
           v-for="day in availabilityWeekDays"
           :key="day.iso"
           class="flex min-h-32 flex-col gap-2 border p-3"
-          :class="day.isToday ? 'border-primary-pink/40 bg-primary-pink/5' : 'border-black/10 bg-[#faf9f7]'"
+          :class="
+            day.isToday
+              ? 'border-primary-pink/40 bg-primary-pink/5'
+              : 'border-black/10 bg-[#faf9f7]'
+          "
         >
-          <p class="text-xs font-bold uppercase tracking-[0.1em]" :class="day.isToday ? 'text-primary-pink' : 'text-neutral-mute'">
+          <p
+            class="text-xs font-bold uppercase tracking-[0.1em]"
+            :class="day.isToday ? 'text-primary-pink' : 'text-neutral-mute'"
+          >
             {{ day.weekday }} {{ day.dayNumber }}
           </p>
-          <p v-if="!day.people.length" class="text-xs text-neutral-mute">Niemand beschikbaar gemeld.</p>
+          <p v-if="!day.people.length" class="text-xs text-neutral-mute">
+            Niemand beschikbaar gemeld.
+          </p>
           <ul v-else class="space-y-1">
-            <li v-for="person in day.people" :key="person.availabilityId" class="text-xs font-semibold">
+            <li
+              v-for="person in day.people"
+              :key="person.availabilityId"
+              class="text-xs font-semibold"
+            >
               {{ person.employeeName }}
-              <span v-if="person.employeeIsTeamLeader" class="ml-1 text-[10px] font-bold uppercase tracking-wider text-primary-pink">TL</span>
+              <span
+                v-if="person.employeeIsTeamLeader"
+                class="ml-1 text-[10px] font-bold uppercase tracking-wider text-primary-pink"
+                >TL</span
+              >
             </li>
           </ul>
         </div>
@@ -403,21 +543,25 @@ onUnmounted(() => {
     <!-- Staffing overview bar — client transcript: "40 shifts, 5 TL, 7 non-TL" as a literal segmented bar. -->
     <section class="grid gap-4 sm:grid-cols-3">
       <article class="border border-black/5 bg-white p-5">
-        <p class="text-xs uppercase tracking-[0.16em] text-neutral-mute">Totaal shifts</p>
+        <p class="text-xs uppercase tracking-[0.16em] text-neutral-mute">Shifts deze maand</p>
         <p class="mt-3 text-3xl font-bold">{{ totals.shifts }}</p>
       </article>
       <article class="border border-black/5 bg-white p-5">
-        <p class="text-xs uppercase tracking-[0.16em] text-neutral-mute">Teamleiders ingepland</p>
+        <p class="text-xs uppercase tracking-[0.16em] text-neutral-mute">Teamleiders deze maand</p>
         <p class="mt-3 text-3xl font-bold">{{ totals.teamLeaders }}</p>
         <div class="mt-3 flex h-2 overflow-hidden rounded-full bg-neutral-100">
           <div
             class="bg-primary-pink"
-            :style="{ width: `${totals.teamLeaders + totals.nonTeamLeaders ? (totals.teamLeaders / (totals.teamLeaders + totals.nonTeamLeaders)) * 100 : 0}%` }"
+            :style="{
+              width: `${totals.teamLeaders + totals.nonTeamLeaders ? (totals.teamLeaders / (totals.teamLeaders + totals.nonTeamLeaders)) * 100 : 0}%`,
+            }"
           ></div>
         </div>
       </article>
       <article class="border border-black/5 bg-white p-5">
-        <p class="text-xs uppercase tracking-[0.16em] text-neutral-mute">Wacht op goedkeuring</p>
+        <p class="text-xs uppercase tracking-[0.16em] text-neutral-mute">
+          Wacht op goedkeuring (deze maand)
+        </p>
         <p class="mt-3 text-3xl font-bold text-amber-600">{{ shiftsStore.pending.length }}</p>
       </article>
     </section>
@@ -431,83 +575,145 @@ onUnmounted(() => {
     <section v-if="viewMode === 'lijst'" class="space-y-3">
       <div v-if="dateFilter" class="flex items-center gap-2 text-xs">
         <span class="text-neutral-mute">Gefilterd op</span>
-        <span class="inline-flex items-center gap-2 bg-primary-pink/10 px-2.5 py-1 font-bold text-primary-pink">
-          {{ new Date(dateFilter).toLocaleDateString('nl-BE', { weekday: 'long', day: 'numeric', month: 'long' }) }}
+        <span
+          class="inline-flex items-center gap-2 bg-primary-pink/10 px-2.5 py-1 font-bold text-primary-pink"
+        >
+          {{
+            parseLocalISODate(dateFilter).toLocaleDateString('nl-BE', {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'long',
+            })
+          }}
           <button class="text-primary-pink hover:underline" @click="dateFilter = null">✕</button>
         </span>
       </div>
       <div class="overflow-x-auto border border-black/5 bg-white">
-      <table class="w-full min-w-[720px] text-left text-sm">
-        <thead class="border-b border-black/5 bg-[#faf9f7] text-[10px] uppercase tracking-[0.16em] text-neutral-mute">
-          <tr>
-            <th class="px-5 py-3">Tijd</th>
-            <th class="px-5 py-3">Type</th>
-            <th class="px-5 py-3">Medewerker</th>
-            <th class="px-5 py-3">Status</th>
-            <th v-if="canDraft" class="px-5 py-3"></th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-black/5">
-          <template v-for="[date, dayShifts] in dayGroups" :key="date">
-            <tr class="bg-[#faf9f7]">
-              <td colspan="5" class="px-5 py-2 text-xs font-bold text-neutral-ink">
-                {{ new Date(date).toLocaleDateString('nl-BE', { weekday: 'long', day: 'numeric', month: 'long' }) }}
-                <span class="ml-2 font-normal text-neutral-mute">{{ dayShifts.length }} shift{{ dayShifts.length === 1 ? '' : 's' }}</span>
-              </td>
+        <table class="w-full min-w-[720px] text-left text-sm">
+          <thead
+            class="border-b border-black/5 bg-[#faf9f7] text-[10px] uppercase tracking-[0.16em] text-neutral-mute"
+          >
+            <tr>
+              <th class="px-5 py-3">Tijd</th>
+              <th class="px-5 py-3">Type</th>
+              <th class="px-5 py-3">Medewerker</th>
+              <th class="px-5 py-3">Status</th>
+              <th v-if="canDraft" class="px-5 py-3"></th>
             </tr>
-            <tr v-for="shift in dayShifts" :key="shift.shiftId" class="hover:bg-[#faf9f7]">
-              <td class="px-5 py-3 font-mono text-xs">{{ shift.startTime }}–{{ shift.endTime }}</td>
-              <td class="px-5 py-3 text-xs font-semibold text-neutral-mute">
-                {{ shift.type }}<span v-if="shift.eventTitle"> — {{ shift.eventTitle }}</span>
-              </td>
-              <td class="px-5 py-3">
-                <span class="font-semibold">{{ shift.employeeName }}</span>
-                <span v-if="shift.employeeIsTeamLeader" class="ml-2 text-[10px] font-bold uppercase tracking-wider text-primary-pink">TL</span>
-              </td>
-              <td class="px-5 py-3">
-                <span class="inline-block rounded px-2 py-0.5 text-[11px] font-bold" :class="statusClasses(shift.status)">
-                  {{ statusLabels[shift.status] }}
-                </span>
-                <span v-if="shift.status === 'rejected' && shift.rejectionReason" class="ml-2 text-[11px] text-neutral-mute">
-                  {{ shift.rejectionReason }}
-                </span>
-              </td>
-              <td v-if="canDraft" class="px-5 py-3 text-right text-xs font-semibold">
-                <button v-if="shift.status === 'draft'" class="text-neutral-ink hover:text-primary-pink" @click="submitShift(shift)">
-                  Indienen
-                </button>
-                <button v-if="shift.status === 'draft'" class="ml-3 text-neutral-mute hover:text-semantic-danger" @click="deleteDraft(shift)">
-                  Verwijderen
-                </button>
-                <template v-if="isAdmin && shift.status === 'pending'">
-                  <button class="mr-3 text-emerald-700 hover:underline" @click="approveShift(shift)">Goedkeuren</button>
-                  <button class="text-red-600 hover:underline" @click="openReject(shift)">Afwijzen</button>
-                </template>
-              </td>
-            </tr>
-          </template>
-        </tbody>
-      </table>
-      <p v-if="shiftsStore.isLoading" class="p-8 text-center text-sm text-neutral-mute">Laden…</p>
-      <p v-else-if="!dayGroups.length" class="p-8 text-center text-sm text-neutral-mute">Nog geen shifts.</p>
+          </thead>
+          <tbody class="divide-y divide-black/5">
+            <template v-for="[date, dayShifts] in dayGroups" :key="date">
+              <tr class="bg-[#faf9f7]">
+                <td colspan="5" class="px-5 py-2 text-xs font-bold text-neutral-ink">
+                  {{
+                    parseLocalISODate(date).toLocaleDateString('nl-BE', {
+                      weekday: 'long',
+                      day: 'numeric',
+                      month: 'long',
+                    })
+                  }}
+                  <span class="ml-2 font-normal text-neutral-mute"
+                    >{{ dayShifts.length }} shift{{ dayShifts.length === 1 ? '' : 's' }}</span
+                  >
+                </td>
+              </tr>
+              <tr v-for="shift in dayShifts" :key="shift.shiftId" class="hover:bg-[#faf9f7]">
+                <td class="px-5 py-3 font-mono text-xs">
+                  {{ shift.startTime }}–{{ shift.endTime }}
+                </td>
+                <td class="px-5 py-3 text-xs font-semibold text-neutral-mute">
+                  {{ shift.type }}<span v-if="shift.eventTitle"> — {{ shift.eventTitle }}</span>
+                </td>
+                <td class="px-5 py-3">
+                  <span class="font-semibold">{{ shift.employeeName }}</span>
+                  <span
+                    v-if="shift.employeeIsTeamLeader"
+                    class="ml-2 text-[10px] font-bold uppercase tracking-wider text-primary-pink"
+                    >TL</span
+                  >
+                </td>
+                <td class="px-5 py-3">
+                  <span
+                    class="inline-block rounded px-2 py-0.5 text-[11px] font-bold"
+                    :class="statusClasses(shift.status)"
+                  >
+                    {{ statusLabels[shift.status] }}
+                  </span>
+                  <span
+                    v-if="shift.status === 'rejected' && shift.rejectionReason"
+                    class="ml-2 text-[11px] text-neutral-mute"
+                  >
+                    {{ shift.rejectionReason }}
+                  </span>
+                </td>
+                <td v-if="canDraft" class="px-5 py-3 text-right text-xs font-semibold">
+                  <button
+                    v-if="shift.status === 'draft'"
+                    class="text-neutral-ink hover:text-primary-pink"
+                    @click="submitShift(shift)"
+                  >
+                    Indienen
+                  </button>
+                  <button
+                    v-if="shift.status === 'draft'"
+                    class="ml-3 text-neutral-mute hover:text-semantic-danger"
+                    @click="deleteDraft(shift)"
+                  >
+                    Verwijderen
+                  </button>
+                  <template v-if="isAdmin && shift.status === 'pending'">
+                    <button
+                      class="mr-3 text-emerald-700 hover:underline"
+                      @click="approveShift(shift)"
+                    >
+                      Goedkeuren
+                    </button>
+                    <button class="text-red-600 hover:underline" @click="openReject(shift)">
+                      Afwijzen
+                    </button>
+                  </template>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+        <p v-if="shiftsStore.isLoading" class="p-8 text-center text-sm text-neutral-mute">Laden…</p>
+        <p v-else-if="!dayGroups.length" class="p-8 text-center text-sm text-neutral-mute">
+          Nog geen shifts.
+        </p>
       </div>
     </section>
 
-    <div v-if="isFormOpen" class="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4">
+    <div
+      v-if="isFormOpen"
+      class="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4"
+    >
       <div class="w-full max-w-md border border-black/10 bg-white p-6">
         <h3 class="text-lg font-bold">Nieuwe shift</h3>
         <form class="mt-4 space-y-3" @submit.prevent="submitForm">
-          <input v-model="form.date" type="date" class="w-full border-black/10 bg-[#faf9f7] text-sm" />
+          <input
+            v-model="form.date"
+            type="date"
+            class="w-full border-black/10 bg-[#faf9f7] text-sm"
+          />
           <select
             :value="form.assignedEmployeeId"
             class="w-full border-black/10 bg-[#faf9f7] text-sm"
             @change="onEmployeePicked(($event.target as HTMLSelectElement).value)"
           >
-            <option v-for="e in employeesStore.activeEmployees" :key="e.employeeId" :value="e.employeeId">
+            <option
+              v-for="e in employeesStore.activeEmployees"
+              :key="e.employeeId"
+              :value="e.employeeId"
+            >
               {{ e.firstName }} {{ e.lastName }}{{ e.isTeamLeader ? ' (TL)' : '' }}
             </option>
           </select>
-          <select :value="form.type" class="w-full border-black/10 bg-[#faf9f7] text-sm" @change="onTypeChange(($event.target as HTMLSelectElement).value as ShiftType)">
+          <select
+            :value="form.type"
+            class="w-full border-black/10 bg-[#faf9f7] text-sm"
+            @change="onTypeChange(($event.target as HTMLSelectElement).value as ShiftType)"
+          >
             <option value="D2D">{{ typeLabels.D2D }} (11:00–19:00)</option>
             <option value="Straat">{{ typeLabels.Straat }} (09:30–17:00)</option>
             <option value="Event">{{ typeLabels.Event }} (vrije uren)</option>
@@ -519,22 +725,45 @@ onUnmounted(() => {
             class="w-full border-black/10 bg-[#faf9f7] text-sm"
           />
           <div class="grid grid-cols-2 gap-3">
-            <input v-model="form.startTime" type="time" :disabled="isTimeLocked" class="border-black/10 bg-[#faf9f7] text-sm disabled:opacity-50" />
-            <input v-model="form.endTime" type="time" :disabled="isTimeLocked" class="border-black/10 bg-[#faf9f7] text-sm disabled:opacity-50" />
+            <input
+              v-model="form.startTime"
+              type="time"
+              :disabled="isTimeLocked"
+              class="border-black/10 bg-[#faf9f7] text-sm disabled:opacity-50"
+            />
+            <input
+              v-model="form.endTime"
+              type="time"
+              :disabled="isTimeLocked"
+              class="border-black/10 bg-[#faf9f7] text-sm disabled:opacity-50"
+            />
           </div>
-          <input v-model="form.location" placeholder="Locatie (optioneel)" class="w-full border-black/10 bg-[#faf9f7] text-sm" />
+          <input
+            v-model="form.location"
+            placeholder="Locatie (optioneel)"
+            class="w-full border-black/10 bg-[#faf9f7] text-sm"
+          />
           <p v-if="formError" class="text-xs font-semibold text-semantic-danger">{{ formError }}</p>
           <div class="flex justify-end gap-2 pt-2">
-            <button type="button" class="px-4 py-2 text-sm font-semibold text-neutral-mute" @click="isFormOpen = false">
+            <button
+              type="button"
+              class="px-4 py-2 text-sm font-semibold text-neutral-mute"
+              @click="isFormOpen = false"
+            >
               Annuleren
             </button>
-            <button type="submit" class="bg-primary-pink px-4 py-2 text-sm font-bold text-white">Shift aanmaken</button>
+            <button type="submit" class="bg-primary-pink px-4 py-2 text-sm font-bold text-white">
+              Shift aanmaken
+            </button>
           </div>
         </form>
       </div>
     </div>
 
-    <div v-if="rejectingId" class="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4">
+    <div
+      v-if="rejectingId"
+      class="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4"
+    >
       <div class="w-full max-w-sm border border-black/10 bg-white p-6">
         <h3 class="text-lg font-bold">Shift afwijzen</h3>
         <textarea
@@ -544,8 +773,15 @@ onUnmounted(() => {
           class="mt-3 w-full border-black/10 bg-[#faf9f7] text-sm"
         ></textarea>
         <div class="mt-3 flex justify-end gap-2">
-          <button class="px-4 py-2 text-sm font-semibold text-neutral-mute" @click="rejectingId = null">Annuleren</button>
-          <button class="bg-red-600 px-4 py-2 text-sm font-bold text-white" @click="confirmReject">Afwijzen</button>
+          <button
+            class="px-4 py-2 text-sm font-semibold text-neutral-mute"
+            @click="rejectingId = null"
+          >
+            Annuleren
+          </button>
+          <button class="bg-red-600 px-4 py-2 text-sm font-bold text-white" @click="confirmReject">
+            Afwijzen
+          </button>
         </div>
       </div>
     </div>

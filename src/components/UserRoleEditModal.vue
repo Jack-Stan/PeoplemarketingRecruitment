@@ -1,11 +1,17 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 
-import { useAuth } from '@/composables/useAuth';
 import { useAuditLogStore } from '@/stores/auditLog';
 import { useUsersStore } from '@/stores/users';
 import { useUiStore } from '@/stores/ui';
-import { FUNCTIES, ROLE_LABELS, Roles, type Functie, type Role, type UserProfile } from '@/types/user';
+import {
+  FUNCTIES,
+  ROLE_LABELS,
+  Roles,
+  type Functie,
+  type Role,
+  type UserProfile,
+} from '@/types/user';
 
 /**
  * Role-assign modal, shared by UsersView (list) and UserDetailView (detail
@@ -19,7 +25,6 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ close: []; saved: [] }>();
 
-const auth = useAuth();
 const store = useUsersStore();
 const auditLog = useAuditLogStore();
 const ui = useUiStore();
@@ -67,21 +72,16 @@ async function submit(): Promise<void> {
     form.value.functie,
   );
   saving.value = false;
-  ui.push(ok ? 'Rol toegewezen.' : (store.error ?? 'Er ging iets mis.'), ok ? 'success' : 'error');
+  ui.push(ok ? 'Rol toegewezen.' : store.error ?? 'Er ging iets mis.', ok ? 'success' : 'error');
   if (ok) {
-    if (auth.user.value && targetOfficeId.value) {
-      auditLog.log(targetOfficeId.value, {
-        actorUid: auth.user.value.uid,
-        actorEmail: auth.user.value.email ?? '',
-        action: 'role_assigned',
-        targetLabel: `${props.user.displayName || props.user.email} → ${ROLE_LABELS[form.value.role]}`,
-        details:
-          [form.value.isTeamLeader ? 'Teamleider' : null, form.value.functie]
-            .filter(Boolean)
-            .join(' · ') || null,
-        createdAtMs: Date.now(),
-      });
-    }
+    void auditLog.record(
+      targetOfficeId.value ?? '',
+      'role_assigned',
+      `${props.user.displayName || props.user.email} → ${ROLE_LABELS[form.value.role]}`,
+      [form.value.isTeamLeader ? 'Teamleider' : null, form.value.functie]
+        .filter(Boolean)
+        .join(' · ') || null,
+    );
     emit('saved');
   }
 }
@@ -99,25 +99,46 @@ async function submit(): Promise<void> {
           <option :value="Roles.Administrator">Beheerder</option>
         </select>
         <div>
-          <label class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute" for="functie-select">Functie</label>
-          <select id="functie-select" v-model="form.functie" class="mt-1 w-full border-black/10 bg-[#faf9f7] text-sm">
+          <label
+            class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute"
+            for="functie-select"
+            >Functie</label
+          >
+          <select
+            id="functie-select"
+            v-model="form.functie"
+            class="mt-1 w-full border-black/10 bg-[#faf9f7] text-sm"
+          >
             <option :value="null">Geen functie</option>
             <option v-for="f in FUNCTIES" :key="f" :value="f">{{ f }}</option>
           </select>
         </div>
         <label class="flex items-center gap-2 text-xs font-semibold">
-          <input v-model="form.isTeamLeader" type="checkbox" class="border-black/20 text-primary-pink focus:ring-primary-pink" />
+          <input
+            v-model="form.isTeamLeader"
+            type="checkbox"
+            class="border-black/20 text-primary-pink focus:ring-primary-pink"
+          />
           Teamleider
         </label>
         <p v-if="willRemoveLastAdmin" class="text-xs font-semibold text-semantic-danger">
-          {{ user.displayName || user.email }} is de laatste beheerder van {{ officeLabel(targetOfficeId) }}
+          {{ user.displayName || user.email }} is de laatste beheerder van
+          {{ officeLabel(targetOfficeId) }}
           — wijs eerst iemand anders als beheerder toe.
         </p>
         <div class="flex justify-end gap-2 pt-2">
-          <button type="button" class="px-4 py-2 text-sm font-semibold text-neutral-mute" @click="emit('close')">
+          <button
+            type="button"
+            class="px-4 py-2 text-sm font-semibold text-neutral-mute"
+            @click="emit('close')"
+          >
             Annuleren
           </button>
-          <button type="submit" class="bg-primary-pink px-4 py-2 text-sm font-bold text-white disabled:opacity-50" :disabled="saving || willRemoveLastAdmin">
+          <button
+            type="submit"
+            class="bg-primary-pink px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+            :disabled="saving || willRemoveLastAdmin"
+          >
             Opslaan
           </button>
         </div>

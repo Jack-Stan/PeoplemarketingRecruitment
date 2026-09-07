@@ -4,10 +4,10 @@
       "command": "npx",
       "args": [
         "-y",
-        "firebase-tools@latest",
+        "firebase-tools@13",
         "mcp",
         "--dir",
-        "C:/RFT/Projects/CRM",
+        "C:/RFT/Projects/Personal/CRM",
         "--only",
         "auth,firestore,storage"
       ]

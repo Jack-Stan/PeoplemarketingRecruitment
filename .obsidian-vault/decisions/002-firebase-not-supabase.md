@@ -1,7 +1,7 @@
 # Decision 002 — Firebase, not Supabase
 
 **Date:** 2026-08-24
-**Status:** Accepted
+**Status:** Accepted — ⚠️ **partially superseded by [[006-firestore-roles-no-claims]]**: this note's "custom claims for RBAC" plan was dropped. Roles live in the `/users` Firestore doc and are read by rules via `get()`; there are no custom claims and no Cloud Functions (Spark plan). Everything else here still stands.
 **Decider:** Stan
 
 ## Context

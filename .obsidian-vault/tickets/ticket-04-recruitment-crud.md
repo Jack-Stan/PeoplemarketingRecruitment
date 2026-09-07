@@ -1,6 +1,6 @@
 # Ticket 04 — Recruitment leads + pipeline
 
-**Status:** 📋 Planned
+**Status:** ✅ Done — `RecruitmentView.vue` + `recruitment.service.ts` live, pipeline stages + FRD §15 quality stats shipped. Not delivered vs original scope: no `LeadDetailView`, no `interviewDate`/interviewer, no `recruitedBy` attribution, no per-stage timestamps, no duplicate detection (all carried into the Briggs gap list, see [[2026-09-01-app-review-and-briggs-gap]] D6).
 **Goal:** Replace the client's Google Docs lead sheet. Admins + TeamManagers create/view leads, move them through the pipeline, TeamMembers get read access to the list per the transcript ("echte gebruiker gewoon aan deze lijst kan").
 
 ## Scope

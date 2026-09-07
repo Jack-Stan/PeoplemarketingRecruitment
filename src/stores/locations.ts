@@ -70,7 +70,11 @@ export const useLocationsStore = defineStore('locations', () => {
     }
   }
 
-  async function update(officeId: string, locationId: string, patch: LocationPatch): Promise<boolean> {
+  async function update(
+    officeId: string,
+    locationId: string,
+    patch: LocationPatch,
+  ): Promise<boolean> {
     error.value = null;
     try {
       await locationsService.update(officeId, locationId, patch);
@@ -92,7 +96,11 @@ export const useLocationsStore = defineStore('locations', () => {
     }
   }
 
-  async function logVisit(officeId: string, locationId: string, payload: LocationVisitCreatePayload): Promise<boolean> {
+  async function logVisit(
+    officeId: string,
+    locationId: string,
+    payload: LocationVisitCreatePayload,
+  ): Promise<boolean> {
     error.value = null;
     try {
       await locationsService.logVisit(officeId, locationId, payload);
