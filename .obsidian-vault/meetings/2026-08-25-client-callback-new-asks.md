@@ -118,12 +118,23 @@ GDPR is waiting on** — this is a policy decision, not a code task Claude shoul
   simplification of the seven-stage pipeline (`decisions/009`). Shipped as `StreetLeadStatus` /
   `RecruitmentLead.streetStatus`, set from the leads table on any lead that has a recruiter, plus a
   "Prestatie per werver" panel grouping by `recruitedBy`. Item 3 is now complete.
+- **Item 8, shift-type half** — done, after Stan settled scope 2026-09-07: members get D2D and Straat,
+  admins keep Event. `MyPlanningView` never rendered `shift.type` and hardcoded `type: 'D2D'` on every
+  shift a member created, so they could neither see nor choose it — a real defect, not a display nit.
+  The day card now shows the type and the add-day form has a selector over `MEMBER_SHIFT_TYPES`
+  (derived from `FIXED_SHIFT_HOURS` so the two can't drift). Hours stay out of the member flow entirely:
+  they follow from the type per `decisions/004`.
+  The **"not with hours" half is still open** — the member view never showed times to begin with, so the
+  complaint can only be about the admin `PlanningView` table/form, where start–end is shown but already
+  disabled for D2D/Straat. Needs Stan to ask whether the client wants hours gone from the admin view too.
+
 - **Unrelated but adjacent** — a required `age` field on the lead form shipped in #1, from Michiel's
   2026-09-05 WhatsApp ask.
 
 The status-model question in item 3 is now **settled** — see `decisions/009`. Items 2, 4, 5, 6, 7, 9
 and 10 remain open and still need a question back to the client before any code is worth writing.
-Item 8 (possible planning regression) still needs Stan to confirm what the client actually meant.
+Item 8 is half-shipped: the shift-type gap is fixed; whether hours should also leave the admin planning
+view is still an open question for the client.
 
 ## Summary for Stan
 
