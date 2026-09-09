@@ -1,6 +1,6 @@
 # Project Status — CRM
 
-**Updated:** 2026-09-07 (full audit + remediation round)
+**Updated:** 2026-09-09 (open-item fix batch, see update below)
 **Repo:** `C:\RFT\Projects\Personal\CRM` (personal, GitHub `Jack-Stan/PeoplemarketingRecruitment`)
 **Stack:** Vue 3 + TypeScript + Vite + Pinia + Tailwind + Firebase (Auth + Firestore) — **no Cloud Functions**, Spark plan, see [[006-firestore-roles-no-claims]]
 
@@ -51,6 +51,57 @@ see the 2026-09-07 audit note.
 
 **Ticket status:** 00 ✅ · 01 ✅ · 02 ✅ · 03 ✅ · 04 ✅ · 05 🔴 re-scope (Cloud Function banned) ·
 06 🟡 partial (§11/§17 blocked).
+
+---
+
+## Update — open-item fix batch (2026-09-09)
+
+Stan asked to "get back on it and start fixing". Picked the items that needed no product decision:
+
+- **Client ask 8 confirmed real and fixed** — `MyPlanningView` showed "Ik werk deze dag" with no shift
+  type; now shows the D2D/Straat/Event label via a shared `SHIFT_TYPE_LABELS` (`types/shift.ts`).
+- **Client ask 1** — `tel:`/`mailto:` links on lead phone/email in `RecruitmentView`.
+- **C1** `availability.mark()` idempotent — store no-ops when the day is already marked (rules deny update).
+- **C3** `assignRole` — roster mirror sync is now `.catch()`ed + warned; the committed role write reports
+  success. Tests that pinned the old behaviour rewritten.
+- **C5** Dashboard funnel — denominator is all leads; `funnelCounts` gained `noShow`/`rejected`, bars for
+  Gecontacteerd / Niet opgekomen / Afgewezen added.
+- Verified stale: C7, C8, M6 already fixed by the 09-07 round.
+
+**Health:** 222/222 unit tests, `vue-tsc` clean, prod build ok, lint 0 errors. Dev server boots, no console
+errors (login page only — no `.env.local`, prod-connected, not logged in). **Uncommitted.**
+
+**Same evening — "logged out on every refresh despite remember-me" ROOT-CAUSED + fixed (uncommitted):**
+Reproduced on prod in a fresh tab: Pinia auth store = signed-in Administrator, URL = `/login?redirect=/dashboard`.
+Persistence itself was fine (`firebase:authUser` present, `pm_remember=1`). Cause: vue-router 4 starts the
+initial navigation — and runs `beforeEach` — synchronously inside `app.use(router)`, which `main.ts` did at
+module top, *before* `authStateReady()`/`hydrate()`. The guard saw an empty store, bounced to /login, and
+nothing re-ran it. The 63a7ec4 `authStateReady` fix only moved the wait, not the router install. Fix:
+`app.use(router)` now happens inside `bootstrap()` after hydrate. Regression test
+`tests/unit/bootstrap-order.spec.ts` pins both the bug shape and the fix. Not yet deployed — needs commit + push.
+
+**Zones (client: "drawing zones isn't going great"):** a *parallel* session (crm-b1) was already on it — its
+uncommitted `LocationsView.vue` patch wraps leaflet-draw's `_onTouch` to ignore mouse pointer events (Leaflet
+1.9 `Browser.touch` is true on desktop Chrome), adds a kind filter and a `color` field on `Location`
+(`types/location.ts`, `firestore.rules`). crm-49 did not touch those files.
+**Finished by crm-b1 later the same evening (2026-09-09):** fixtures updated, `vue-tsc` clean again.
+Findings from a throwaway leaflet-draw harness page (real pane clicks, needs a `hover` before each click
+because leaflet-draw only listens on its invisible mouse-follower marker):
+- The synthesised-touchstart theory did **not** reproduce — no `touchstart` fired from mouse clicks in the
+  pane. The `_onTouch` guard is kept as a defensive no-op but is *unverified*.
+- Real culprits fixed: (1) the on-screen hint said "dubbelklik om af te ronden" — leaflet-draw does not
+  disable `doubleClickZoom`, so a double-click zoomed the map under the cursor; drawing now disables it
+  and the hint says "klik op het eerste punt". (2) `renderLocations()` re-ran `fitBounds` on every
+  Firestore snapshot / search keystroke / row click, yanking the map mid-draw; it now fits once on first
+  data and on filter changes only.
+- Shipped alongside: `shape: 'area' | 'street' | null` on `Location` (streets = open polyline, "Straat
+  tekenen" button), `color` picker (8 presets, `ZONE_COLORS`), kind filter (punten / zones / straten).
+  Rules guard both new keys with `get(key, null)` so pre-existing docs still pass `onlyVisitCounterChanged`.
+- Still open here: leaflet-draw 1.0.4 is unmaintained (Geoman is the proper swap); a custom zone colour
+  hides the status colour on the map; pins can't take a colour; rules spec still CI-only.
+
+**Still needs Stan:** self-signup removal (client asked), §11/§17 redefine-as-live-aggregation decision,
+client asks 2/4/5/6/7/9/10, GDPR retention, M1 lead PII, C4/C6.
 
 ---
 

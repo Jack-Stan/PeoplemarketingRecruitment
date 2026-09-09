@@ -29,6 +29,8 @@ const LOC: Location = {
   lat: 51.0543,
   lng: 3.7226,
   boundary: null,
+  shape: null,
+  color: null,
   notes: null,
   status: 'planned',
   timesVisited: 0,
@@ -164,6 +166,8 @@ describe('locations store', () => {
       lat: 51.03,
       lng: 3.72,
       boundary: null,
+      shape: null,
+      color: null,
       notes: null,
       status: 'planned' as const,
     };

@@ -5,6 +5,22 @@ import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw';
 import 'leaflet-draw/dist/leaflet.draw.css';
 
+/**
+ * leaflet-draw 1.0.4 predates Leaflet 1.8+'s pointer-event model. On desktop
+ * Chrome `L.Browser.touch` is true, so Leaflet synthesises a `touchstart` from
+ * every mouse `pointerdown` and leaflet-draw's `_onTouch` drops a vertex on
+ * press (before any drag check) — panning adds vertices, double-clicks stack
+ * points, closing the shape fails. Only let `_onTouch` handle real touches.
+ */
+type PolylineProto = { _onTouch(e: L.LeafletEvent): void };
+const polylineProto = L.Draw.Polyline.prototype as unknown as PolylineProto;
+const originalOnTouch = polylineProto._onTouch;
+polylineProto._onTouch = function (this: unknown, e: L.LeafletEvent) {
+  const oe = (e as L.LeafletMouseEvent).originalEvent as Event & { pointerType?: string };
+  if (oe.pointerType && oe.pointerType !== 'touch') return;
+  originalOnTouch.call(this, e);
+};
+
 import { useAuth } from '@/composables/useAuth';
 import { useActiveOffice } from '@/composables/useActiveOffice';
 import { useLocationsStore } from '@/stores/locations';
@@ -15,6 +31,7 @@ import {
   type Location,
   type LocationCreatePayload,
   type LocationStatus,
+  ZONE_COLORS,
 } from '@/types/location';
 
 const STATUS_COLORS: Record<LocationStatus, string> = {
@@ -42,10 +59,29 @@ const canSeeCoverage = canManage;
 
 const statusFilter = ref<LocationStatus | 'all'>('all');
 const search = ref('');
+/** all = everything; 'point' = pins; 'area' = drawn zones; 'street' = drawn street lines. */
+const kindFilter = ref<'all' | 'point' | 'area' | 'street'>('all');
+type Shape = NonNullable<Location['shape']>;
+/** Shape of a location, tolerating pre-`shape` docs (boundary ⇒ area). */
+function shapeOf(l: Location): Shape | null {
+  return l.shape ?? (l.boundary ? 'area' : null);
+}
+function isZone(l: Location): boolean {
+  const s = shapeOf(l);
+  return !!s && !!l.boundary && l.boundary.length >= (s === 'street' ? 2 : 3);
+}
+/** Picked zone colour, else the status colour (also covers pre-colour docs). */
+function zoneColorOf(l: Location): string {
+  return l.color ?? STATUS_COLORS[l.status];
+}
 const filtered = computed(() =>
   store.locations.filter(
     (l) =>
       (statusFilter.value === 'all' || l.status === statusFilter.value) &&
+      (kindFilter.value === 'all' ||
+        (kindFilter.value === 'point'
+          ? !isZone(l)
+          : isZone(l) && shapeOf(l) === kindFilter.value)) &&
       `${l.name} ${l.neighbourhood ?? ''} ${l.address ?? ''}`
         .toLowerCase()
         .includes(search.value.toLowerCase()),
@@ -90,13 +126,38 @@ watch(selectedId, (id) => {
 // --- Map ---------------------------------------------------------------
 const mapEl = ref<HTMLElement | null>(null);
 let map: L.Map | null = null;
-let drawPolygonHandler: L.Draw.Polygon | null = null;
-type EditablePolygon = L.Polygon & { editing: { enable(): void; disable(): void } };
-let reshapeLayer: EditablePolygon | null = null;
-/** none = browsing/selecting; 'point'/'area' = placing a NEW location; 'reshape' = editing an existing zone's boundary. */
-const mode = ref<'none' | 'point' | 'area' | 'reshape'>('none');
+let drawHandler: L.Draw.Polygon | L.Draw.Polyline | null = null;
+type EditableLine = L.Polyline & { editing: { enable(): void; disable(): void } };
+let reshapeLayer: EditableLine | null = null;
+/** none = browsing/selecting; 'point'/'area'/'street' = placing a NEW location; 'reshape' = editing an existing zone's boundary. */
+const mode = ref<'none' | 'point' | 'area' | 'street' | 'reshape'>('none');
 const markers: L.Marker[] = [];
-const zoneLayers: L.Polygon[] = [];
+const zoneLayers: L.Polyline[] = [];
+
+/** Polygon for an area, open polyline for a street — same colour styling. */
+function shapeLayer(
+  shape: Shape,
+  latlngs: [number, number][],
+  color: string,
+  selected: boolean,
+): L.Polyline {
+  const stroke = selected ? '#111111' : color;
+  if (shape === 'street')
+    return L.polyline(latlngs, { color: stroke, weight: selected ? 7 : 5, opacity: 0.85 });
+  // L.Polygon extends L.Polyline at runtime; the GeoJSON generics just don't unify.
+  return L.polygon(latlngs, {
+    color: stroke,
+    weight: selected ? 3 : 2,
+    fillColor: color,
+    fillOpacity: 0.35,
+  }) as unknown as L.Polyline;
+}
+/** Polyline.getLatLngs() is flat; Polygon's is ring-nested. */
+function layerPoints(layer: L.Polyline): LatLng[] {
+  const raw = layer.getLatLngs();
+  const ring = (Array.isArray(raw[0]) ? raw[0] : raw) as L.LatLng[];
+  return ring.map((ll) => ({ lat: ll.lat, lng: ll.lng }));
+}
 
 function clearMapLayers(): void {
   markers.forEach((m) => m.remove());
@@ -115,7 +176,14 @@ function pinIcon(color: string, isSelected: boolean): L.DivIcon {
   });
 }
 
-function renderLocations(): void {
+/**
+ * Re-fitting the viewport on every re-render yanked the map around: every
+ * Firestore snapshot (someone else saving), every search keystroke and every
+ * row click re-ran fitBounds — including mid-draw. Now we fit only when the
+ * user changes what's shown (filters) plus once when data first arrives.
+ */
+let hasFittedOnce = false;
+function renderLocations(fit = false): void {
   if (!map) return;
   clearMapLayers();
 
@@ -124,22 +192,19 @@ function renderLocations(): void {
 
   for (const l of filtered.value) {
     if (mode.value === 'reshape' && l.locationId === selectedId.value) continue;
-    if (l.boundary && l.boundary.length >= 3) {
+    if (isZone(l) && l.boundary) {
       hasPoints = true;
       const latlngs = l.boundary.map((p) => [p.lat, p.lng] as [number, number]);
       latlngs.forEach((ll) => bounds.extend(ll));
       const isSelected = l.locationId === selectedId.value;
-      const polygon = L.polygon(latlngs, {
-        color: isSelected ? '#111111' : STATUS_COLORS[l.status],
-        weight: isSelected ? 3 : 2,
-        fillColor: STATUS_COLORS[l.status],
-        fillOpacity: 0.35,
-      }).addTo(map);
-      polygon.on('click', () => selectLocation(l));
-      polygon.on('mouseover', () => map && (map.getContainer().style.cursor = 'pointer'));
-      polygon.on('mouseout', () => map && (map.getContainer().style.cursor = ''));
-      zoneLayers.push(polygon);
-      continue; // rendered as a polygon, not a pin
+      const layer = shapeLayer(shapeOf(l) ?? 'area', latlngs, zoneColorOf(l), isSelected).addTo(
+        map,
+      );
+      layer.on('click', () => selectLocation(l));
+      layer.on('mouseover', () => map && (map.getContainer().style.cursor = 'pointer'));
+      layer.on('mouseout', () => map && (map.getContainer().style.cursor = ''));
+      zoneLayers.push(layer);
+      continue; // rendered as an area/street, not a pin
     }
     hasPoints = true;
     bounds.extend([l.lat, l.lng]);
@@ -150,8 +215,11 @@ function renderLocations(): void {
     marker.on('click', () => selectLocation(l));
     markers.push(marker);
   }
-  if (hasPoints && bounds.isValid() && mode.value !== 'reshape')
+  const shouldFit = (fit || !hasFittedOnce) && hasPoints && bounds.isValid();
+  if (shouldFit && mode.value === 'none') {
+    hasFittedOnce = true;
     map.fitBounds(bounds, { padding: [48, 48], maxZoom: 15 });
+  }
 }
 
 onMounted(async () => {
@@ -171,8 +239,10 @@ onBeforeUnmount(() => {
   map?.remove();
   map = null;
 });
+// Data snapshots and row selection redraw in place; only a filter change refits.
 watch(filtered, () => renderLocations());
 watch(selectedId, () => renderLocations());
+watch([kindFilter, statusFilter, search], () => renderLocations(true));
 
 function onMapClick(e: L.LeafletMouseEvent): void {
   if (mode.value !== 'point') return;
@@ -181,19 +251,28 @@ function onMapClick(e: L.LeafletMouseEvent): void {
   mode.value = 'none';
 }
 
-function toggleDrawArea(): void {
+function stopDrawing(): void {
+  drawHandler?.disable();
+  drawHandler = null;
+  map?.doubleClickZoom.enable();
+  mode.value = 'none';
+}
+/** Toggle drawing a closed area (polygon) or an open street (polyline). */
+function toggleDraw(shape: Shape): void {
   if (!map) return;
-  if (mode.value === 'area') {
-    mode.value = 'none';
-    drawPolygonHandler?.disable();
-    drawPolygonHandler = null;
-  } else {
-    mode.value = 'area';
-    drawPolygonHandler = new L.Draw.Polygon(map as unknown as L.DrawMap, {
-      shapeOptions: { color: '#ec4899' },
-    });
-    drawPolygonHandler.enable();
-  }
+  const wasActive = mode.value === shape;
+  if (drawHandler) stopDrawing();
+  if (wasActive) return;
+  mode.value = shape;
+  // leaflet-draw doesn't touch doubleClickZoom itself: a double-click mid-draw
+  // zooms the map under the cursor and throws the vertex placement off.
+  map.doubleClickZoom.disable();
+  const drawMap = map as unknown as L.DrawMap;
+  drawHandler =
+    shape === 'street'
+      ? new L.Draw.Polyline(drawMap, { shapeOptions: { color: '#ec4899', weight: 5 } })
+      : new L.Draw.Polygon(drawMap, { shapeOptions: { color: '#ec4899' } });
+  drawHandler.enable();
 }
 function toggleAddPoint(): void {
   mode.value = mode.value === 'point' ? 'none' : 'point';
@@ -210,13 +289,13 @@ function boundaryCentroid(boundary: LatLng[]): LatLng {
 }
 
 function onAreaDrawn(e: L.DrawEvents.Created): void {
-  drawPolygonHandler = null;
-  const latlngs = (e.layer as L.Polygon).getLatLngs()[0] as L.LatLng[];
-  const boundary: LatLng[] = latlngs.map((ll) => ({ lat: ll.lat, lng: ll.lng }));
+  const shape: Shape = e.layerType === 'polyline' ? 'street' : 'area';
+  const boundary = layerPoints(e.layer as L.Polyline);
+  drawHandler = null; // leaflet-draw already disabled itself on completion
+  stopDrawing();
   openCreate();
   const centroid = boundaryCentroid(boundary);
-  form.value = { ...form.value, boundary, ...centroid };
-  mode.value = 'none';
+  form.value = { ...form.value, boundary, shape, ...centroid };
 }
 
 // --- Reshape an existing zone's boundary --------------------------------
@@ -225,7 +304,9 @@ function startReshape(l: Location): void {
   mode.value = 'reshape';
   closePanel();
   const latlngs = l.boundary.map((p) => [p.lat, p.lng] as [number, number]);
-  reshapeLayer = L.polygon(latlngs, { color: '#111111', weight: 3 }).addTo(map) as EditablePolygon;
+  reshapeLayer = shapeLayer(shapeOf(l) ?? 'area', latlngs, zoneColorOf(l), true).addTo(
+    map,
+  ) as EditableLine;
   reshapeTargetId.value = l.locationId;
   renderLocations();
   reshapeLayer.editing?.enable();
@@ -233,8 +314,7 @@ function startReshape(l: Location): void {
 const reshapeTargetId = ref<string | null>(null);
 async function saveReshape(): Promise<void> {
   if (!reshapeTargetId.value || !reshapeLayer) return;
-  const latlngs = reshapeLayer.getLatLngs()[0] as L.LatLng[];
-  const boundary: LatLng[] = latlngs.map((ll) => ({ lat: ll.lat, lng: ll.lng }));
+  const boundary = layerPoints(reshapeLayer);
   const centroid = boundaryCentroid(boundary);
   const ok = await store.update(officeId.value, reshapeTargetId.value, { boundary, ...centroid });
   ui.push(ok ? 'Zone bijgewerkt.' : store.error ?? 'Er ging iets mis.', ok ? 'success' : 'error');
@@ -260,6 +340,8 @@ const emptyForm: LocationCreatePayload = {
   lat: 51.0538,
   lng: 3.725,
   boundary: null,
+  shape: null,
+  color: null,
   notes: null,
   status: 'planned',
 };
@@ -280,6 +362,8 @@ function openEdit(l: Location): void {
     lat: l.lat,
     lng: l.lng,
     boundary: l.boundary,
+    shape: shapeOf(l),
+    color: l.color ?? null,
     notes: l.notes,
     status: l.status,
   };
@@ -369,9 +453,16 @@ onBeforeUnmount(() => {
         <button
           class="border border-primary-pink px-4 py-2.5 text-sm font-bold text-primary-pink"
           :class="{ 'bg-primary-pink text-white': mode === 'area' }"
-          @click="toggleDrawArea"
+          @click="toggleDraw('area')"
         >
           {{ mode === 'area' ? 'Tekenen annuleren' : '⬠ Zone tekenen' }}
+        </button>
+        <button
+          class="border border-primary-pink px-4 py-2.5 text-sm font-bold text-primary-pink"
+          :class="{ 'bg-primary-pink text-white': mode === 'street' }"
+          @click="toggleDraw('street')"
+        >
+          {{ mode === 'street' ? 'Tekenen annuleren' : '〰 Straat tekenen' }}
         </button>
       </div>
     </section>
@@ -386,7 +477,15 @@ onBeforeUnmount(() => {
       v-if="mode === 'area'"
       class="border border-primary-pink/30 bg-primary-pink/5 p-3 text-xs font-semibold text-primary-pink"
     >
-      Klik op de kaart om een zone af te bakenen; dubbelklik om af te ronden.
+      Klik op de kaart om hoekpunten te plaatsen (minstens 3); klik op het eerste punt om de zone te
+      sluiten.
+    </p>
+    <p
+      v-if="mode === 'street'"
+      class="border border-primary-pink/30 bg-primary-pink/5 p-3 text-xs font-semibold text-primary-pink"
+    >
+      Klik langs de straat om punten te plaatsen (minstens 2); klik op het laatste punt om de straat
+      af te ronden.
     </p>
     <div
       v-if="mode === 'reshape'"
@@ -410,6 +509,12 @@ onBeforeUnmount(() => {
         placeholder="Zoek op naam, wijk of adres"
         type="search"
       />
+      <select v-model="kindFilter" class="border-black/10 bg-[#faf9f7] text-sm">
+        <option value="all">Punten, zones en straten</option>
+        <option value="point">Alleen punten</option>
+        <option value="area">Alleen zones</option>
+        <option value="street">Alleen straten</option>
+      </select>
       <select v-model="statusFilter" class="border-black/10 bg-[#faf9f7] text-sm">
         <option value="all">Alle statussen</option>
         <option v-for="(label, key) in LOCATION_STATUS_LABELS" :key="key" :value="key">
@@ -532,7 +637,17 @@ onBeforeUnmount(() => {
           >
             <td class="px-5 py-4">
               <p class="font-bold">
-                {{ l.name }} <span v-if="l.boundary" class="text-xs text-neutral-mute">(zone)</span>
+                {{ l.name }}
+                <span
+                  v-if="l.boundary"
+                  class="inline-flex items-center gap-1 text-xs text-neutral-mute"
+                >
+                  <i
+                    class="inline-block size-2.5 rounded-sm"
+                    :style="{ backgroundColor: zoneColorOf(l) }"
+                  ></i>
+                  {{ shapeOf(l) === 'street' ? 'straat' : 'zone' }}
+                </span>
               </p>
               <p class="text-xs text-neutral-mute">{{ l.neighbourhood ?? l.address ?? '—' }}</p>
             </td>
@@ -577,8 +692,34 @@ onBeforeUnmount(() => {
           {{ editingId ? 'Locatie bewerken' : 'Locatie toevoegen' }}
         </h3>
         <p v-if="form.boundary" class="mt-1 text-xs text-neutral-mute">
-          Zone getekend ({{ form.boundary.length }} punten).
+          {{ form.shape === 'street' ? 'Straat' : 'Zone' }} getekend ({{ form.boundary.length }}
+          punten) — geef ze hieronder een naam en kleur.
         </p>
+        <div v-if="form.boundary" class="mt-3">
+          <label class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute"
+            >Zonekleur</label
+          >
+          <div class="mt-1 flex flex-wrap gap-2">
+            <button
+              type="button"
+              class="size-7 rounded-full border-2"
+              :class="form.color === null ? 'border-neutral-ink' : 'border-transparent'"
+              :style="{ backgroundColor: STATUS_COLORS[form.status] }"
+              title="Statuskleur"
+              @click="form.color = null"
+            ></button>
+            <button
+              v-for="(hex, label) in ZONE_COLORS"
+              :key="hex"
+              type="button"
+              class="size-7 rounded-full border-2"
+              :class="form.color === hex ? 'border-neutral-ink' : 'border-transparent'"
+              :style="{ backgroundColor: hex }"
+              :title="label"
+              @click="form.color = hex"
+            ></button>
+          </div>
+        </div>
         <form class="mt-4 space-y-3" @submit.prevent="submitForm">
           <input
             v-model="form.name"

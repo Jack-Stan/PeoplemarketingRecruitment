@@ -389,6 +389,11 @@ service cloud.firestore {
             && request.resource.data.lat == resource.data.lat
             && request.resource.data.lng == resource.data.lng
             && request.resource.data.boundary == resource.data.boundary
+            // color is a later addition (zone colours, 2026-09-09): older docs
+            // lack the key, so compare via get() or the missing-field access
+            // would deny every member visit log on a pre-colour location.
+            && request.resource.data.get('color', null) == resource.data.get('color', null)
+            && request.resource.data.get('shape', null) == resource.data.get('shape', null)
             && request.resource.data.notes == resource.data.notes
             && request.resource.data.status == resource.data.status
             && request.resource.data.timesVisited == resource.data.timesVisited + 1
