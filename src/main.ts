@@ -16,7 +16,7 @@ const pinia = createPinia();
 const router = createAppRouter();
 
 app.use(pinia);
-app.use(router);
+// NOTE: `app.use(router)` is deliberately NOT here — see bootstrap().
 
 // Hydrate auth from any persisted Firebase session before mounting so
 // role-based route checks don't run against an empty claim state.
@@ -48,6 +48,15 @@ async function bootstrap(): Promise<void> {
   await auth.authStateReady();
   await authStore.hydrate(auth.currentUser);
   authService.onAuthStateChanged((fbUser) => void authStore.hydrate(fbUser));
+  // Install the router only AFTER auth is hydrated. vue-router 4 starts the
+  // initial navigation (and runs `beforeEach`) synchronously inside
+  // `app.use(router)` — not at `router.isReady()`, not at `mount()`. With the
+  // router installed up top, every refresh ran the guard against an empty
+  // auth store, bounced to /login?redirect=..., and nothing re-ran the guard
+  // once the persisted user arrived a moment later. Reproduced on prod
+  // 2026-09-09: Pinia auth = signed-in Administrator, URL = /login. See
+  // tests/unit/bootstrap-order.spec.ts.
+  app.use(router);
   await router.isReady();
   app.mount('#app');
 }

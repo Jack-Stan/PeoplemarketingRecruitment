@@ -72,6 +72,9 @@ export const useAvailabilityStore = defineStore('availability', () => {
 
   async function mark(officeId: string, payload: AvailabilityCreatePayload): Promise<boolean> {
     error.value = null;
+    // Idempotent: rules deny `update`, so re-writing an existing mark (double-click,
+    // second tab) would fail with permission-denied. Already marked = already done.
+    if (isMarked(payload.employeeId, payload.date)) return true;
     try {
       await availabilityService.create(officeId, payload);
       return true;

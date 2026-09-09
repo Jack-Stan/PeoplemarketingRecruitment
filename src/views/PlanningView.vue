@@ -15,6 +15,7 @@ import {
   type Shift,
   type ShiftCreatePayload,
   type ShiftType,
+  SHIFT_TYPE_LABELS,
 } from '@/types/shift';
 import {
   addDaysISO,
@@ -218,11 +219,7 @@ const statusLabels: Record<Shift['status'], string> = {
   rejected: 'Afgewezen',
 };
 
-const typeLabels: Record<ShiftType, string> = {
-  D2D: 'D2D (deur-tot-deur)',
-  Straat: 'Straat',
-  Event: 'Event',
-};
+const typeLabels = SHIFT_TYPE_LABELS;
 
 function openCreate(date?: string): void {
   const firstEmployee = employeesStore.activeEmployees[0];

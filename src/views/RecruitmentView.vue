@@ -235,8 +235,12 @@ onUnmounted(() => store.unsubscribe());
               </span>
             </td>
             <td class="px-5 py-4 text-xs text-neutral-mute">
-              <p v-if="lead.email">{{ lead.email }}</p>
-              <p v-if="lead.phone">{{ lead.phone }}</p>
+              <p v-if="lead.email">
+                <a :href="`mailto:${lead.email}`" class="hover:underline">{{ lead.email }}</a>
+              </p>
+              <p v-if="lead.phone">
+                <a :href="`tel:${lead.phone}`" class="hover:underline">{{ lead.phone }}</a>
+              </p>
             </td>
             <td v-if="canManage" class="px-5 py-4 text-right">
               <select

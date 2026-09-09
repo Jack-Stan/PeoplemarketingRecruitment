@@ -65,7 +65,12 @@ export const useUsersStore = defineStore('users', () => {
     error.value = null;
     try {
       await usersService.assignRole(uid, role, officeId, isTeamLeader, functie);
-      await employeesService.syncRoleAndTeamLeader(officeId, uid, role, isTeamLeader, functie);
+      // The role write above has committed; the roster mirror is best-effort.
+      // Reporting its failure as a failed assignment left a stale mirror AND a
+      // misleading error (review 2026-09-01 C3).
+      await employeesService
+        .syncRoleAndTeamLeader(officeId, uid, role, isTeamLeader, functie)
+        .catch((err: unknown) => console.warn('[users] roster sync failed after role write', err));
       return true;
     } catch (err) {
       error.value = friendlyError(err);

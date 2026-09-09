@@ -5,7 +5,12 @@ import { useAuth } from '@/composables/useAuth';
 import { useAvailabilityStore } from '@/stores/availability';
 import { useShiftsStore } from '@/stores/shifts';
 import { useUiStore } from '@/stores/ui';
-import { FIXED_SHIFT_HOURS, type Shift, type ShiftCreatePayload } from '@/types/shift';
+import {
+  FIXED_SHIFT_HOURS,
+  SHIFT_TYPE_LABELS,
+  type Shift,
+  type ShiftCreatePayload,
+} from '@/types/shift';
 import { parseLocalISODate, toLocalISODate, todayLocalISO, weekStartFor } from '@/utils/date';
 
 /**
@@ -232,7 +237,7 @@ onUnmounted(() => {
             :key="shift.shiftId"
             class="border border-black/10 bg-white p-2 text-xs"
           >
-            <p class="font-semibold">Ik werk deze dag</p>
+            <p class="font-semibold">{{ SHIFT_TYPE_LABELS[shift.type] }}</p>
             <p v-if="shift.location" class="text-neutral-mute">{{ shift.location }}</p>
             <div class="mt-1 flex items-center justify-between">
               <span

@@ -52,7 +52,9 @@ describe('recruitment store', () => {
       contacted: 0,
       interviewPlanned: 1,
       attended: 0,
+      noShow: 0,
       hired: 1,
+      rejected: 0,
     });
   });
 

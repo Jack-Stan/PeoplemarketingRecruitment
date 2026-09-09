@@ -39,7 +39,9 @@ export const useRecruitmentStore = defineStore('recruitment', () => {
     contacted: byStage.value.get('contacted')?.length ?? 0,
     interviewPlanned: byStage.value.get('interview_planned')?.length ?? 0,
     attended: byStage.value.get('attended')?.length ?? 0,
+    noShow: byStage.value.get('no_show')?.length ?? 0,
     hired: byStage.value.get('hired')?.length ?? 0,
+    rejected: byStage.value.get('rejected')?.length ?? 0,
   }));
 
   /** "Zoveel leads deze week" — client transcript's weekly leads bar. */

@@ -97,9 +97,17 @@ const weeklyStaffing = computed(() => {
 
 const recruitmentPulse = computed(() => {
   const c = recruitmentStore.funnelCounts;
-  const total = Math.max(1, c.new + c.interviewPlanned + c.attended + c.hired);
+  // Denominator is every lead, so the bars describe the whole funnel
+  // (review 2026-09-01 C5: contacted/no_show/rejected were dropped from both).
+  const total = Math.max(1, recruitmentStore.leads.length);
   return [
     { label: 'Nieuwe leads', value: c.new, color: 'bg-[#111]', pct: (c.new / total) * 100 },
+    {
+      label: 'Gecontacteerd',
+      value: c.contacted,
+      color: 'bg-neutral-400',
+      pct: (c.contacted / total) * 100,
+    },
     {
       label: 'Sollicitatie gepland',
       value: c.interviewPlanned,
@@ -112,7 +120,9 @@ const recruitmentPulse = computed(() => {
       color: 'bg-emerald-500',
       pct: (c.attended / total) * 100,
     },
+    { label: 'Niet opgekomen', value: c.noShow, color: 'bg-rose-300', pct: (c.noShow / total) * 100 },
     { label: 'Aangenomen', value: c.hired, color: 'bg-amber-400', pct: (c.hired / total) * 100 },
+    { label: 'Afgewezen', value: c.rejected, color: 'bg-neutral-300', pct: (c.rejected / total) * 100 },
   ];
 });
 

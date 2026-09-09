@@ -59,3 +59,10 @@ export type ShiftCreatePayload = Omit<
   'shiftId' | 'officeId' | 'weekStart' | 'createdBy' | 'submittedAt' | 'decidedAt' | 'decidedBy'
 >;
 export type ShiftPatch = Partial<Omit<Shift, 'shiftId' | 'officeId'>>;
+
+/** Dutch display labels for ShiftType — shared by PlanningView and MyPlanningView. */
+export const SHIFT_TYPE_LABELS: Record<ShiftType, string> = {
+  D2D: 'D2D (deur-tot-deur)',
+  Straat: 'Straat',
+  Event: 'Event',
+};

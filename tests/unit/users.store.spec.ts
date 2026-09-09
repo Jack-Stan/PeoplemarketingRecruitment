@@ -207,9 +207,9 @@ describe('users store', () => {
      * PARTIAL FAILURE — the important one. There is no transaction spanning
      * `/users/{uid}` and `/offices/{id}/employees/{uid}`, so if the roster
      * sync fails AFTER the user doc write succeeded, the authoritative role
-     * IS already changed but the roster mirror is stale, and the store still
-     * reports failure. These tests pin that observable behaviour rather than
-     * pretending it is atomic.
+     * IS already changed but the roster mirror is stale. Since C3 (2026-09-09)
+     * the store reports success and warns — the role write is what matters,
+     * and the mirror self-heals on the next assignRole. These tests pin that.
      */
     describe('when the roster sync fails after the user write succeeded', () => {
       beforeEach(() => {
@@ -219,12 +219,15 @@ describe('users store', () => {
         );
       });
 
-      it('returns false even though the authoritative write already landed', async () => {
+      it('returns true — the authoritative write landed, the mirror is best-effort (C3)', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
         const store = useUsersStore();
         const ok = await store.assignRole('member-1', 'TeamManager', 'office-main', true);
 
-        expect(ok).toBe(false);
+        expect(ok).toBe(true);
         expect(usersService.assignRole).toHaveBeenCalledTimes(1);
+        expect(warn).toHaveBeenCalledTimes(1);
+        warn.mockRestore();
       });
 
       it('does NOT roll the user doc back — the role change stands', async () => {
@@ -237,11 +240,12 @@ describe('users store', () => {
         expect(usersService.assignRole).toHaveBeenCalledWith('member-1', 'TeamManager', 'office-main', true, null);
       });
 
-      it('surfaces the roster error, so the caller cannot tell which half failed', async () => {
+      it('does not surface the roster error as an assignment failure (C3)', async () => {
+        vi.spyOn(console, 'warn').mockImplementation(() => undefined);
         const store = useUsersStore();
         await store.assignRole('member-1', 'TeamManager', 'office-main', true);
 
-        expect(store.error).toBe(PERMISSION_DENIED_MSG);
+        expect(store.error).toBeNull();
       });
 
       it('a retry re-runs BOTH writes — the user doc write is not idempotency-guarded', async () => {
