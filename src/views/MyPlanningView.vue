@@ -7,6 +7,7 @@ import { useShiftsStore } from '@/stores/shifts';
 import { useUiStore } from '@/stores/ui';
 import {
   FIXED_SHIFT_HOURS,
+  MEMBER_SHIFT_TYPES,
   SHIFT_TYPE_LABELS,
   type Shift,
   type ShiftCreatePayload,
@@ -54,6 +55,22 @@ function makeEmptyForm(): ShiftCreatePayload {
   };
 }
 const form = ref<ShiftCreatePayload>(makeEmptyForm());
+
+/**
+ * Hours follow from the type (decision 004) and members never enter them —
+ * the client plans by shift type, not by clock time. Event is not offered
+ * here, so FIXED_SHIFT_HOURS always has an entry.
+ */
+function onTypeChange(value: string): void {
+  // The select is populated from MEMBER_SHIFT_TYPES, so this only rejects a
+  // value the DOM was tampered with — but an unchecked cast here would index
+  // FIXED_SHIFT_HOURS with a key it may not have and throw.
+  const type = MEMBER_SHIFT_TYPES.find((t) => t === value);
+  if (!type) return;
+  form.value.type = type;
+  form.value.startTime = FIXED_SHIFT_HOURS[type].start;
+  form.value.endTime = FIXED_SHIFT_HOURS[type].end;
+}
 
 const statusLabels: Record<Shift['status'], string> = {
   draft: 'Concept',
@@ -287,6 +304,15 @@ onUnmounted(() => {
             :min="currentWeekStart"
             class="w-full border-black/10 bg-[#faf9f7] text-sm"
           />
+          <select
+            :value="form.type"
+            class="w-full border-black/10 bg-[#faf9f7] text-sm"
+            @change="onTypeChange(($event.target as HTMLSelectElement).value)"
+          >
+            <option v-for="type in MEMBER_SHIFT_TYPES" :key="type" :value="type">
+              {{ SHIFT_TYPE_LABELS[type] }}
+            </option>
+          </select>
           <input
             v-model="form.location"
             placeholder="Locatie (optioneel)"

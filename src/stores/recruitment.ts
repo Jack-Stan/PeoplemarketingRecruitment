@@ -10,6 +10,7 @@ import {
   type LeadStage,
   type RecruitmentLead,
   type RecruitmentLeadCreatePayload,
+  type StreetLeadStatus,
 } from '@/types/recruitmentLead';
 import { todayLocalISO, toLocalISODate, weekStartFor } from '@/utils/date';
 
@@ -103,6 +104,44 @@ export const useRecruitmentStore = defineStore('recruitment', () => {
       .sort((a, b) => b.total - a.total);
   });
 
+  /** Leads someone signed up on the street — the ones a street status applies to. */
+  const streetLeads = computed(() => leads.value.filter((l) => l.recruitedBy));
+
+  /**
+   * Per-recruiter street performance — the analytics half of §3 in
+   * meetings/2026-08-25-client-callback-new-asks.md. Groups by `recruitedBy`
+   * and counts `streetStatus`, NOT `stage`: the client tracks street signups on
+   * their own three-state axis (decisions/009). `pending` is a lead whose
+   * street outcome hasn't been recorded yet, so it's reported rather than
+   * folded into a rate that would understate every recruiter.
+   */
+  const byRecruiterPerformance = computed(() => {
+    const grouped = new Map<string, RecruitmentLead[]>();
+    for (const lead of streetLeads.value) {
+      const bucket = grouped.get(lead.recruitedBy as string) ?? [];
+      bucket.push(lead);
+      grouped.set(lead.recruitedBy as string, bucket);
+    }
+    return [...grouped.entries()]
+      .map(([recruiterId, recruited]) => {
+        const hired = recruited.filter((l) => l.streetStatus === 'hired').length;
+        const noShow = recruited.filter((l) => l.streetStatus === 'no_show').length;
+        const planned = recruited.filter((l) => l.streetStatus === 'planned').length;
+        const decided = hired + noShow;
+        return {
+          recruiterId,
+          total: recruited.length,
+          hired,
+          noShow,
+          planned,
+          pending: recruited.length - hired - noShow - planned,
+          /** Share of *decided* signups that were hired — pending/planned excluded. */
+          hiredRate: decided ? Math.round((hired / decided) * 100) : 0,
+        };
+      })
+      .sort((a, b) => b.hired - a.hired || b.total - a.total);
+  });
+
   /**
    * Newest `max` leads only — see recruitmentService.RECENT_LEADS_LIMIT for
    * why it's capped. Left undefined here so the cap has exactly one home (the
@@ -156,11 +195,28 @@ export const useRecruitmentStore = defineStore('recruitment', () => {
     }
   }
 
+  async function setStreetStatus(
+    officeId: string,
+    leadId: string,
+    streetStatus: StreetLeadStatus | null,
+  ): Promise<boolean> {
+    error.value = null;
+    try {
+      await recruitmentService.update(officeId, leadId, { streetStatus });
+      return true;
+    } catch (err) {
+      error.value = friendlyError(err);
+      return false;
+    }
+  }
+
   return {
     leads,
     isLoading,
     error,
     byStage,
+    streetLeads,
+    byRecruiterPerformance,
     funnelCounts,
     leadsThisWeek,
     openCount,
@@ -170,5 +226,6 @@ export const useRecruitmentStore = defineStore('recruitment', () => {
     unsubscribe,
     create,
     setStage,
+    setStreetStatus,
   };
 });

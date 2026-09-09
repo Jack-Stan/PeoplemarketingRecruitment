@@ -10,6 +10,13 @@ export const FIXED_SHIFT_HOURS: Record<
   Straat: { start: '09:30', end: '17:00' },
 };
 
+/**
+ * The types a TeamMember may plan for themselves. Event is deliberately absent:
+ * it needs a free-text title and times an admin sets (decision 004), so it stays
+ * in PlanningView. Derived from FIXED_SHIFT_HOURS so the two can't drift.
+ */
+export const MEMBER_SHIFT_TYPES = Object.keys(FIXED_SHIFT_HOURS) as Exclude<ShiftType, 'Event'>[];
+
 /** `weekStartFor` used to live here; it's date logic, so it moved to `@/utils/date`. */
 export interface Shift {
   shiftId: string;

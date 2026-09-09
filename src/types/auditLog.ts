@@ -13,7 +13,8 @@ export type AuditAction =
   | 'user_deactivated'
   | 'user_reactivated'
   | 'user_deleted'
-  | 'recruitment_stage_changed';
+  | 'recruitment_stage_changed'
+  | 'recruitment_street_status_changed';
 
 export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   shift_approved: 'Shift goedgekeurd',
@@ -26,6 +27,7 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   user_reactivated: 'Gebruiker gereactiveerd',
   user_deleted: 'Gebruiker verwijderd',
   recruitment_stage_changed: 'Rekrutering: fase gewijzigd',
+  recruitment_street_status_changed: 'Rekrutering: straatstatus gewijzigd',
 };
 
 export interface AuditLogEntry {

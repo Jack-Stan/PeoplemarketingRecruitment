@@ -101,6 +101,41 @@ GDPR is waiting on** — this is a policy decision, not a code task Claude shoul
 
 ---
 
+## Shipped so far
+
+- **Item 1 (click-to-call)** — done. Lead phone numbers in `RecruitmentView` are `tel:` links and emails are
+  `mailto:` links. `UserDetailView` already had a call button; the leads table was the remaining gap
+  (`EmployeesView` never rendered phone, so nothing to do there).
+- **Item 3, `recruitedBy` half** — done. `RecruitmentLead.recruitedBy` holds an `employeeId` (= uid,
+  decisions/007), nullable for legacy docs and non-street sources. Captured via a "Geworven door" selector on
+  the add-lead form and shown as its own column in the leads table — **staff only**: a TeamMember may read
+  `/recruitmentLeads` but only their own `/employees/{uid}` doc, so they can't resolve recruiter ids to names.
+  The view subscribes to the roster only when the viewer is allowed to list it, and hides the column
+  otherwise. Lead reads now normalize `age`/`recruitedBy` to `null` in `recruitment.service.ts`, since
+  Firestore omits those fields entirely on docs written before they existed.
+- **Item 3, status + analytics half** — done, after Stan settled the status question on 2026-09-06:
+  the client's `no show | planned | hired` is a **separate** status for street leads, not a
+  simplification of the seven-stage pipeline (`decisions/009`). Shipped as `StreetLeadStatus` /
+  `RecruitmentLead.streetStatus`, set from the leads table on any lead that has a recruiter, plus a
+  "Prestatie per werver" panel grouping by `recruitedBy`. Item 3 is now complete.
+- **Item 8, shift-type half** — done, after Stan settled scope 2026-09-07: members get D2D and Straat,
+  admins keep Event. `MyPlanningView` never rendered `shift.type` and hardcoded `type: 'D2D'` on every
+  shift a member created, so they could neither see nor choose it — a real defect, not a display nit.
+  The day card now shows the type and the add-day form has a selector over `MEMBER_SHIFT_TYPES`
+  (derived from `FIXED_SHIFT_HOURS` so the two can't drift). Hours stay out of the member flow entirely:
+  they follow from the type per `decisions/004`.
+  The **"not with hours" half is still open** — the member view never showed times to begin with, so the
+  complaint can only be about the admin `PlanningView` table/form, where start–end is shown but already
+  disabled for D2D/Straat. Needs Stan to ask whether the client wants hours gone from the admin view too.
+
+- **Unrelated but adjacent** — a required `age` field on the lead form shipped in #1, from Michiel's
+  2026-09-05 WhatsApp ask.
+
+The status-model question in item 3 is now **settled** — see `decisions/009`. Items 2, 4, 5, 6, 7, 9
+and 10 remain open and still need a question back to the client before any code is worth writing.
+Item 8 is half-shipped: the shift-type gap is fixed; whether hours should also leave the admin planning
+view is still an open question for the client.
+
 ## Summary for Stan
 
 Most of this list is **not yet buildable as-is** — six of the ten items need one clarifying question back to
