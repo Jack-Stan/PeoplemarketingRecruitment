@@ -3,18 +3,30 @@ import type { FirebaseOptions } from 'firebase/app';
 /**
  * Reads Vite env vars and exports a typed Firebase config. When
  * VITE_USE_EMULATORS is truthy we wire the SDK to local emulator hosts
- * (see `src/services/firebase.ts`). For production, set the env vars in
- * .env.local — or just delete .env.local and the values baked below are
- * used (this project ships with real People Marketing Firebase creds).
+ * (see `src/services/firebase.ts`). There is no hardcoded fallback: every
+ * environment (local dev, Netlify deploy previews, production) must set
+ * these env vars explicitly, or the app refuses to start. This is
+ * deliberate — a silent fallback to real credentials previously caused
+ * dev/preview builds to write to live production data.
  */
+function requireEnv(name: string): string {
+  const value = import.meta.env[name];
+  if (!value || typeof value !== 'string' || value.trim() === '') {
+    throw new Error(
+      `Missing required environment variable ${name}. Set it in .env.local (local dev) ` +
+        'or in your Netlify site\'s environment variables (deploys).',
+    );
+  }
+  return value;
+}
+
 export const firebaseConfig: FirebaseOptions = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY ?? 'AIzaSyB-dUrj5tg3X5y-9PdJcO7NPWcTyFohF7Q',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ?? 'peoplemarketing-c5bfd.firebaseapp.com',
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID ?? 'peoplemarketing-c5bfd',
-  storageBucket:
-    import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ?? 'peoplemarketing-c5bfd.firebasestorage.app',
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID ?? '533725479834',
-  appId: import.meta.env.VITE_FIREBASE_APP_ID ?? '1:533725479834:web:327357b2387d02e64eb023',
+  apiKey: requireEnv('VITE_FIREBASE_API_KEY'),
+  authDomain: requireEnv('VITE_FIREBASE_AUTH_DOMAIN'),
+  projectId: requireEnv('VITE_FIREBASE_PROJECT_ID'),
+  storageBucket: requireEnv('VITE_FIREBASE_STORAGE_BUCKET'),
+  messagingSenderId: requireEnv('VITE_FIREBASE_MESSAGING_SENDER_ID'),
+  appId: requireEnv('VITE_FIREBASE_APP_ID'),
 };
 
 export const PROD_APP_URL = 'https://peoplemarketing.netlify.app';
