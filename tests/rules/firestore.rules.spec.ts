@@ -307,15 +307,16 @@ describe('shifts', () => {
       });
     });
     const admin = await ctxFor('admin-1', { role: 'Administrator', primaryOfficeId: OFFICE_ID });
+    const db = admin.firestore();
     await assertFails(
-      admin.firestore().doc(`offices/${OFFICE_ID}/shifts/shift-pending`).update({
+      db.doc(`offices/${OFFICE_ID}/shifts/shift-pending`).update({
         status: 'approved',
         decidedBy: 'mgr-1',
         decidedAt: Date.now(),
       }),
     );
     await assertSucceeds(
-      admin.firestore().doc(`offices/${OFFICE_ID}/shifts/shift-pending`).update({
+      db.doc(`offices/${OFFICE_ID}/shifts/shift-pending`).update({
         status: 'approved',
         decidedBy: 'admin-1',
         decidedAt: Date.now(),
@@ -422,14 +423,15 @@ describe('locations (isCoverageViewer: staff OR a teamleader-flagged member)', (
       await ctx.firestore().doc(`offices/${OFFICE_ID}/locations/loc-visit`).set(zone);
     });
     const member = await ctxFor('emp-member', { role: 'TeamMember', primaryOfficeId: OFFICE_ID });
+    const db = member.firestore();
     await assertFails(
-      member.firestore().doc(`offices/${OFFICE_ID}/locations/loc-visit`).update({
+      db.doc(`offices/${OFFICE_ID}/locations/loc-visit`).update({
         timesVisited: 1,
         lastVisitedAt: Date.now() + 86_400_000,
       }),
     );
     await assertSucceeds(
-      member.firestore().doc(`offices/${OFFICE_ID}/locations/loc-visit`).update({
+      db.doc(`offices/${OFFICE_ID}/locations/loc-visit`).update({
         timesVisited: 1,
         lastVisitedAt: Date.now(),
       }),
@@ -441,6 +443,7 @@ describe('locations (isCoverageViewer: staff OR a teamleader-flagged member)', (
       await ctx.firestore().doc(`offices/${OFFICE_ID}/locations/loc-log`).set(zone);
     });
     const member = await ctxFor('emp-member', { role: 'TeamMember', primaryOfficeId: OFFICE_ID });
+    const db = member.firestore();
     const visit = (visitedAt: number) => ({
       employeeId: 'emp-member',
       employeeName: 'Mia Member',
@@ -448,12 +451,12 @@ describe('locations (isCoverageViewer: staff OR a teamleader-flagged member)', (
       notes: null,
     });
     await assertFails(
-      member.firestore()
+      db
         .doc(`offices/${OFFICE_ID}/locations/loc-log/visits/v-old`)
         .set(visit(Date.now() - 86_400_000)),
     );
     await assertSucceeds(
-      member.firestore()
+      db
         .doc(`offices/${OFFICE_ID}/locations/loc-log/visits/v-now`)
         .set(visit(Date.now())),
     );
@@ -832,14 +835,15 @@ describe('auditLog (append-only, attributed)', () => {
 
   it('a stale or far-future createdAtMs is rejected (it drives ordering)', async () => {
     const manager = await ctxFor('mgr-1', { role: 'TeamManager', primaryOfficeId: OFFICE_ID });
+    const db = manager.firestore();
     await assertFails(
-      manager.firestore().doc(`offices/${OFFICE_ID}/auditLog/entry-7`).set({
+      db.doc(`offices/${OFFICE_ID}/auditLog/entry-7`).set({
         ...entry('mgr-1'),
         createdAtMs: 1756700000000,
       }),
     );
     await assertFails(
-      manager.firestore().doc(`offices/${OFFICE_ID}/auditLog/entry-8`).set({
+      db.doc(`offices/${OFFICE_ID}/auditLog/entry-8`).set({
         ...entry('mgr-1'),
         createdAtMs: Date.now() + 365 * 86_400_000,
       }),
@@ -861,10 +865,11 @@ describe('auditLog (append-only, attributed)', () => {
       await ctx.firestore().doc(`offices/${OFFICE_ID}/auditLog/entry-4`).set(entry('admin-1'));
     });
     const admin = await ctxFor('admin-1', { role: 'Administrator', primaryOfficeId: OFFICE_ID });
+    const db = admin.firestore();
     await assertFails(
-      admin.firestore().doc(`offices/${OFFICE_ID}/auditLog/entry-4`).update({ details: 'edited' }),
+      db.doc(`offices/${OFFICE_ID}/auditLog/entry-4`).update({ details: 'edited' }),
     );
-    await assertFails(admin.firestore().doc(`offices/${OFFICE_ID}/auditLog/entry-4`).delete());
+    await assertFails(db.doc(`offices/${OFFICE_ID}/auditLog/entry-4`).delete());
   });
 });
 
