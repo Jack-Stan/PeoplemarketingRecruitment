@@ -473,6 +473,10 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function doHydrate(fbUser: User, revokeIfMissing: boolean): Promise<void> {
+    // Fresh hydrate = clean slate, as before the de-dup split: clear() is the
+    // only place profileLoadFailed resets (else /unauthorized's retry can
+    // never succeed) and it drops the previous uid's role/office/listener.
+    clear();
     if (isSessionExpired()) {
       localStorage.removeItem(LOGIN_AT_KEY);
       localStorage.removeItem(REMEMBER_KEY);
