@@ -101,7 +101,7 @@ export const tutorialChapters: TutorialChapter[] = [
         text: 'Nieuwe shifts staan eerst op "Concept". Pas als je op "Week indienen" klikt, gaan al je concepten in één keer naar de beheerder ter goedkeuring.',
       },
       {
-        text: 'Een concept verwijderen kan met "Verwijderen" — dat gebeurt meteen, zonder bevestiging.',
+        text: 'Een concept verwijderen kan met "Verwijderen" — de app vraagt eerst om bevestiging.',
       },
       {
         text: 'Klik op "Beschikbaar?" bij een dag om te laten weten dat je die dag kan werken (wordt "✓ Beschikbaar"). Nog eens klikken haalt het weg. Dit is los van je shifts.',
@@ -129,7 +129,12 @@ export const tutorialChapters: TutorialChapter[] = [
         text: 'Een medewerker kan geen twee overlappende shifts op dezelfde dag hebben — de app houdt dat tegen.',
       },
       {
-        text: 'Nieuwe shifts starten als "Concept". Klik op "Indienen" om ze ter goedkeuring te sturen, of op "Verwijderen" (meteen, zonder bevestiging).',
+        text: 'Nieuwe shifts starten als "Concept". Klik op "Indienen" om ze ter goedkeuring te sturen, of op "Verwijderen" (de app vraagt eerst om bevestiging).',
+        roles: ADMIN,
+      },
+      {
+        text: 'Nieuwe shifts starten als "Concept". Klik op "Indienen" om ze ter goedkeuring te sturen.',
+        roles: ['TeamManager'],
       },
       {
         text: 'Shifts "In afwachting" keur je goed met "Goedkeuren" of wijs je af met "Afwijzen". Bij afwijzen kan je een reden meegeven die de teammanager ziet.',
