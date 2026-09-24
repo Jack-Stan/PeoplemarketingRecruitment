@@ -11,7 +11,7 @@
  */
 import { readFileSync } from 'node:fs';
 
-import { AUDIT_ACTION_LABELS, MEMBER_AUDIT_ACTIONS } from '../../src/types/auditLog';
+import { AUDIT_ACTION_LABELS, LEADER_AUDIT_ACTIONS, MEMBER_AUDIT_ACTIONS } from '../../src/types/auditLog';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   assertFails,
@@ -833,6 +833,31 @@ describe('auditLog (append-only, attributed)', () => {
         ...entry('mem-1'),
         action: 'shift_created',
         officeId: OTHER_OFFICE_ID,
+      }),
+    );
+  });
+
+  // 2026-09-24 audit — team leaders may manage locations (isCoverageViewer)
+  // but their location_* audit rows were rejected by the member allowlist.
+  it('a teamleader-flagged TeamMember may log the location actions, a plain member may not', async () => {
+    const lead = await ctxFor('emp-lead', {
+      role: 'TeamMember',
+      primaryOfficeId: OFFICE_ID,
+      isTeamLeader: true,
+    });
+    const member = await ctxFor('mem-1', { role: 'TeamMember', primaryOfficeId: OFFICE_ID });
+    for (const action of LEADER_AUDIT_ACTIONS) {
+      await assertSucceeds(
+        lead.firestore().doc(`offices/${OFFICE_ID}/auditLog/tl-${action}`).set({ ...entry('emp-lead'), action }),
+      );
+      await assertFails(
+        member.firestore().doc(`offices/${OFFICE_ID}/auditLog/mem-${action}`).set({ ...entry('mem-1'), action }),
+      );
+    }
+    await assertFails(
+      lead.firestore().doc(`offices/${OFFICE_ID}/auditLog/tl-forbidden`).set({
+        ...entry('emp-lead'),
+        action: 'role_assigned',
       }),
     );
   });

@@ -687,7 +687,7 @@ onBeforeUnmount(() => {
                     Indienen
                   </button>
                   <button
-                    v-if="shift.status === 'draft'"
+                    v-if="isAdmin && shift.status === 'draft'"
                     class="ml-3 text-neutral-mute hover:text-semantic-danger"
                     @click="deleteDraft(shift)"
                   >

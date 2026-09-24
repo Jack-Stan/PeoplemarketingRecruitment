@@ -355,9 +355,16 @@ service cloud.firestore {
         // else. The old allowlist was also missing
         // recruitment_street_status_changed, so those writes were silently
         // rejected.
+        // A TeamMember with the isTeamLeader flag may also log the location
+        // management they're allowed to do (create/delete/update gate on
+        // isCoverageViewer below) — LEADER_AUDIT_ACTIONS in types/auditLog.ts.
+        // Without this their zone edits succeeded and the audit row was
+        // silently rejected.
         allow create: if (isStaffOf(officeId)
             || (isMember() && sameOffice(officeId)
-                && request.resource.data.action in ['shift_created', 'shift_deleted', 'shift_submitted', 'availability_changed', 'location_visited']))
+                && request.resource.data.action in ['shift_created', 'shift_deleted', 'shift_submitted', 'availability_changed', 'location_visited'])
+            || (isCoverageViewer(officeId)
+                && request.resource.data.action in ['location_created', 'location_updated', 'location_deleted']))
           && request.resource.data.keys().hasOnly([
             'actorUid', 'actorEmail', 'action', 'targetLabel', 'details',
             'createdAtMs', 'officeId', 'createdAt',
