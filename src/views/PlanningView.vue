@@ -4,7 +4,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useAuth } from '@/composables/useAuth';
 import { useActiveOffice } from '@/composables/useActiveOffice';
 import { useOfficeNames } from '@/composables/useOfficeNames';
-import type { DateWindow } from '@/services/shifts.service';
+import { type DateWindow, shiftsService } from '@/services/shifts.service';
 import { useAuditLogStore } from '@/stores/auditLog';
 import { useAvailabilityStore } from '@/stores/availability';
 import { useEmployeesStore } from '@/stores/employees';
@@ -26,6 +26,8 @@ import {
   todayLocalISO,
   weekStartFor,
 } from '@/utils/date';
+import { friendlyError } from '@/utils/errors';
+import { formatWeekMessage } from '@/utils/planningMessage';
 
 const auth = useAuth();
 const employeesStore = useEmployeesStore();
@@ -376,6 +378,63 @@ watch(
   { immediate: true },
 );
 void loadOfficeNames();
+
+// --- Share the week's planning to WhatsApp ---------------------------------
+// Option 1 of the WhatsApp research: no bot, no backend — the manager taps
+// share and picks the group chat themselves. Text is editable before sending.
+const isShareOpen = ref(false);
+const shareWeek = ref(addDaysISO(weekStartFor(today), 7)); // planning is made for next week
+const shareText = ref('');
+const shareLoading = ref(false);
+const shareWeekOptions = computed(() =>
+  [-1, 0, 1, 2].map((offset) => {
+    const start = addDaysISO(weekStartFor(today), offset * 7);
+    const fmt = (iso: string) =>
+      parseLocalISODate(iso).toLocaleDateString('nl-BE', { day: 'numeric', month: 'short' });
+    return { value: start, label: `${fmt(start)} – ${fmt(addDaysISO(start, 6))}` };
+  }),
+);
+async function loadShareText(): Promise<void> {
+  shareLoading.value = true;
+  try {
+    shareText.value = formatWeekMessage(await shiftsService.fetchWeek(officeId.value, shareWeek.value));
+  } catch (err) {
+    shareText.value = '';
+    ui.push(friendlyError(err), 'error');
+  } finally {
+    shareLoading.value = false;
+  }
+}
+function openShare(): void {
+  isShareOpen.value = true;
+  void loadShareText();
+}
+watch(shareWeek, () => isShareOpen.value && void loadShareText());
+async function copyShareText(): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(shareText.value);
+    ui.push('Planning gekopieerd.', 'success');
+  } catch {
+    ui.push('Kopiëren lukte niet — selecteer de tekst en kopieer manueel.', 'error');
+  }
+}
+/**
+ * Phones: the native share sheet (WhatsApp → pick the group). Elsewhere, or if
+ * the sheet is missing: wa.me opens WhatsApp (Web) with the text prefilled and
+ * a chat picker. A user cancelling the sheet throws AbortError — not an error.
+ */
+async function shareToWhatsApp(): Promise<void> {
+  if (navigator.share) {
+    try {
+      await navigator.share({ text: shareText.value });
+      return;
+    } catch (err) {
+      if ((err as DOMException).name === 'AbortError') return;
+    }
+  }
+  window.open(`https://wa.me/?text=${encodeURIComponent(shareText.value)}`, '_blank', 'noopener');
+}
+
 // onBeforeUnmount, not onUnmounted: onUnmounted is post-flush, so on a
 // route change it runs AFTER the next view's setup has already
 // re-subscribed the same shared store — and this cleanup then killed that
@@ -394,15 +453,71 @@ onBeforeUnmount(() => {
         <p class="text-sm text-neutral-mute">Kantoor · {{ officeLabel(officeId) }}</p>
         <h2 class="mt-1 text-3xl font-bold tracking-tight">Planning</h2>
       </div>
-      <button
-        v-if="canDraft"
-        data-tour="new-shift"
-        class="bg-primary-pink px-4 py-2.5 text-sm font-bold text-white"
-        @click="openCreate()"
-      >
-        + Nieuwe shift
-      </button>
+      <div v-if="canDraft" class="flex gap-2">
+        <button
+          class="border border-primary-pink px-4 py-2.5 text-sm font-bold text-primary-pink"
+          @click="openShare()"
+        >
+          Deel planning
+        </button>
+        <button
+          data-tour="new-shift"
+          class="bg-primary-pink px-4 py-2.5 text-sm font-bold text-white"
+          @click="openCreate()"
+        >
+          + Nieuwe shift
+        </button>
+      </div>
     </section>
+
+    <div
+      v-if="isShareOpen"
+      class="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4"
+      @click.self="isShareOpen = false"
+    >
+      <div class="max-h-[90vh] w-full max-w-md overflow-y-auto border border-black/10 bg-white p-6">
+        <div class="flex items-start justify-between">
+          <h3 class="text-lg font-bold">Planning delen</h3>
+          <button class="text-neutral-mute hover:text-neutral-ink" @click="isShareOpen = false">
+            ✕
+          </button>
+        </div>
+        <p class="mt-1 text-xs text-neutral-mute">
+          Enkel goedgekeurde shiften. Pas de tekst gerust aan voor je deelt.
+        </p>
+        <select v-model="shareWeek" class="mt-4 w-full border-black/10 bg-[#faf9f7] text-sm">
+          <option v-for="w in shareWeekOptions" :key="w.value" :value="w.value">
+            Week {{ w.label }}
+          </option>
+        </select>
+        <p v-if="shareLoading" class="mt-3 text-sm text-neutral-mute">Laden…</p>
+        <p v-else-if="!shareText" class="mt-3 text-sm text-neutral-mute">
+          Nog geen goedgekeurde shiften deze week.
+        </p>
+        <textarea
+          v-else
+          v-model="shareText"
+          rows="12"
+          class="mt-3 w-full border-black/10 bg-[#faf9f7] font-mono text-xs"
+        ></textarea>
+        <div class="mt-4 flex justify-end gap-2">
+          <button
+            class="border border-black/10 px-4 py-2 text-sm font-semibold disabled:opacity-40"
+            :disabled="!shareText"
+            @click="copyShareText"
+          >
+            Kopiëren
+          </button>
+          <button
+            class="bg-primary-pink px-4 py-2 text-sm font-bold text-white disabled:opacity-40"
+            :disabled="!shareText"
+            @click="shareToWhatsApp"
+          >
+            Delen via WhatsApp
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- FRD §8 — daily/weekly/monthly views toggle. -->
     <div

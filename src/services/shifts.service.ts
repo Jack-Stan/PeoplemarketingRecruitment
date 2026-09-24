@@ -3,6 +3,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDocs,
   onSnapshot,
   query,
   serverTimestamp,
@@ -93,6 +94,19 @@ export const shiftsService = {
       },
       onError,
     );
+  },
+
+  /**
+   * One-shot read of a whole office week (staff only, per firestore.rules).
+   * For the WhatsApp share: the page's live subscription is bounded to the
+   * visible MONTH, so a week straddling two months would come out half empty.
+   * Single-field equality → automatic index, nothing in firestore.indexes.json.
+   */
+  async fetchWeek(officeId: string, weekStart: string): Promise<Shift[]> {
+    const snapshot = await getDocs(
+      query(shiftsCollection(officeId), where('weekStart', '==', weekStart)),
+    );
+    return snapshot.docs.map((d) => ({ shiftId: d.id, officeId, ...d.data() }) as Shift);
   },
 
   /** A TeamMember's own week — draft/pending/approved for the week they're currently planning. */
