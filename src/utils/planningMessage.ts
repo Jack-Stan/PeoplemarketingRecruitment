@@ -52,3 +52,25 @@ export function formatWeekMessage(shifts: Shift[]): string {
     })
     .join('\n\n');
 }
+
+/**
+ * Hand the planning text to WhatsApp. Only touch/coarse-pointer devices (phones,
+ * tablets) get the native share sheet (WhatsApp → pick the group). Desktop
+ * Chrome/Edge on Windows also expose navigator.share, but that opens the Windows
+ * share sheet, which only lists WhatsApp when the desktop app is installed — so
+ * desktop goes straight to wa.me: WhatsApp (Web) with the text prefilled and a
+ * chat picker. A user cancelling the sheet throws AbortError — not an error, so
+ * nothing opens; any other share failure falls back to wa.me.
+ */
+export async function shareToWhatsApp(text: string): Promise<void> {
+  const isPhone = window.matchMedia?.('(pointer: coarse)').matches ?? false;
+  if (isPhone && typeof navigator.share === 'function') {
+    try {
+      await navigator.share({ text });
+      return;
+    } catch (err) {
+      if ((err as DOMException).name === 'AbortError') return;
+    }
+  }
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
+}

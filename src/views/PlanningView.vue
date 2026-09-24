@@ -27,7 +27,7 @@ import {
   weekStartFor,
 } from '@/utils/date';
 import { friendlyError } from '@/utils/errors';
-import { formatWeekMessage } from '@/utils/planningMessage';
+import { formatWeekMessage, shareToWhatsApp } from '@/utils/planningMessage';
 
 const auth = useAuth();
 const employeesStore = useEmployeesStore();
@@ -435,22 +435,6 @@ async function copyShareText(): Promise<void> {
     ui.push('Kopiëren lukte niet — selecteer de tekst en kopieer manueel.', 'error');
   }
 }
-/**
- * Phones: the native share sheet (WhatsApp → pick the group). Elsewhere, or if
- * the sheet is missing: wa.me opens WhatsApp (Web) with the text prefilled and
- * a chat picker. A user cancelling the sheet throws AbortError — not an error.
- */
-async function shareToWhatsApp(): Promise<void> {
-  if (navigator.share) {
-    try {
-      await navigator.share({ text: shareText.value });
-      return;
-    } catch (err) {
-      if ((err as DOMException).name === 'AbortError') return;
-    }
-  }
-  window.open(`https://wa.me/?text=${encodeURIComponent(shareText.value)}`, '_blank', 'noopener');
-}
 
 // onBeforeUnmount, not onUnmounted: onUnmounted is post-flush, so on a
 // route change it runs AFTER the next view's setup has already
@@ -528,7 +512,7 @@ onBeforeUnmount(() => {
           <button
             class="bg-primary-pink px-4 py-2 text-sm font-bold text-white disabled:opacity-40"
             :disabled="!shareText"
-            @click="shareToWhatsApp"
+            @click="shareToWhatsApp(shareText)"
           >
             Delen via WhatsApp
           </button>
