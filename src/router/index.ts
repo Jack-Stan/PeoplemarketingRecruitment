@@ -9,6 +9,19 @@ import { useAuthStore } from '@/stores/auth';
  *   2. Redirects already-signed-in users away from /login to /dashboard.
  *   3. (Ticket 1) Enforces `meta.roles` allowlists.
  */
+/**
+ * True when a lazy route failed because its hashed chunk is gone after a
+ * deploy. Covers the JS import errors of each browser plus Vite's preload
+ * helper, which rejects with "Unable to preload CSS for …" when the view's
+ * CSS chunk 404s first (LocationsView has its own CSS chunk).
+ */
+export function isStaleChunkError(err: unknown): boolean {
+  const msg = String((err as Error)?.message ?? err);
+  return /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|Unable to preload CSS|MIME type/i.test(
+    msg,
+  );
+}
+
 export function createAppRouter() {
   const router = createRouter({
     history: createWebHistory(),
@@ -62,12 +75,7 @@ export function createAppRouter() {
   // fetches the new index.html and its chunks. The sessionStorage stamp
   // stops a reload loop if the chunk is genuinely broken.
   router.onError((err, to) => {
-    const msg = String((err as Error)?.message ?? err);
-    const isChunkError =
-      /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|MIME type/i.test(
-        msg,
-      );
-    if (!isChunkError) return;
+    if (!isStaleChunkError(err)) return;
     const key = 'pm_chunk_reload';
     try {
       if (sessionStorage.getItem(key) === to.fullPath) return;
