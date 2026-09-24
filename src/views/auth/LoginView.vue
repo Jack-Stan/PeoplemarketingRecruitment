@@ -37,6 +37,12 @@ const resetEmail = ref('');
 const resetting = ref(false);
 
 async function onSubmit(): Promise<void> {
+  // Validated here, not via :disabled — browser autofill holds the values back
+  // from JS until the first interaction, which left the button dead on tap one.
+  if (!email.value.trim() || !password.value) {
+    ui.push('Vul je e-mailadres en wachtwoord in.', 'error');
+    return;
+  }
   submitting.value = true;
   const ok = await auth.signIn(email.value.trim(), password.value, rememberMe.value);
   submitting.value = false;
@@ -109,7 +115,7 @@ async function onSendReset(): Promise<void> {
             />
             Aangemeld blijven
           </label>
-          <BaseButton type="submit" block :loading="submitting" :disabled="!email || !password">
+          <BaseButton type="submit" block :loading="submitting">
             Aanmelden
           </BaseButton>
           <p class="text-center text-xs">
