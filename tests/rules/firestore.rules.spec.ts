@@ -862,16 +862,20 @@ describe('auditLog (append-only, attributed)', () => {
       isTeamLeader: true,
     });
     const member = await ctxFor('mem-1', { role: 'TeamMember', primaryOfficeId: OFFICE_ID });
+    // One Firestore handle per context: a second `.firestore()` call re-applies
+    // emulator settings to an instance already in use and throws.
+    const leadDb = lead.firestore();
+    const memberDb = member.firestore();
     for (const action of LEADER_AUDIT_ACTIONS) {
       await assertSucceeds(
-        lead.firestore().doc(`offices/${OFFICE_ID}/auditLog/tl-${action}`).set({ ...entry('emp-lead'), action }),
+        leadDb.doc(`offices/${OFFICE_ID}/auditLog/tl-${action}`).set({ ...entry('emp-lead'), action }),
       );
       await assertFails(
-        member.firestore().doc(`offices/${OFFICE_ID}/auditLog/mem-${action}`).set({ ...entry('mem-1'), action }),
+        memberDb.doc(`offices/${OFFICE_ID}/auditLog/mem-${action}`).set({ ...entry('mem-1'), action }),
       );
     }
     await assertFails(
-      lead.firestore().doc(`offices/${OFFICE_ID}/auditLog/tl-forbidden`).set({
+      leadDb.doc(`offices/${OFFICE_ID}/auditLog/tl-forbidden`).set({
         ...entry('emp-lead'),
         action: 'role_assigned',
       }),
