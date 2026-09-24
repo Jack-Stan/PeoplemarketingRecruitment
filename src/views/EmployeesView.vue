@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 
 import { useAuth } from '@/composables/useAuth';
@@ -207,7 +207,11 @@ onMounted(() => {
   // — a TeamManager here would just eat a permission-denied anyway.
   if (isAdmin.value) usersStore.subscribe();
 });
-onUnmounted(() => {
+// onBeforeUnmount, not onUnmounted: onUnmounted is post-flush, so on a
+// route change it runs AFTER the next view's setup has already
+// re-subscribed the same shared store — and this cleanup then killed that
+// new listener (Planning stuck on "Laden…", Medewerkers empty after nav).
+onBeforeUnmount(() => {
   store.unsubscribe();
   usersStore.unsubscribe();
 });

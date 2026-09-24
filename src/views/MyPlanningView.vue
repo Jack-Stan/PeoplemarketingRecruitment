@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
 import { useAuth } from '@/composables/useAuth';
 import { useAuditLogStore } from '@/stores/auditLog';
@@ -221,7 +221,11 @@ async function toggleAvailable(date: string): Promise<void> {
 }
 
 onMounted(subscribe);
-onUnmounted(() => {
+// onBeforeUnmount, not onUnmounted: onUnmounted is post-flush, so on a
+// route change it runs AFTER the next view's setup has already
+// re-subscribed the same shared store — and this cleanup then killed that
+// new listener (Planning stuck on "Laden…", Medewerkers empty after nav).
+onBeforeUnmount(() => {
   shiftsStore.unsubscribe();
   availabilityStore.unsubscribe();
 });

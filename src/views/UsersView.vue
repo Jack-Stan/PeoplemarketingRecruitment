@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
 import { useAuth } from '@/composables/useAuth';
@@ -203,7 +203,11 @@ onMounted(async () => {
     ui.push('Kon de lijst met kantoren niet laden.', 'error');
   }
 });
-onUnmounted(() => store.unsubscribe());
+// onBeforeUnmount, not onUnmounted: onUnmounted is post-flush, so on a
+// route change it runs AFTER the next view's setup has already
+// re-subscribed the same shared store — and this cleanup then killed that
+// new listener (Planning stuck on "Laden…", Medewerkers empty after nav).
+onBeforeUnmount(() => store.unsubscribe());
 </script>
 
 <template>

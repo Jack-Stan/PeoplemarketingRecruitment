@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onUnmounted, watch } from 'vue';
+import { onBeforeUnmount, watch } from 'vue';
 
 import { useActiveOffice } from '@/composables/useActiveOffice';
 import { useOfficeNames } from '@/composables/useOfficeNames';
@@ -24,7 +24,11 @@ watch(
   },
   { immediate: true },
 );
-onUnmounted(() => store.unsubscribe());
+// onBeforeUnmount, not onUnmounted: onUnmounted is post-flush, so on a
+// route change it runs AFTER the next view's setup has already
+// re-subscribed the same shared store — and this cleanup then killed that
+// new listener (Planning stuck on "Laden…", Medewerkers empty after nav).
+onBeforeUnmount(() => store.unsubscribe());
 </script>
 
 <template>
