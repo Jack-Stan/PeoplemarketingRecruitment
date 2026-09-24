@@ -209,7 +209,7 @@ onUnmounted(() => {
       </button>
     </section>
 
-    <section class="border border-black/5 bg-white p-6">
+    <section class="border border-black/5 bg-white p-4 sm:p-6">
       <p v-if="shiftsStore.isLoading" class="text-sm text-neutral-mute">Laden…</p>
       <div v-else class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7">
         <div
@@ -277,7 +277,7 @@ onUnmounted(() => {
 
       <div
         v-if="draftCount"
-        class="mt-6 flex items-center justify-between border-t border-black/5 pt-4"
+        class="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-black/5 pt-4"
       >
         <p class="text-xs text-neutral-mute">
           {{ draftCount }} concept-shift{{ draftCount === 1 ? '' : 's' }} klaar om in te dienen.
@@ -295,7 +295,7 @@ onUnmounted(() => {
       v-if="isFormOpen"
       class="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4"
     >
-      <div class="w-full max-w-md border border-black/10 bg-white p-6">
+      <div class="max-h-[90vh] w-full max-w-md overflow-y-auto border border-black/10 bg-white p-6">
         <h3 class="text-lg font-bold">Dag toevoegen</h3>
         <form class="mt-4 space-y-3" @submit.prevent="submitForm">
           <input

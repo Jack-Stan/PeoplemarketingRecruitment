@@ -375,7 +375,7 @@ onUnmounted(() => {
     </section>
 
     <!-- FRD §8 — daily/weekly/monthly views toggle. -->
-    <div class="flex gap-1 border-b border-black/10 pb-px">
+    <div class="flex gap-1 overflow-x-auto border-b border-black/10 pb-px">
       <button
         class="border-b-2 px-4 py-2 text-xs font-bold"
         :class="
@@ -413,7 +413,7 @@ onUnmounted(() => {
     </div>
 
     <!-- Monthly calendar — coverage, weekend highlighting, TL visibility per day. -->
-    <section v-if="viewMode === 'maand'" class="border border-black/5 bg-white p-6">
+    <section v-if="viewMode === 'maand'" class="border border-black/5 bg-white p-4 sm:p-6">
       <div class="flex items-center justify-between">
         <h3 class="text-lg font-bold capitalize">{{ monthLabel }}</h3>
         <div class="flex gap-2">
@@ -431,56 +431,64 @@ onUnmounted(() => {
           </button>
         </div>
       </div>
-      <div
-        class="mt-5 grid grid-cols-7 gap-1.5 text-center text-[10px] font-bold uppercase tracking-[0.1em] text-neutral-mute"
-      >
-        <span v-for="wd in weekdayLabels" :key="wd">{{ wd }}</span>
-      </div>
-      <div class="mt-1.5 grid grid-cols-7 gap-1.5">
-        <div
-          v-for="(cell, i) in monthCells"
-          :key="cell ? cell.iso : `blank-${i}`"
-          class="flex min-h-24 flex-col gap-1 border p-2 text-left"
-          :class="[
-            cell ? 'cursor-pointer hover:border-primary-pink/50' : 'border-transparent',
-            cell?.isToday
-              ? 'border-primary-pink/40 bg-primary-pink/5'
-              : cell?.isWeekend
-                ? 'border-black/10 bg-[#faf9f7]'
-                : 'border-black/10 bg-white',
-          ]"
-          @click="cell && openDayFromMonth(cell.iso)"
-        >
-          <template v-if="cell">
-            <span
-              class="text-xs font-bold"
-              :class="cell.isToday ? 'text-primary-pink' : 'text-neutral-ink'"
-              >{{ cell.dayNumber }}</span
+      <!-- Phone: 7 columns don't fit at 375px, so the month grid side-scrolls. -->
+      <div class="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+        <div class="min-w-[560px] sm:min-w-0">
+          <div
+            class="mt-5 grid grid-cols-7 gap-1.5 text-center text-[10px] font-bold uppercase tracking-[0.1em] text-neutral-mute"
+          >
+            <span v-for="wd in weekdayLabels" :key="wd">{{ wd }}</span>
+          </div>
+          <div class="mt-1.5 grid grid-cols-7 gap-1.5">
+            <div
+              v-for="(cell, i) in monthCells"
+              :key="cell ? cell.iso : `blank-${i}`"
+              class="flex min-h-24 flex-col gap-1 border p-2 text-left"
+              :class="[
+                cell ? 'cursor-pointer hover:border-primary-pink/50' : 'border-transparent',
+                cell?.isToday
+                  ? 'border-primary-pink/40 bg-primary-pink/5'
+                  : cell?.isWeekend
+                    ? 'border-black/10 bg-[#faf9f7]'
+                    : 'border-black/10 bg-white',
+              ]"
+              @click="cell && openDayFromMonth(cell.iso)"
             >
-            <div v-if="cell.shiftCount" class="mt-auto space-y-1">
-              <p class="text-[11px] font-semibold text-neutral-mute">
-                {{ cell.shiftCount }} shift{{ cell.shiftCount === 1 ? '' : 's' }}
-              </p>
-              <div class="flex flex-wrap gap-1">
+              <template v-if="cell">
                 <span
-                  v-if="cell.tlCount"
-                  class="rounded bg-primary-pink/10 px-1.5 py-0.5 text-[10px] font-bold text-primary-pink"
-                  >{{ cell.tlCount }} TL</span
+                  class="text-xs font-bold"
+                  :class="cell.isToday ? 'text-primary-pink' : 'text-neutral-ink'"
+                  >{{ cell.dayNumber }}</span
                 >
-                <span
-                  v-if="cell.pendingCount"
-                  class="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700"
-                  >{{ cell.pendingCount }} wacht</span
-                >
-              </div>
+                <div v-if="cell.shiftCount" class="mt-auto space-y-1">
+                  <p class="text-[11px] font-semibold text-neutral-mute">
+                    {{ cell.shiftCount }} shift{{ cell.shiftCount === 1 ? '' : 's' }}
+                  </p>
+                  <div class="flex flex-wrap gap-1">
+                    <span
+                      v-if="cell.tlCount"
+                      class="rounded bg-primary-pink/10 px-1.5 py-0.5 text-[10px] font-bold text-primary-pink"
+                      >{{ cell.tlCount }} TL</span
+                    >
+                    <span
+                      v-if="cell.pendingCount"
+                      class="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700"
+                      >{{ cell.pendingCount }} wacht</span
+                    >
+                  </div>
+                </div>
+              </template>
             </div>
-          </template>
+          </div>
         </div>
       </div>
     </section>
 
     <!-- Beschikbaarheid — who marked themselves available, per day. TL/admin only. -->
-    <section v-if="viewMode === 'beschikbaarheid'" class="border border-black/5 bg-white p-6">
+    <section
+      v-if="viewMode === 'beschikbaarheid'"
+      class="border border-black/5 bg-white p-4 sm:p-6"
+    >
       <div class="flex items-center justify-between">
         <h3 class="text-sm font-bold text-neutral-mute">Week van {{ availabilityWeekLabel }}</h3>
         <div class="flex gap-2">
@@ -586,7 +594,7 @@ onUnmounted(() => {
         </span>
       </div>
       <div class="overflow-x-auto border border-black/5 bg-white">
-        <table class="w-full min-w-[720px] text-left text-sm">
+        <table class="table-stack w-full text-left text-sm sm:min-w-[720px]">
           <thead
             class="border-b border-black/5 bg-[#faf9f7] text-[10px] uppercase tracking-[0.16em] text-neutral-mute"
           >
@@ -615,13 +623,13 @@ onUnmounted(() => {
                 </td>
               </tr>
               <tr v-for="shift in dayShifts" :key="shift.shiftId" class="hover:bg-[#faf9f7]">
-                <td class="px-5 py-3 font-mono text-xs">
+                <td class="px-5 py-3 font-mono text-xs" data-label="Tijd">
                   {{ shift.startTime }}–{{ shift.endTime }}
                 </td>
-                <td class="px-5 py-3 text-xs font-semibold text-neutral-mute">
+                <td class="px-5 py-3 text-xs font-semibold text-neutral-mute" data-label="Type">
                   {{ shift.type }}<span v-if="shift.eventTitle"> — {{ shift.eventTitle }}</span>
                 </td>
-                <td class="px-5 py-3">
+                <td class="px-5 py-3" data-label="Medewerker">
                   <span class="font-semibold">{{ shift.employeeName }}</span>
                   <span
                     v-if="shift.employeeIsTeamLeader"
@@ -629,7 +637,7 @@ onUnmounted(() => {
                     >TL</span
                   >
                 </td>
-                <td class="px-5 py-3">
+                <td class="px-5 py-3" data-label="Status">
                   <span
                     class="inline-block rounded px-2 py-0.5 text-[11px] font-bold"
                     :class="statusClasses(shift.status)"
@@ -643,7 +651,11 @@ onUnmounted(() => {
                     {{ shift.rejectionReason }}
                   </span>
                 </td>
-                <td v-if="canDraft" class="px-5 py-3 text-right text-xs font-semibold">
+                <td
+                  v-if="canDraft"
+                  class="px-5 py-3 text-right text-xs font-semibold"
+                  data-label=""
+                >
                   <button
                     v-if="shift.status === 'draft'"
                     class="text-neutral-ink hover:text-primary-pink"
@@ -685,7 +697,7 @@ onUnmounted(() => {
       v-if="isFormOpen"
       class="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4"
     >
-      <div class="w-full max-w-md border border-black/10 bg-white p-6">
+      <div class="max-h-[90vh] w-full max-w-md overflow-y-auto border border-black/10 bg-white p-6">
         <h3 class="text-lg font-bold">Nieuwe shift</h3>
         <form class="mt-4 space-y-3" @submit.prevent="submitForm">
           <input
@@ -761,7 +773,7 @@ onUnmounted(() => {
       v-if="rejectingId"
       class="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4"
     >
-      <div class="w-full max-w-sm border border-black/10 bg-white p-6">
+      <div class="max-h-[90vh] w-full max-w-sm overflow-y-auto border border-black/10 bg-white p-6">
         <h3 class="text-lg font-bold">Shift afwijzen</h3>
         <textarea
           v-model="rejectReason"

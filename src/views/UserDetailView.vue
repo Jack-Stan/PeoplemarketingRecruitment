@@ -82,7 +82,7 @@ onUnmounted(() => store.unsubscribe());
     <template v-if="user">
       <section class="flex items-center gap-4 border border-black/5 bg-white p-5">
         <span
-          class="grid h-14 w-14 place-items-center rounded-full text-lg font-bold text-white"
+          class="grid h-14 w-14 shrink-0 place-items-center rounded-full text-lg font-bold text-white"
           :class="user.isTeamLeader ? 'bg-primary-pink' : 'bg-[#111]'"
         >
           {{ (user.displayName || user.email).slice(0, 2).toUpperCase() }}
@@ -101,15 +101,15 @@ onUnmounted(() => store.unsubscribe());
         </div>
       </section>
 
-      <section class="border border-black/5 bg-white p-6">
+      <section class="border border-black/5 bg-white p-4 sm:p-6">
         <h3 class="text-sm font-bold">Contact</h3>
         <div class="mt-4 space-y-5">
           <div class="border-b border-black/5 pb-5">
             <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">
               E-mail
             </p>
-            <div class="mt-1.5 flex items-center gap-2">
-              <p class="text-base">{{ user.email }}</p>
+            <div class="mt-1.5 flex flex-wrap items-center gap-2">
+              <p class="min-w-0 break-all text-base">{{ user.email }}</p>
               <span
                 v-if="!skipVerification"
                 class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold"
@@ -201,7 +201,7 @@ onUnmounted(() => store.unsubscribe());
         </div>
       </section>
 
-      <section class="border border-black/5 bg-white p-6">
+      <section class="border border-black/5 bg-white p-4 sm:p-6">
         <h3 class="text-sm font-bold">Toegang</h3>
         <dl class="mt-4 grid grid-cols-2 gap-6 text-sm sm:grid-cols-4">
           <div>

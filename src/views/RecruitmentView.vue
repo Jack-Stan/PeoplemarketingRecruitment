@@ -204,7 +204,7 @@ onUnmounted(() => {
 
     <!-- FRD §15 Recruitment Quality Reporting — attendance/no-show/conversion + performance per bron. -->
     <section v-if="canManage" class="grid gap-6 xl:grid-cols-[1fr_1.4fr]">
-      <div class="grid grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <article class="border border-black/5 bg-white p-5">
           <p class="text-xs uppercase tracking-[0.16em] text-neutral-mute">Opkomst</p>
           <p class="mt-3 text-3xl font-bold text-emerald-600">
@@ -252,7 +252,7 @@ onUnmounted(() => {
         geplande en nog niet bepaalde tellen niet mee.
       </p>
       <div class="mt-4 overflow-x-auto">
-        <table class="w-full min-w-[560px] text-left text-xs">
+        <table class="table-stack w-full text-left text-xs sm:min-w-[560px]">
           <thead class="text-[10px] uppercase tracking-[0.16em] text-neutral-mute">
             <tr>
               <th class="py-2">Werver</th>
@@ -269,12 +269,18 @@ onUnmounted(() => {
               <td class="py-2.5 font-semibold">
                 {{ recruiterNames.get(row.recruiterId) ?? row.recruiterId }}
               </td>
-              <td class="py-2.5">{{ row.total }}</td>
-              <td class="py-2.5 font-semibold text-emerald-600">{{ row.hired }}</td>
-              <td class="py-2.5 text-semantic-danger">{{ row.noShow }}</td>
-              <td class="py-2.5 text-neutral-mute">{{ row.planned }}</td>
-              <td class="py-2.5 text-neutral-mute">{{ row.pending }}</td>
-              <td class="py-2.5 text-right font-bold">
+              <td class="py-2.5" data-label="Geworven">{{ row.total }}</td>
+              <td class="py-2.5 font-semibold text-emerald-600" data-label="Aangenomen">
+                {{ row.hired }}
+              </td>
+              <td class="py-2.5 text-semantic-danger" data-label="Niet Gekomen">
+                {{ row.noShow }}
+              </td>
+              <td class="py-2.5 text-neutral-mute" data-label="Gepland">{{ row.planned }}</td>
+              <td class="py-2.5 text-neutral-mute" data-label="Nog Niet Bepaald">
+                {{ row.pending }}
+              </td>
+              <td class="py-2.5 text-right font-bold" data-label="Aannamepercentage">
                 {{ row.hired + row.noShow ? `${row.hiredRate}%` : '—' }}
               </td>
             </tr>
@@ -314,7 +320,7 @@ onUnmounted(() => {
     </div>
 
     <section class="overflow-x-auto border border-black/5 bg-white">
-      <table class="w-full min-w-[700px] text-left text-sm">
+      <table class="table-stack w-full text-left text-sm sm:min-w-[700px]">
         <thead
           class="border-b border-black/5 bg-[#faf9f7] text-[10px] uppercase tracking-[0.16em] text-neutral-mute"
         >
@@ -339,15 +345,23 @@ onUnmounted(() => {
               </p>
               <p v-if="lead.notes" class="text-[11px] text-neutral-mute">{{ lead.notes }}</p>
             </td>
-            <td class="px-5 py-4 text-xs text-neutral-mute">{{ lead.source }}</td>
-            <td v-if="canManage" class="px-5 py-4 text-xs text-neutral-mute">
+            <td class="px-5 py-4 text-xs text-neutral-mute" data-label="Bron">{{ lead.source }}</td>
+            <td
+              v-if="canManage"
+              class="px-5 py-4 text-xs text-neutral-mute"
+              data-label="Geworven Door"
+            >
               <!-- Falls back to the raw id so attribution to an employee who has
                    since left the roster isn't silently hidden. -->
               {{
                 lead.recruitedBy ? recruiterNames.get(lead.recruitedBy) ?? lead.recruitedBy : '—'
               }}
             </td>
-            <td v-if="canManage" class="px-5 py-4 text-xs text-neutral-mute">
+            <td
+              v-if="canManage"
+              class="px-5 py-4 text-xs text-neutral-mute"
+              data-label="Straatstatus"
+            >
               <!-- Only street signups carry a street outcome — a Website lead
                    has no recruiter to attribute one to. -->
               <select
@@ -368,14 +382,14 @@ onUnmounted(() => {
               </select>
               <span v-else>—</span>
             </td>
-            <td class="px-5 py-4">
+            <td class="px-5 py-4" data-label="Fase">
               <span
                 class="inline-block bg-primary-pink/10 px-2.5 py-1 text-xs font-bold text-primary-pink"
               >
                 {{ LEAD_STAGE_LABELS[lead.stage] }}
               </span>
             </td>
-            <td class="px-5 py-4 text-xs text-neutral-mute">
+            <td class="px-5 py-4 text-xs text-neutral-mute" data-label="Contact">
               <p v-if="lead.email">
                 <a :href="`mailto:${lead.email}`" class="hover:text-primary-pink" title="Mailen">
                   {{ lead.email }}
@@ -387,7 +401,7 @@ onUnmounted(() => {
                 </a>
               </p>
             </td>
-            <td v-if="canManage" class="px-5 py-4 text-right">
+            <td v-if="canManage" class="px-5 py-4 text-right" data-label="">
               <select
                 :value="lead.stage"
                 class="border-black/10 bg-[#faf9f7] text-xs"
@@ -413,7 +427,7 @@ onUnmounted(() => {
       v-if="isFormOpen"
       class="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4"
     >
-      <div class="w-full max-w-md border border-black/10 bg-white p-6">
+      <div class="max-h-[90vh] w-full max-w-md overflow-y-auto border border-black/10 bg-white p-6">
         <h3 class="text-lg font-bold">Lead toevoegen</h3>
         <form class="mt-4 space-y-3" @submit.prevent="submitForm">
           <input

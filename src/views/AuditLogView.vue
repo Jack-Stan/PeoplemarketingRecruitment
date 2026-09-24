@@ -39,7 +39,7 @@ onUnmounted(() => store.unsubscribe());
     </section>
 
     <section class="overflow-x-auto border border-black/5 bg-white">
-      <table class="w-full min-w-[700px] text-left text-sm">
+      <table class="table-stack w-full text-left text-sm sm:min-w-[700px]">
         <thead
           class="border-b border-black/5 bg-[#faf9f7] text-[10px] uppercase tracking-[0.16em] text-neutral-mute"
         >
@@ -55,15 +55,15 @@ onUnmounted(() => store.unsubscribe());
             <td class="whitespace-nowrap px-5 py-4 font-mono text-xs text-neutral-mute">
               {{ new Date(entry.createdAtMs).toLocaleString('nl-BE') }}
             </td>
-            <td class="px-5 py-4 text-xs">{{ entry.actorEmail }}</td>
-            <td class="px-5 py-4">
+            <td class="px-5 py-4 text-xs" data-label="Door">{{ entry.actorEmail }}</td>
+            <td class="px-5 py-4" data-label="Actie">
               <span
                 class="inline-block bg-primary-pink/10 px-2.5 py-1 text-xs font-bold text-primary-pink"
               >
                 {{ AUDIT_ACTION_LABELS[entry.action] }}
               </span>
             </td>
-            <td class="px-5 py-4 text-xs">
+            <td class="px-5 py-4 text-xs" data-label="Betreft">
               {{ entry.targetLabel }}
               <span v-if="entry.details" class="text-neutral-mute"> — {{ entry.details }}</span>
             </td>

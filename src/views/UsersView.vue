@@ -257,7 +257,7 @@ onUnmounted(() => store.unsubscribe());
     </div>
 
     <section class="overflow-x-auto border border-black/5 bg-white">
-      <table class="w-full min-w-[900px] text-left text-sm">
+      <table class="table-stack w-full text-left text-sm sm:min-w-[900px]">
         <thead
           class="border-b border-black/5 bg-[#faf9f7] text-[10px] uppercase tracking-[0.16em] text-neutral-mute"
         >
@@ -294,7 +294,7 @@ onUnmounted(() => store.unsubscribe());
               <p class="font-bold">{{ u.displayName || u.email }}</p>
               <p class="text-xs text-neutral-mute">{{ u.email }}</p>
             </td>
-            <td class="px-5 py-4">
+            <td class="px-5 py-4" data-label="Rol">
               <span
                 v-if="u.role === null"
                 class="rounded-full bg-primary-pink/10 px-2 py-1 text-xs font-semibold text-primary-pink"
@@ -303,7 +303,7 @@ onUnmounted(() => store.unsubscribe());
               </span>
               <span v-else class="text-xs font-semibold">{{ ROLE_LABELS[u.role] }}</span>
             </td>
-            <td class="px-5 py-4 text-xs text-neutral-mute">
+            <td class="px-5 py-4 text-xs text-neutral-mute" data-label="Kantoor">
               <span v-if="u.role === null">
                 Aangevraagd voor {{ officeLabel(u.desiredOfficeId) }}
                 <span
@@ -316,8 +316,8 @@ onUnmounted(() => store.unsubscribe());
               </span>
               <span v-else>{{ officeLabel(u.primaryOfficeId) }}</span>
             </td>
-            <td class="px-5 py-4 text-xs text-neutral-mute">{{ u.isTeamLeader ? 'Ja' : 'Nee' }}</td>
-            <td class="px-5 py-4">
+            <td class="px-5 py-4 text-xs text-neutral-mute" data-label="Teamleider">{{ u.isTeamLeader ? 'Ja' : 'Nee' }}</td>
+            <td class="px-5 py-4" data-label="Status">
               <span class="inline-flex items-center gap-2 text-xs">
                 <i
                   class="h-2 w-2 rounded-full"
@@ -326,7 +326,7 @@ onUnmounted(() => store.unsubscribe());
                 {{ isUserActive(u) ? 'Actief' : 'Inactief' }}
               </span>
             </td>
-            <td class="px-5 py-4 text-right" @click.stop>
+            <td class="px-5 py-4 text-right" data-label="" @click.stop>
               <button
                 class="grid h-8 w-8 place-items-center rounded-full text-neutral-mute hover:bg-black/5 hover:text-neutral-ink"
                 @click="toggleMenu(u.uid, $event)"

@@ -167,13 +167,13 @@ onUnmounted(() => {
         <p class="mt-4 text-3xl font-bold">{{ pendingCount }}</p>
       </article>
     </section>
-    <section class="border border-black/5 bg-white p-6">
+    <section class="border border-black/5 bg-white p-4 sm:p-6">
       <h3 class="text-lg font-bold">Aankomende shifts</h3>
       <ul v-if="upcoming.length" class="mt-4 divide-y divide-black/5">
         <li
           v-for="s in upcoming"
           :key="s.shiftId"
-          class="flex items-center justify-between py-3 text-sm"
+          class="flex items-center justify-between gap-3 py-3 text-sm"
         >
           <span class="font-semibold">{{ s.date }}</span>
           <span class="text-neutral-mute">{{ s.type }} · {{ s.startTime }}–{{ s.endTime }}</span>
@@ -229,19 +229,19 @@ onUnmounted(() => {
       </article>
     </section>
     <section class="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
-      <article class="border border-black/5 bg-white p-6">
-        <div class="flex items-center justify-between">
+      <article class="border border-black/5 bg-white p-4 sm:p-6">
+        <div class="flex items-center justify-between gap-4">
           <div>
             <h3 class="text-lg font-bold">Deze week in één oogopslag</h3>
             <p class="mt-1 text-xs text-neutral-mute">Ingeplande medewerkers per dag</p>
           </div>
-          <RouterLink to="/planning" class="text-xs font-bold text-primary-pink"
+          <RouterLink to="/planning" class="shrink-0 text-xs font-bold text-primary-pink"
             >Naar planning →</RouterLink
           >
         </div>
         <div
           v-if="weeklyStaffing.length"
-          class="mt-8 flex h-48 items-end justify-between gap-3 border-b border-black/10 px-2"
+          class="mt-8 flex h-48 items-end justify-between gap-1.5 border-b border-black/10 px-0 sm:gap-3 sm:px-2"
         >
           <div
             v-for="day in weeklyStaffing"
@@ -260,13 +260,13 @@ onUnmounted(() => {
         </div>
         <p v-else class="mt-8 text-sm text-neutral-mute">Nog geen shifts deze week.</p>
       </article>
-      <article class="border border-black/5 bg-white p-6">
-        <div class="flex items-center justify-between">
+      <article class="border border-black/5 bg-white p-4 sm:p-6">
+        <div class="flex items-center justify-between gap-4">
           <div>
             <h3 class="text-lg font-bold">Rekrutering</h3>
             <p class="mt-1 text-xs text-neutral-mute">Huidige funnel</p>
           </div>
-          <RouterLink to="/recruitment" class="text-xs font-bold text-primary-pink"
+          <RouterLink to="/recruitment" class="shrink-0 text-xs font-bold text-primary-pink"
             >Open pipeline →</RouterLink
           >
         </div>

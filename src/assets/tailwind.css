@@ -17,3 +17,39 @@
     @apply text-primary-pink hover:underline;
   }
 }
+
+@layer components {
+  /*
+   * Phone layout for the data tables: below `sm` each row becomes a stacked
+   * card and every cell prints its column name from `data-label`, instead of
+   * the whole table side-scrolling at 700-900px. Opt in per table with
+   * `class="table-stack"` + `data-label` on each <td>; pair the table's
+   * min-width with an `sm:` prefix so it only applies from `sm` up.
+   */
+  @media (max-width: 639px) {
+    .table-stack,
+    .table-stack tbody,
+    .table-stack tr,
+    .table-stack td {
+      display: block;
+      width: 100%;
+    }
+    .table-stack thead {
+      display: none;
+    }
+    .table-stack tr {
+      @apply px-4 py-3;
+    }
+    .table-stack td {
+      @apply flex items-start justify-between gap-4 px-0 py-1.5 text-right;
+    }
+    .table-stack td[data-label]::before {
+      content: attr(data-label);
+      @apply shrink-0 pt-0.5 text-left text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute;
+    }
+    /* A cell without a label (name/title) spans the card as its heading. */
+    .table-stack td:not([data-label]) {
+      @apply block text-left;
+    }
+  }
+}

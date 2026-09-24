@@ -89,7 +89,7 @@ async function submit(): Promise<void> {
 
 <template>
   <div class="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4">
-    <div class="w-full max-w-md border border-black/10 bg-white p-6">
+    <div class="max-h-[90vh] w-full max-w-md overflow-y-auto border border-black/10 bg-white p-6">
       <h3 class="text-lg font-bold">Rol toewijzen</h3>
       <p class="mt-1 text-xs text-neutral-mute">Kantoor: {{ officeLabel(targetOfficeId) }}</p>
       <form class="mt-4 space-y-3" @submit.prevent="submit">

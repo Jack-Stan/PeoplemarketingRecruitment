@@ -249,7 +249,7 @@ onUnmounted(() => {
     </div>
 
     <section class="overflow-x-auto border border-black/5 bg-white">
-      <table class="w-full min-w-[700px] text-left text-sm">
+      <table class="table-stack w-full text-left text-sm sm:min-w-[700px]">
         <thead
           class="border-b border-black/5 bg-[#faf9f7] text-[10px] uppercase tracking-[0.16em] text-neutral-mute"
         >
@@ -277,7 +277,7 @@ onUnmounted(() => {
                 </div>
               </div>
             </td>
-            <td class="px-5 py-4">
+            <td class="px-5 py-4" data-label="Rol">
               <span
                 class="text-xs font-semibold"
                 :class="e.isTeamLeader ? 'text-primary-pink' : 'text-neutral-mute'"
@@ -285,7 +285,7 @@ onUnmounted(() => {
                 {{ e.isTeamLeader ? 'Teamleider' : 'Teamlid' }}
               </span>
             </td>
-            <td class="px-5 py-4">
+            <td class="px-5 py-4" data-label="Status">
               <span class="inline-flex items-center gap-2 text-xs">
                 <i
                   class="h-2 w-2 rounded-full"
@@ -294,10 +294,10 @@ onUnmounted(() => {
                 {{ e.isActive ? 'Actief' : 'Inactief' }}
               </span>
             </td>
-            <td class="px-5 py-4 text-xs text-neutral-mute">
+            <td class="px-5 py-4 text-xs text-neutral-mute" data-label="Contract">
               {{ e.weeklyContractHours ? `${e.weeklyContractHours}u / week` : '—' }}
             </td>
-            <td v-if="isAdmin" class="px-5 py-4 text-right">
+            <td v-if="isAdmin" class="px-5 py-4 text-right" data-label="">
               <button
                 class="mr-3 text-xs font-semibold text-neutral-ink hover:text-primary-pink"
                 @click="openEdit(e)"
@@ -324,7 +324,7 @@ onUnmounted(() => {
       v-if="isFormOpen"
       class="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4"
     >
-      <div class="w-full max-w-md border border-black/10 bg-white p-6">
+      <div class="max-h-[90vh] w-full max-w-md overflow-y-auto border border-black/10 bg-white p-6">
         <h3 class="text-lg font-bold">
           {{ editingId ? 'Medewerker bewerken' : 'Medewerker toevoegen' }}
         </h3>
@@ -354,7 +354,7 @@ onUnmounted(() => {
               >-pagina.
             </p>
           </div>
-          <div class="grid grid-cols-2 gap-3">
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <input
               v-model="form.firstName"
               placeholder="Voornaam"

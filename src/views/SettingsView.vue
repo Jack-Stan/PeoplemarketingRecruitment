@@ -207,13 +207,15 @@ function toggleFaq(i: number): void {
         <div class="border border-black/5 bg-white p-5">
           <h3 class="text-sm font-bold">Contact</h3>
           <div class="mt-3 space-y-3">
-            <div class="flex items-center justify-between gap-3 border-b border-black/5 pb-3">
+            <div
+              class="flex flex-col gap-3 border-b border-black/5 pb-3 sm:flex-row sm:items-center sm:justify-between"
+            >
               <div class="min-w-0">
                 <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">
                   E-mail
                 </p>
-                <p class="flex items-center gap-2 truncate text-sm">
-                  {{ profile.email }}
+                <p class="flex min-w-0 items-center gap-2 text-sm">
+                  <span class="truncate">{{ profile.email }}</span>
                   <span
                     v-if="!skipVerification"
                     class="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
@@ -227,7 +229,7 @@ function toggleFaq(i: number): void {
                   </span>
                 </p>
               </div>
-              <div class="flex shrink-0 gap-2">
+              <div class="flex shrink-0 flex-wrap gap-2">
                 <button
                   v-if="!skipVerification && !profile.emailVerified"
                   class="border border-black/10 px-3 py-1.5 text-xs font-semibold hover:border-primary-pink hover:text-primary-pink disabled:opacity-50"

@@ -22,6 +22,9 @@ const HANDLED_CODES = [
   'auth/weak-password',
   'auth/invalid-email',
   'permission-denied',
+  'auth/quota-exceeded',
+  'auth/operation-not-allowed',
+  'auth/unauthorized-continue-uri',
 ] as const;
 
 /** Codes that intentionally share one message (same message to avoid leaking which half of a login was wrong). */

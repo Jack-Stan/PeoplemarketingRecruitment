@@ -111,9 +111,15 @@ const selected = computed(
   () => store.locations.find((l) => l.locationId === selectedId.value) ?? null,
 );
 
+const panelEl = ref<HTMLElement | null>(null);
 function selectLocation(l: Location): void {
   if (mode.value !== 'none') return; // ignore selection clicks while placing/reshaping
   selectedId.value = l.locationId;
+  // Below `lg` the panel stacks under a 60vh map, i.e. off-screen — without
+  // this a tap on a zone looks like it did nothing on a phone.
+  if (!window.matchMedia('(min-width: 1024px)').matches) {
+    void nextTick(() => panelEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }
 }
 function closePanel(): void {
   selectedId.value = null;
@@ -489,7 +495,7 @@ onBeforeUnmount(() => {
     </p>
     <div
       v-if="mode === 'reshape'"
-      class="flex items-center justify-between border border-primary-pink/30 bg-primary-pink/5 p-3 text-xs font-semibold text-primary-pink"
+      class="flex flex-wrap items-center justify-between gap-2 border border-primary-pink/30 bg-primary-pink/5 p-3 text-xs font-semibold text-primary-pink"
     >
       <span>Sleep de punten om de zone aan te passen.</span>
       <span class="flex gap-2">
@@ -524,11 +530,12 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="flex flex-col gap-4 lg:flex-row">
-      <div ref="mapEl" class="h-[520px] flex-1 border border-black/5 bg-[#eee]"></div>
+      <div ref="mapEl" class="h-[60vh] min-h-[320px] flex-1 lg:h-[520px] border border-black/5 bg-[#eee]"></div>
 
       <!-- Detail panel: opens on clicking a pin/zone on the map, or a row below. -->
       <aside
         v-if="selected"
+        ref="panelEl"
         class="w-full shrink-0 space-y-4 border border-black/5 bg-white p-5 lg:w-80"
       >
         <div class="flex items-start justify-between">
@@ -615,7 +622,7 @@ onBeforeUnmount(() => {
     </div>
 
     <section class="overflow-x-auto border border-black/5 bg-white">
-      <table class="w-full min-w-[760px] text-left text-sm">
+      <table class="table-stack w-full text-left text-sm sm:min-w-[760px]">
         <thead
           class="border-b border-black/5 bg-[#faf9f7] text-[10px] uppercase tracking-[0.16em] text-neutral-mute"
         >
@@ -651,7 +658,7 @@ onBeforeUnmount(() => {
               </p>
               <p class="text-xs text-neutral-mute">{{ l.neighbourhood ?? l.address ?? '—' }}</p>
             </td>
-            <td class="px-5 py-4">
+            <td class="px-5 py-4" data-label="Status">
               <span class="inline-flex items-center gap-2 text-xs font-semibold">
                 <i
                   class="h-2 w-2 rounded-full"
@@ -660,13 +667,13 @@ onBeforeUnmount(() => {
                 {{ LOCATION_STATUS_LABELS[l.status] }}
               </span>
             </td>
-            <td v-if="canSeeCoverage" class="px-5 py-4 text-xs text-neutral-mute">
+            <td v-if="canSeeCoverage" class="px-5 py-4 text-xs text-neutral-mute" data-label="Keer bezocht">
               {{ l.timesVisited }}x
             </td>
-            <td v-if="canSeeCoverage" class="px-5 py-4 text-xs text-neutral-mute">
+            <td v-if="canSeeCoverage" class="px-5 py-4 text-xs text-neutral-mute" data-label="Laatst bezocht">
               {{ formatDate(l.lastVisitedAt) }}
             </td>
-            <td class="px-5 py-4 text-right">
+            <td class="px-5 py-4 text-right" data-label="">
               <button
                 class="text-xs font-semibold text-neutral-ink hover:text-primary-pink"
                 @click.stop="logVisit(l)"
@@ -687,7 +694,7 @@ onBeforeUnmount(() => {
       v-if="isFormOpen"
       class="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4"
     >
-      <div class="w-full max-w-md border border-black/10 bg-white p-6">
+      <div class="max-h-[90vh] w-full max-w-md overflow-y-auto border border-black/10 bg-white p-6">
         <h3 class="text-lg font-bold">
           {{ editingId ? 'Locatie bewerken' : 'Locatie toevoegen' }}
         </h3>
@@ -736,7 +743,7 @@ onBeforeUnmount(() => {
             placeholder="Adres (optioneel)"
             class="w-full border-black/10 bg-[#faf9f7] text-sm"
           />
-          <div v-if="!form.boundary" class="grid grid-cols-2 gap-3">
+          <div v-if="!form.boundary" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <input
               v-model.number="form.lat"
               type="number"

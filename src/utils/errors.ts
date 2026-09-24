@@ -27,6 +27,15 @@ export function friendlyError(err: unknown): string {
         return 'Geef een geldig e-mailadres op.';
       case 'permission-denied':
         return 'Je hebt geen rechten om dit te doen.';
+      // Invite-mail failures. Spark plan caps email-link sign-in at 5 mails a
+      // day (firebase.google.com/docs/auth/limits); without these the admin
+      // just saw the generic fallback and couldn't tell quota from config.
+      case 'auth/quota-exceeded':
+        return 'Daglimiet voor uitnodigingsmails bereikt. Probeer het morgen opnieuw.';
+      case 'auth/operation-not-allowed':
+        return 'Aanmelden via e-maillink staat uit in Firebase.';
+      case 'auth/unauthorized-continue-uri':
+        return 'Het domein van de uitnodigingslink is niet toegestaan in Firebase.';
       default:
         return 'Er ging iets mis. Probeer het opnieuw.';
     }
