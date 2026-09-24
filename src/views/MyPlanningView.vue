@@ -4,6 +4,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useAuth } from '@/composables/useAuth';
 import { useAuditLogStore } from '@/stores/auditLog';
 import { useAvailabilityStore } from '@/stores/availability';
+import { useConfirmStore } from '@/stores/confirm';
 import { useShiftsStore } from '@/stores/shifts';
 import { useUiStore } from '@/stores/ui';
 import {
@@ -156,6 +157,11 @@ async function submitForm(): Promise<void> {
 }
 
 async function removeDraft(shift: Shift): Promise<void> {
+  const sure = await useConfirmStore().ask('Deze concept-shift verwijderen?', {
+    title: 'Concept verwijderen',
+    danger: true,
+  });
+  if (!sure) return;
   const ok = await shiftsStore.remove(officeId.value, shift.shiftId);
   ui.push(
     ok ? 'Concept verwijderd.' : shiftsStore.error ?? 'Er ging iets mis.',
@@ -258,6 +264,7 @@ onBeforeUnmount(() => {
         <h2 class="mt-1 text-3xl font-bold tracking-tight">Plan jouw week</h2>
       </div>
       <button
+        data-tour="add-shift"
         class="bg-primary-pink px-4 py-2.5 text-sm font-bold text-white"
         @click="openCreate()"
       >
@@ -301,6 +308,7 @@ onBeforeUnmount(() => {
                 : 'border-black/10 text-neutral-mute hover:border-primary-pink/40 hover:text-primary-pink'
             "
             :disabled="togglingDates.has(day.iso)"
+            data-tour="availability"
             @click="toggleAvailable(day.iso)"
           >
             {{ availabilityStore.isMarked(uid, day.iso) ? '✓ Beschikbaar' : 'Beschikbaar?' }}
@@ -342,6 +350,7 @@ onBeforeUnmount(() => {
         <button
           class="bg-neutral-ink px-4 py-2 text-xs font-bold text-white hover:bg-black disabled:opacity-60"
           :disabled="submittingWeek"
+          data-tour="submit-week"
           @click="submitWeek"
         >
           Week indienen

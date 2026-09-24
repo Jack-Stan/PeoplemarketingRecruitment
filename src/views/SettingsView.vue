@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
-import { useRoute } from 'vue-router';
+import { computed, onMounted, ref, watch } from 'vue';
+import { RouterLink, useRoute } from 'vue-router';
 
 import { useAuth } from '@/composables/useAuth';
 import { useOfficeNames } from '@/composables/useOfficeNames';
+import { useTutorial } from '@/composables/useTutorial';
+import { chaptersForRole } from '@/content/tutorial';
 import { useUiStore } from '@/stores/ui';
 import { usersService } from '@/services/users.service';
 import { isValidEmail } from '@/utils/validators';
@@ -16,6 +18,12 @@ const ui = useUiStore();
 const { officeLabel, loadOfficeNames } = useOfficeNames();
 
 const tab = ref<'profile' | 'faq'>(route.query.tab === 'faq' ? 'faq' : 'profile');
+// The account-menu link can be clicked while already on /settings — the view
+// is reused then, so follow the query instead of reading it once.
+watch(
+  () => route.query.tab,
+  (t) => (tab.value = t === 'faq' ? 'faq' : 'profile'),
+);
 const profile = ref<UserProfile | null>(null);
 const isLoading = ref(true);
 // Verification badges/actions exist so a colleague or admin can trust a
@@ -133,10 +141,29 @@ const faqs = [
     a: 'Het menu toont enkel pagina’s die passen bij jouw rol (Teamlid, Teammanager of Beheerder). Neem contact op met een beheerder als je denkt dat dit niet klopt.',
   },
   {
+    q: 'Ik ben goedgekeurd, maar zie nog steeds "Wachten op goedkeuring".',
+    a: 'Die pagina ververst niet vanzelf. Herlaad de pagina of meld je opnieuw aan.',
+  },
+  {
+    q: 'Waarom kan ik iemand niet inplannen of als werver kiezen?',
+    a: 'Alleen actieve medewerkers op het rooster verschijnen in die lijsten. Een goedgekeurd account moet nog door een beheerder toegevoegd worden onder Medewerkers.',
+  },
+  {
+    q: 'Mijn shift staat niet bij "Aankomende shifts".',
+    a: 'Daar staan enkel goedgekeurde shifts. Check in Mijn planning of hij nog op "Concept" staat (dan moet je je week nog indienen) of op "In afwachting".',
+  },
+  {
     q: 'Bij wie kan ik terecht met vragen over mijn planning?',
     a: 'Neem contact op met je teammanager of de beheerder van je kantoor.',
   },
 ];
+const tutorial = useTutorial();
+const chapters = computed(() => chaptersForRole(auth.role.value));
+const openChapter = ref<string | null>(null);
+function toggleChapter(id: string): void {
+  openChapter.value = openChapter.value === id ? null : id;
+}
+
 const openFaq = ref<number | null>(null);
 function toggleFaq(i: number): void {
   openFaq.value = openFaq.value === i ? null : i;
@@ -168,7 +195,7 @@ function toggleFaq(i: number): void {
         "
         @click="tab = 'faq'"
       >
-        FAQ
+        Handleiding &amp; FAQ
       </button>
     </div>
 
@@ -329,16 +356,75 @@ function toggleFaq(i: number): void {
       </p>
     </section>
 
-    <section v-else class="divide-y divide-black/5 border border-black/5 bg-white">
-      <div v-for="(item, i) in faqs" :key="item.q">
+    <section v-else class="space-y-6">
+      <div
+        class="flex flex-col gap-3 border border-black/5 bg-white p-5 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div>
+          <h3 class="text-sm font-bold">Nieuw hier?</h3>
+          <p class="mt-0.5 text-sm text-neutral-mute">
+            Een korte rondleiding langs alles wat jij in de app kan doen.
+          </p>
+        </div>
         <button
-          class="flex w-full items-center justify-between gap-3 px-5 py-4 text-left text-sm font-semibold"
-          @click="toggleFaq(i)"
+          class="shrink-0 bg-primary-pink px-4 py-2 text-xs font-bold text-white"
+          @click="tutorial.open()"
         >
-          {{ item.q }}
-          <span class="text-neutral-mute">{{ openFaq === i ? '−' : '+' }}</span>
+          Rondleiding starten
         </button>
-        <p v-if="openFaq === i" class="px-5 pb-4 text-sm text-neutral-mute">{{ item.a }}</p>
+      </div>
+
+      <div>
+        <h3 class="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">
+          Handleiding
+        </h3>
+        <div class="divide-y divide-black/5 border border-black/5 bg-white">
+          <div v-for="c in chapters" :key="c.id">
+            <button
+              class="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
+              :aria-expanded="openChapter === c.id"
+              @click="toggleChapter(c.id)"
+            >
+              <span class="min-w-0">
+                <span class="flex items-center gap-2 text-sm font-semibold">
+                  <span class="w-4 text-primary-pink">{{ c.icon }}</span
+                  >{{ c.title }}
+                </span>
+                <span class="mt-0.5 block pl-6 text-xs text-neutral-mute">{{ c.summary }}</span>
+              </span>
+              <span class="text-neutral-mute">{{ openChapter === c.id ? '−' : '+' }}</span>
+            </button>
+            <div v-if="openChapter === c.id" class="px-5 pb-4 pl-11">
+              <ol class="list-decimal space-y-2 pl-4 text-sm text-neutral-ink">
+                <li v-for="s in c.steps" :key="s.text">{{ s.text }}</li>
+              </ol>
+              <RouterLink
+                v-if="c.to && c.to !== route.path"
+                :to="c.to"
+                class="mt-3 inline-block text-xs font-semibold text-primary-pink hover:underline"
+                >Naar {{ c.title }} →</RouterLink
+              >
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h3 class="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute">
+          Veelgestelde vragen
+        </h3>
+        <div class="divide-y divide-black/5 border border-black/5 bg-white">
+          <div v-for="(item, i) in faqs" :key="item.q">
+            <button
+              class="flex w-full items-center justify-between gap-3 px-5 py-4 text-left text-sm font-semibold"
+              @click="toggleFaq(i)"
+            >
+              {{ item.q }}
+              <span class="text-neutral-mute">{{ openFaq === i ? '−' : '+' }}</span>
+            </button>
+            <p v-if="openFaq === i" class="px-5 pb-4 text-sm text-neutral-mute">{{ item.a }}</p>
+          </div>
+        </div>
       </div>
     </section>
   </div>

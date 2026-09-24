@@ -8,6 +8,7 @@ import type { DateWindow } from '@/services/shifts.service';
 import { useAuditLogStore } from '@/stores/auditLog';
 import { useAvailabilityStore } from '@/stores/availability';
 import { useEmployeesStore } from '@/stores/employees';
+import { useConfirmStore } from '@/stores/confirm';
 import { useShiftsStore } from '@/stores/shifts';
 import { useUiStore } from '@/stores/ui';
 import {
@@ -352,6 +353,11 @@ async function confirmReject(): Promise<void> {
 }
 
 async function deleteDraft(shift: Shift): Promise<void> {
+  const sure = await useConfirmStore().ask('Deze concept-shift verwijderen?', {
+    title: 'Concept verwijderen',
+    danger: true,
+  });
+  if (!sure) return;
   const ok = await shiftsStore.remove(officeId.value, shift.shiftId);
   ui.push(
     ok ? 'Concept verwijderd.' : shiftsStore.error ?? 'Er ging iets mis.',
@@ -407,6 +413,7 @@ onBeforeUnmount(() => {
       </div>
       <button
         v-if="canDraft"
+        data-tour="new-shift"
         class="bg-primary-pink px-4 py-2.5 text-sm font-bold text-white"
         @click="openCreate()"
       >
@@ -415,7 +422,10 @@ onBeforeUnmount(() => {
     </section>
 
     <!-- FRD §8 — daily/weekly/monthly views toggle. -->
-    <div class="flex gap-1 overflow-x-auto border-b border-black/10 pb-px">
+    <div
+      data-tour="planning-tabs"
+      class="flex gap-1 overflow-x-auto border-b border-black/10 pb-px"
+    >
       <button
         class="border-b-2 px-4 py-2 text-xs font-bold"
         :class="
@@ -633,7 +643,7 @@ onBeforeUnmount(() => {
           <button class="text-primary-pink hover:underline" @click="dateFilter = null">✕</button>
         </span>
       </div>
-      <div class="overflow-x-auto border border-black/5 bg-white">
+      <div data-tour="planning-list" class="overflow-x-auto border border-black/5 bg-white">
         <table class="table-stack w-full text-left text-sm sm:min-w-[720px]">
           <thead
             class="border-b border-black/5 bg-[#faf9f7] text-[10px] uppercase tracking-[0.16em] text-neutral-mute"

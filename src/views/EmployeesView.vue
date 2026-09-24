@@ -228,6 +228,7 @@ onBeforeUnmount(() => {
       </div>
       <button
         v-if="isAdmin"
+        data-tour="add-employee"
         class="bg-primary-pink px-4 py-2.5 text-sm font-bold text-white"
         @click="openCreate"
       >
@@ -238,6 +239,7 @@ onBeforeUnmount(() => {
     <div class="flex flex-col gap-3 border border-black/5 bg-white p-4 sm:flex-row">
       <input
         v-model="search"
+        data-tour="employee-search"
         class="min-w-0 flex-1 border-black/10 bg-[#faf9f7] text-sm focus:border-primary-pink focus:ring-primary-pink"
         placeholder="Zoek medewerkers op naam of e-mail"
         type="search"

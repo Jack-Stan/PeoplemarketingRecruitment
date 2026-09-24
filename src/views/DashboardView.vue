@@ -120,9 +120,19 @@ const recruitmentPulse = computed(() => {
       color: 'bg-emerald-500',
       pct: (c.attended / total) * 100,
     },
-    { label: 'Niet opgekomen', value: c.noShow, color: 'bg-rose-300', pct: (c.noShow / total) * 100 },
+    {
+      label: 'Niet opgekomen',
+      value: c.noShow,
+      color: 'bg-rose-300',
+      pct: (c.noShow / total) * 100,
+    },
     { label: 'Aangenomen', value: c.hired, color: 'bg-amber-400', pct: (c.hired / total) * 100 },
-    { label: 'Afgewezen', value: c.rejected, color: 'bg-neutral-300', pct: (c.rejected / total) * 100 },
+    {
+      label: 'Afgewezen',
+      value: c.rejected,
+      color: 'bg-neutral-300',
+      pct: (c.rejected / total) * 100,
+    },
   ];
 });
 
@@ -159,7 +169,7 @@ onBeforeUnmount(() => {
       <p class="text-sm text-neutral-mute">{{ auth.functie.value || 'Jouw shifts' }}</p>
       <h2 class="mt-1 text-3xl font-bold tracking-tight">{{ greeting }}</h2>
     </section>
-    <section class="grid gap-4 sm:grid-cols-2">
+    <section data-tour="dashboard-cards" class="grid gap-4 sm:grid-cols-2">
       <article class="border border-black/5 bg-white p-5">
         <p class="text-xs font-bold uppercase tracking-[0.16em] text-neutral-mute">
           Shifts voltooid
@@ -210,7 +220,7 @@ onBeforeUnmount(() => {
         Planning openen <span class="ml-3">→</span></RouterLink
       >
     </section>
-    <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <section data-tour="dashboard-cards" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <article class="min-h-32 border border-black/5 bg-neutral-ink p-5 text-white">
         <p class="text-xs font-bold uppercase tracking-[0.16em] opacity-60">Vandaag ingepland</p>
         <p class="mt-4 text-3xl font-bold">{{ todaysShifts.length }}</p>

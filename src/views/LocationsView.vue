@@ -24,6 +24,7 @@ polylineProto._onTouch = function (this: unknown, e: L.LeafletEvent) {
 import { useAuth } from '@/composables/useAuth';
 import { useActiveOffice } from '@/composables/useActiveOffice';
 import { useAuditLogStore } from '@/stores/auditLog';
+import { useConfirmStore } from '@/stores/confirm';
 import { useLocationsStore } from '@/stores/locations';
 import { useUiStore } from '@/stores/ui';
 import {
@@ -45,6 +46,7 @@ const auth = useAuth();
 const store = useLocationsStore();
 const auditLog = useAuditLogStore();
 const ui = useUiStore();
+const confirm = useConfirmStore();
 const { officeId } = useActiveOffice();
 
 /**
@@ -241,12 +243,38 @@ onMounted(async () => {
   }).addTo(map);
   map.on('click', onMapClick);
   map.on('draw:created', ((e: L.DrawEvents.Created) => onAreaDrawn(e)) as L.LeafletEventHandlerFn);
+  map.on('draw:drawvertex', () => (vertexCount.value = drawnVertices()));
+  if (L.Browser.mobile) enableTwoFingerPan(map);
   renderLocations();
 });
 onBeforeUnmount(() => {
+  clearTimeout(hintTimer);
   map?.remove();
   map = null;
 });
+
+/**
+ * On a phone the map fills most of the screen and a one-finger drag panned it,
+ * so the page couldn't be scrolled past it. With `dragging` off Leaflet drops
+ * `leaflet-touch-drag` and the container falls back to `touch-action: pan-x
+ * pan-y`: one finger scrolls the page, and two fingers still pan + pinch-zoom
+ * via TouchZoom (it follows the pinch centre). Taps (pins, draw vertices) and
+ * reshape-marker drags are unaffected. UA-based, so touch laptops keep drag.
+ */
+const showPanHint = ref(false);
+let hintTimer: ReturnType<typeof setTimeout> | undefined;
+function enableTwoFingerPan(m: L.Map): void {
+  m.dragging.disable();
+  m.getContainer().addEventListener(
+    'touchmove',
+    (e) => {
+      showPanHint.value = e.touches.length === 1;
+      clearTimeout(hintTimer);
+      if (showPanHint.value) hintTimer = setTimeout(() => (showPanHint.value = false), 1500);
+    },
+    { passive: true },
+  );
+}
 // Data snapshots and row selection redraw in place; only a filter change refits.
 watch(filtered, () => renderLocations());
 watch(selectedId, () => renderLocations());
@@ -259,9 +287,29 @@ function onMapClick(e: L.LeafletMouseEvent): void {
   mode.value = 'none';
 }
 
+/**
+ * Vertices placed so far in the active draw. On a phone, hitting the first
+ * vertex exactly to close a zone is near-impossible, so the banner offers
+ * explicit Voltooien / Ongedaan buttons driven by this count.
+ */
+const vertexCount = ref(0);
+function drawnVertices(): number {
+  return (drawHandler as unknown as { _markers?: unknown[] } | null)?._markers?.length ?? 0;
+}
+function finishDrawing(): void {
+  drawHandler?.completeShape();
+}
+function undoVertex(): void {
+  drawHandler?.deleteLastVertex();
+  // deleteLastVertex doesn't fire draw:drawvertex — recount by hand, or
+  // Voltooien stays enabled below the minimum after an undo.
+  vertexCount.value = drawnVertices();
+}
+
 function stopDrawing(): void {
   drawHandler?.disable();
   drawHandler = null;
+  vertexCount.value = 0;
   map?.doubleClickZoom.enable();
   mode.value = 'none';
 }
@@ -423,6 +471,11 @@ async function quickSetStatus(l: Location, status: LocationStatus): Promise<void
   );
 }
 async function removeLocation(l: Location): Promise<void> {
+  const sure = await confirm.ask(
+    `${l.name} verwijderen? De locatie en haar bezoeken verdwijnen van de kaart.`,
+    { title: 'Locatie verwijderen', danger: true },
+  );
+  if (!sure) return;
   const ok = await store.remove(officeId.value, l.locationId);
   ui.push(
     ok ? 'Locatie verwijderd.' : store.error ?? 'Er ging iets mis.',
@@ -472,27 +525,35 @@ onBeforeUnmount(() => {
         <p class="text-sm text-neutral-mute">Kantoor · {{ store.locations.length }} locaties</p>
         <h2 class="mt-1 text-3xl font-bold tracking-tight">Locaties</h2>
       </div>
-      <div v-if="canManage" class="flex flex-wrap gap-2">
+      <!-- One row of three on a phone (short labels); full labels from `sm`. -->
+      <div
+        v-if="canManage"
+        data-tour="draw-tools"
+        class="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap"
+      >
         <button
-          class="border border-primary-pink px-4 py-2.5 text-sm font-bold text-primary-pink"
+          class="border border-primary-pink px-2 py-2.5 text-sm font-bold text-primary-pink sm:px-4"
           :class="{ 'bg-primary-pink text-white': mode === 'point' }"
           @click="toggleAddPoint"
         >
-          {{ mode === 'point' ? 'Klik op de kaart…' : '📍 Punt plaatsen' }}
+          <template v-if="mode === 'point'">✕ Annuleren</template>
+          <template v-else>📍 Punt<span class="hidden sm:inline"> plaatsen</span></template>
         </button>
         <button
-          class="border border-primary-pink px-4 py-2.5 text-sm font-bold text-primary-pink"
+          class="border border-primary-pink px-2 py-2.5 text-sm font-bold text-primary-pink sm:px-4"
           :class="{ 'bg-primary-pink text-white': mode === 'area' }"
           @click="toggleDraw('area')"
         >
-          {{ mode === 'area' ? 'Tekenen annuleren' : '⬠ Zone tekenen' }}
+          <template v-if="mode === 'area'">✕ Annuleren</template>
+          <template v-else>⬠ Zone<span class="hidden sm:inline"> tekenen</span></template>
         </button>
         <button
-          class="border border-primary-pink px-4 py-2.5 text-sm font-bold text-primary-pink"
+          class="border border-primary-pink px-2 py-2.5 text-sm font-bold text-primary-pink sm:px-4"
           :class="{ 'bg-primary-pink text-white': mode === 'street' }"
           @click="toggleDraw('street')"
         >
-          {{ mode === 'street' ? 'Tekenen annuleren' : '〰 Straat tekenen' }}
+          <template v-if="mode === 'street'">✕ Annuleren</template>
+          <template v-else>〰 Straat<span class="hidden sm:inline"> tekenen</span></template>
         </button>
       </div>
     </section>
@@ -503,20 +564,31 @@ onBeforeUnmount(() => {
     >
       Klik ergens op de kaart om daar een nieuwe locatie te plaatsen.
     </p>
-    <p
-      v-if="mode === 'area'"
-      class="border border-primary-pink/30 bg-primary-pink/5 p-3 text-xs font-semibold text-primary-pink"
+    <div
+      v-if="mode === 'area' || mode === 'street'"
+      class="flex flex-wrap items-center justify-between gap-2 border border-primary-pink/30 bg-primary-pink/5 p-3 text-xs font-semibold text-primary-pink"
     >
-      Klik op de kaart om hoekpunten te plaatsen (minstens 3); klik op het eerste punt om de zone te
-      sluiten.
-    </p>
-    <p
-      v-if="mode === 'street'"
-      class="border border-primary-pink/30 bg-primary-pink/5 p-3 text-xs font-semibold text-primary-pink"
-    >
-      Klik langs de straat om punten te plaatsen (minstens 2); klik op het laatste punt om de straat
-      af te ronden.
-    </p>
+      <span v-if="mode === 'area'">
+        Tik op de kaart om hoekpunten te plaatsen (minstens 3), dan Voltooien.
+      </span>
+      <span v-else>Tik langs de straat om punten te plaatsen (minstens 2), dan Voltooien.</span>
+      <span class="flex gap-2">
+        <button
+          class="border border-primary-pink px-3 py-1.5 disabled:opacity-40"
+          :disabled="vertexCount < 1"
+          @click="undoVertex"
+        >
+          Punt terug
+        </button>
+        <button
+          class="bg-primary-pink px-3 py-1.5 text-white disabled:opacity-40"
+          :disabled="vertexCount < (mode === 'area' ? 3 : 2)"
+          @click="finishDrawing"
+        >
+          Voltooien
+        </button>
+      </span>
+    </div>
     <div
       v-if="mode === 'reshape'"
       class="flex flex-wrap items-center justify-between gap-2 border border-primary-pink/30 bg-primary-pink/5 p-3 text-xs font-semibold text-primary-pink"
@@ -532,20 +604,23 @@ onBeforeUnmount(() => {
       </span>
     </div>
 
-    <div class="flex flex-col gap-3 border border-black/5 bg-white p-4 sm:flex-row sm:items-center">
+    <!-- Phone: search on its own row, the two selects side by side under it. -->
+    <div
+      class="grid grid-cols-2 gap-2 border border-black/5 bg-white p-3 sm:flex sm:items-center sm:gap-3 sm:p-4"
+    >
       <input
         v-model="search"
-        class="min-w-0 flex-1 border-black/10 bg-[#faf9f7] text-sm focus:border-primary-pink focus:ring-primary-pink"
+        class="col-span-2 min-w-0 flex-1 border-black/10 bg-[#faf9f7] text-sm focus:border-primary-pink focus:ring-primary-pink"
         placeholder="Zoek op naam, wijk of adres"
         type="search"
       />
-      <select v-model="kindFilter" class="border-black/10 bg-[#faf9f7] text-sm">
-        <option value="all">Punten, zones en straten</option>
+      <select v-model="kindFilter" class="min-w-0 border-black/10 bg-[#faf9f7] text-sm">
+        <option value="all">Alle types</option>
         <option value="point">Alleen punten</option>
         <option value="area">Alleen zones</option>
         <option value="street">Alleen straten</option>
       </select>
-      <select v-model="statusFilter" class="border-black/10 bg-[#faf9f7] text-sm">
+      <select v-model="statusFilter" class="min-w-0 border-black/10 bg-[#faf9f7] text-sm">
         <option value="all">Alle statussen</option>
         <option v-for="(label, key) in LOCATION_STATUS_LABELS" :key="key" :value="key">
           {{ label }}
@@ -554,7 +629,21 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="flex flex-col gap-4 lg:flex-row">
-      <div ref="mapEl" class="h-[60vh] min-h-[320px] flex-1 lg:h-[520px] border border-black/5 bg-[#eee]"></div>
+      <!-- `isolate`: Leaflet's panes/controls use z-index 400–1000, which
+           otherwise paint over the z-30 add/edit modal (hides the name field). -->
+      <div class="relative flex-1">
+        <div
+          ref="mapEl"
+          data-tour="map"
+          class="isolate h-[60vh] min-h-[320px] border border-black/5 bg-[#eee] lg:h-[520px]"
+        ></div>
+        <div
+          v-if="showPanHint"
+          class="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/40 p-6 text-center text-sm font-bold text-white"
+        >
+          Gebruik twee vingers om de kaart te verplaatsen
+        </div>
+      </div>
 
       <!-- Detail panel: opens on clicking a pin/zone on the map, or a row below. -->
       <aside
@@ -645,7 +734,7 @@ onBeforeUnmount(() => {
       </aside>
     </div>
 
-    <section class="overflow-x-auto border border-black/5 bg-white">
+    <section data-tour="location-table" class="overflow-x-auto border border-black/5 bg-white">
       <table class="table-stack w-full text-left text-sm sm:min-w-[760px]">
         <thead
           class="border-b border-black/5 bg-[#faf9f7] text-[10px] uppercase tracking-[0.16em] text-neutral-mute"
@@ -691,10 +780,18 @@ onBeforeUnmount(() => {
                 {{ LOCATION_STATUS_LABELS[l.status] }}
               </span>
             </td>
-            <td v-if="canSeeCoverage" class="px-5 py-4 text-xs text-neutral-mute" data-label="Keer bezocht">
+            <td
+              v-if="canSeeCoverage"
+              class="px-5 py-4 text-xs text-neutral-mute"
+              data-label="Keer bezocht"
+            >
               {{ l.timesVisited }}x
             </td>
-            <td v-if="canSeeCoverage" class="px-5 py-4 text-xs text-neutral-mute" data-label="Laatst bezocht">
+            <td
+              v-if="canSeeCoverage"
+              class="px-5 py-4 text-xs text-neutral-mute"
+              data-label="Laatst bezocht"
+            >
               {{ formatDate(l.lastVisitedAt) }}
             </td>
             <td class="px-5 py-4 text-right" data-label="">

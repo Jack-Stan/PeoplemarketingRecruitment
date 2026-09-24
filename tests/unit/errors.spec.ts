@@ -30,7 +30,11 @@ const HANDLED_CODES = [
 ] as const;
 
 /** Codes that intentionally share one message (same message to avoid leaking which half of a login was wrong). */
-const CREDENTIAL_CODES = ['auth/invalid-credential', 'auth/wrong-password', 'auth/user-not-found'] as const;
+const CREDENTIAL_CODES = [
+  'auth/invalid-credential',
+  'auth/wrong-password',
+  'auth/user-not-found',
+] as const;
 
 const fallback = () => friendlyError({ code: 'some/code-that-will-never-exist' });
 
@@ -101,7 +105,9 @@ describe('friendlyError', () => {
   it('matches on `.code` rather than instanceof, so a plain object works', () => {
     // Deliberate: the SDK's FirebaseError class does not survive `instanceof`
     // across every bundler/test boundary (see the note in errors.ts).
-    expect(friendlyError({ code: 'permission-denied' })).toBe(friendlyError(err('permission-denied')));
+    expect(friendlyError({ code: 'permission-denied' })).toBe(
+      friendlyError(err('permission-denied')),
+    );
   });
 
   it('ignores a non-string `code` and falls through to the Error branch', () => {
@@ -110,8 +116,8 @@ describe('friendlyError', () => {
   });
 
   it('passes through a plain Error message when there is no code', () => {
-    expect(friendlyError(new Error('That account is already on this office roster.'))).toBe(
-      'That account is already on this office roster.',
+    expect(friendlyError(new Error('Deze persoon staat al op het rooster van dit kantoor.'))).toBe(
+      'Deze persoon staat al op het rooster van dit kantoor.',
     );
   });
 

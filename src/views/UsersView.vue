@@ -186,7 +186,9 @@ async function sendInvite(): Promise<void> {
   const ok = await auth.sendInvite(email, officeId);
   inviting.value = false;
   ui.push(
-    ok ? `Uitnodiging verstuurd naar ${email}.` : auth.error.value ?? 'Kon de uitnodiging niet versturen.',
+    ok
+      ? `Uitnodiging verstuurd naar ${email}.`
+      : auth.error.value ?? 'Kon de uitnodiging niet versturen.',
     ok ? 'success' : 'error',
   );
   if (ok) {
@@ -226,7 +228,11 @@ onBeforeUnmount(() => store.unsubscribe());
         Stuurt een e-mail met een aanmeldlink naar {{ officeLabel(ownOfficeId) }} — geen wachtwoord
         nodig.
       </p>
-      <form class="mt-3 flex flex-col gap-2 sm:flex-row" @submit.prevent="sendInvite">
+      <form
+        data-tour="invite"
+        class="mt-3 flex flex-col gap-2 sm:flex-row"
+        @submit.prevent="sendInvite"
+      >
         <input
           v-model="inviteEmail"
           type="email"
@@ -244,7 +250,10 @@ onBeforeUnmount(() => store.unsubscribe());
       </form>
     </section>
 
-    <div class="flex flex-col gap-3 border border-black/5 bg-white p-4 sm:flex-row">
+    <div
+      data-tour="user-filters"
+      class="flex flex-col gap-3 border border-black/5 bg-white p-4 sm:flex-row"
+    >
       <input
         v-model="search"
         class="min-w-0 flex-1 border-black/10 bg-[#faf9f7] text-sm focus:border-primary-pink focus:ring-primary-pink"
@@ -336,7 +345,9 @@ onBeforeUnmount(() => store.unsubscribe());
               </span>
               <span v-else>{{ officeLabel(u.primaryOfficeId) }}</span>
             </td>
-            <td class="px-5 py-4 text-xs text-neutral-mute" data-label="Teamleider">{{ u.isTeamLeader ? 'Ja' : 'Nee' }}</td>
+            <td class="px-5 py-4 text-xs text-neutral-mute" data-label="Teamleider">
+              {{ u.isTeamLeader ? 'Ja' : 'Nee' }}
+            </td>
             <td class="px-5 py-4" data-label="Status">
               <span class="inline-flex items-center gap-2 text-xs">
                 <i
