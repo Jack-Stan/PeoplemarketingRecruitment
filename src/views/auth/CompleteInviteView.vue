@@ -58,9 +58,11 @@ const canSubmit = computed(
 );
 
 onMounted(async () => {
-  isValidLink.value = authService.isInviteLink(window.location.href);
+  isValidLink.value =
+    authService.isInviteLink(window.location.href) &&
+    (await authService.checkInviteLink(window.location.href)) !== 'used';
   if (!isValidLink.value) {
-    ui.push('Deze uitnodigingslink is ongeldig of verlopen.', 'error');
+    ui.push('Deze uitnodigingslink is al gebruikt of verlopen.', 'error');
     return;
   }
   // Offices are public-readable (decisions/005), so this works pre-account.

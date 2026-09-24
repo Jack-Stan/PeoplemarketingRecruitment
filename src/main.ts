@@ -46,7 +46,9 @@ window.addEventListener('unhandledrejection', (event) => {
 async function bootstrap(): Promise<void> {
   warnIfProduction();
   await auth.authStateReady();
-  await authStore.hydrate(auth.currentUser);
+  // Page load: a persisted session whose profile was deleted gets signed
+  // out here (see hydrate's `revokeIfMissing`); the listener below must not.
+  await authStore.hydrate(auth.currentUser, { revokeIfMissing: true });
   authService.onAuthStateChanged((fbUser) => void authStore.hydrate(fbUser));
   // Install the router only AFTER auth is hydrated. vue-router 4 starts the
   // initial navigation (and runs `beforeEach`) synchronously inside

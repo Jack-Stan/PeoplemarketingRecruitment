@@ -18,6 +18,10 @@ const ui = useUiStore();
 // the black login screen.
 onMounted(() => {
   document.body.style.backgroundColor = '#000000';
+  // Force-signed-out (deleted / deactivated) — say why instead of silently
+  // dropping them back on an empty login form.
+  const reason = auth.consumeSignedOutReason();
+  if (reason) ui.push(reason, 'error');
 });
 onUnmounted(() => {
   document.body.style.backgroundColor = '';

@@ -56,6 +56,7 @@ export function useAuth() {
     completeInvite: store.completeInvite,
     hydrate: store.hydrate,
     retryProfileLoad: store.retryProfileLoad,
+    consumeSignedOutReason: store.consumeSignedOutReason,
     clear: store.clear,
   };
 }

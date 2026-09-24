@@ -25,6 +25,8 @@ const HANDLED_CODES = [
   'auth/quota-exceeded',
   'auth/operation-not-allowed',
   'auth/unauthorized-continue-uri',
+  'auth/invalid-action-code',
+  'auth/expired-action-code',
 ] as const;
 
 /** Codes that intentionally share one message (same message to avoid leaking which half of a login was wrong). */

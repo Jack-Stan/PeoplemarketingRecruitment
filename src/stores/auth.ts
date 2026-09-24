@@ -27,6 +27,8 @@ import type { AppUser, Functie, Role, UserProfile } from '@/types/user';
  */
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const LOGIN_AT_KEY = 'pm_login_at';
+const ACCOUNT_REMOVED_MESSAGE =
+  'Je account is verwijderd. Vraag een beheerder om een nieuwe uitnodiging.';
 const REMEMBER_KEY = 'pm_remember';
 /**
  * Office the user picked/was invited into, parked here between "account
@@ -130,6 +132,13 @@ export const useAuthStore = defineStore('auth', () => {
 
   const isAuthenticated = computed(() => user.value !== null);
   /**
+   * Why the store just force-signed someone out (deactivated / deleted).
+   * Deliberately NOT reset by `clear()` — clear runs as part of that very
+   * sign-out, and the login page needs to read this afterwards to tell the
+   * user why they're back there.
+   */
+  const signedOutReason = ref<string | null>(null);
+  /**
    * Who to stamp on denormalised "who did this" fields (shift.employeeName,
    * availability.employeeName, audit-log actor). Prefers the `/users` doc's
    * displayName: Firebase Auth's own displayName is null for every
@@ -158,6 +167,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function signIn(email: string, password: string, rememberMe = false): Promise<boolean> {
     isLoading.value = true;
     error.value = null;
+    signedOutReason.value = null;
     try {
       const fbUser = await authService.signIn(email, password, rememberMe);
       markLoginNow(rememberMe);
@@ -166,7 +176,13 @@ export const useAuthStore = defineStore('auth', () => {
       // fires async and races the caller's post-signIn navigation, which was
       // sending freshly-signed-in users to /unauthorized because `role` was
       // still null when the router guard ran.
-      await hydrate(fbUser);
+      await hydrate(fbUser, { revokeIfMissing: true });
+      // Hydrate signed them straight back out (deactivated or deleted) — the
+      // password was right, but this is not a successful login.
+      if (!user.value) {
+        error.value = consumeSignedOutReason() ?? 'Aanmelden mislukt.';
+        return false;
+      }
       return true;
     } catch (err) {
       error.value = friendlyError(err);
@@ -404,7 +420,10 @@ export const useAuthStore = defineStore('auth', () => {
    * without the user having to sign out/in. Called by both `signIn`/`signUp`
    * and the `onAuthStateChanged` subscription in main.ts.
    */
-  async function hydrate(fbUser: User | null): Promise<void> {
+  async function hydrate(
+    fbUser: User | null,
+    { revokeIfMissing = false }: { revokeIfMissing?: boolean } = {},
+  ): Promise<void> {
     // Idempotent per uid: main.ts's onAuthStateChanged and signIn/signUp/
     // completeInvite all hydrate the same sign-in, often concurrently. Once a
     // uid has a live subscription there is nothing to redo, and re-running
@@ -439,6 +458,17 @@ export const useAuthStore = defineStore('auth', () => {
       // between "account created" and "profile written". Retry that write
       // rather than parking them on /pending-approval forever.
       if (!profile) profile = await retryPendingProfile(fbUser);
+      // Still no doc: an admin deleted this profile. Deleting only removes the
+      // `/users` doc — the Auth account survives (Spark, no Admin SDK), so
+      // without this the user lands on /pending-approval with nothing for an
+      // admin to approve. Only for a password login / page load
+      // (`revokeIfMissing`): the onAuthStateChanged hydrate that fires in the
+      // middle of signUp/completeInvite also sees "no doc yet" and must not
+      // sign a brand-new account out. Re-inviting the email still works.
+      if (!profile && revokeIfMissing) {
+        await signOutWithReason(ACCOUNT_REMOVED_MESSAGE);
+        return;
+      }
       applyProfile(profile);
       // Self-heal the emailVerified mirror if it drifted (e.g. verified in a
       // past session, tab closed before Settings ever synced it) — fire and
@@ -457,9 +487,17 @@ export const useAuthStore = defineStore('auth', () => {
     // ownership, so exactly one subscription is ever live per session.
     unsubProfile?.();
     hydratedUid = fbUser.uid;
+    let hadProfile = profile !== null;
     unsubProfile = usersService.subscribeOwn(
       fbUser.uid,
       (profile) => {
+        // Doc existed and is now gone: deleted by an admin mid-session. A
+        // null that was never preceded by a doc is just signup still writing.
+        if (!profile && hadProfile) {
+          void signOutWithReason(ACCOUNT_REMOVED_MESSAGE);
+          return;
+        }
+        if (profile) hadProfile = true;
         // An admin can deactivate someone mid-session — enforce it live,
         // not just at next sign-in, same as the "last admin" guard on
         // UsersView is meant to prevent an account nobody can act on again.
@@ -504,11 +542,22 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /** Deactivated mid-session or found deactivated at hydrate — force sign-out. */
-  async function signOutDeactivated(): Promise<void> {
+  function signOutDeactivated(): Promise<void> {
+    return signOutWithReason('Je account is gedeactiveerd. Neem contact op met een beheerder.');
+  }
+
+  async function signOutWithReason(reason: string): Promise<void> {
     localStorage.removeItem(LOGIN_AT_KEY);
     localStorage.removeItem(REMEMBER_KEY);
     await authService.signOut();
     clear();
+    signedOutReason.value = reason;
+  }
+
+  function consumeSignedOutReason(): string | null {
+    const reason = signedOutReason.value;
+    signedOutReason.value = null;
+    return reason;
   }
 
   /** Re-run the profile fetch after a failed load — the retry button on /unauthorized. */
@@ -529,6 +578,7 @@ export const useAuthStore = defineStore('auth', () => {
     isLoading,
     error,
     profileLoadFailed,
+    signedOutReason,
     isAuthenticated,
     appUser,
     actorLabel,
@@ -544,6 +594,7 @@ export const useAuthStore = defineStore('auth', () => {
     completeInvite,
     hydrate,
     retryProfileLoad,
+    consumeSignedOutReason,
     clear,
   };
 });

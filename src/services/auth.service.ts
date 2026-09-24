@@ -2,6 +2,7 @@ import {
   EmailAuthProvider,
   browserLocalPersistence,
   browserSessionPersistence,
+  checkActionCode,
   createUserWithEmailAndPassword,
   isSignInWithEmailLink,
   onAuthStateChanged,
@@ -95,6 +96,27 @@ export const authService = {
 
   isInviteLink(url: string): boolean {
     return isSignInWithEmailLink(auth, url);
+  },
+
+  /**
+   * Whether the link's one-time code is still unused. Firebase burns the
+   * `oobCode` on the first successful sign-in, but `isInviteLink` above only
+   * checks the URL's shape — so without this a second click on the same mail
+   * showed the whole form and only failed on submit. `checkActionCode` reads
+   * the code's status without consuming it. Returns 'used' only for
+   * Firebase's explicit invalid/expired verdict; anything else (network,
+   * unexpected error) returns 'unknown' so we never block a valid invite.
+   */
+  async checkInviteLink(url: string): Promise<'valid' | 'used' | 'unknown'> {
+    const code = new URL(url).searchParams.get('oobCode');
+    if (!code) return 'used';
+    try {
+      await checkActionCode(auth, code);
+      return 'valid';
+    } catch (err) {
+      const c = (err as { code?: string }).code;
+      return c === 'auth/invalid-action-code' || c === 'auth/expired-action-code' ? 'used' : 'unknown';
+    }
   },
 
   completeInvite(email: string, url: string): Promise<User> {

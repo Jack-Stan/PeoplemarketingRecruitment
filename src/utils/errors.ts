@@ -34,6 +34,9 @@ export function friendlyError(err: unknown): string {
         return 'Daglimiet voor uitnodigingsmails bereikt. Probeer het morgen opnieuw.';
       case 'auth/operation-not-allowed':
         return 'Aanmelden via e-maillink staat uit in Firebase.';
+      case 'auth/invalid-action-code':
+      case 'auth/expired-action-code':
+        return 'Deze link is al gebruikt of verlopen. Vraag een nieuwe uitnodiging.';
       case 'auth/unauthorized-continue-uri':
         return 'Het domein van de uitnodigingslink is niet toegestaan in Firebase.';
       default:

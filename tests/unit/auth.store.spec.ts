@@ -4,8 +4,24 @@ import { createPinia, setActivePinia } from 'pinia';
 import { authService } from '@/services/auth.service';
 import { usersService } from '@/services/users.service';
 import { useAuthStore } from '@/stores/auth';
-import { Roles } from '@/types/user';
+import { Roles, type UserProfile } from '@/types/user';
 import { friendlyError } from '@/utils/errors';
+
+function profile(over: Partial<UserProfile> = {}): UserProfile {
+  return {
+    uid: 'u1',
+    email: 'a@b.nl',
+    displayName: null,
+    role: Roles.TeamMember,
+    primaryOfficeId: 'office-1',
+    desiredOfficeId: null,
+    isTeamLeader: false,
+    isActive: true,
+    phone: null,
+    emailVerified: false,
+    ...over,
+  } as UserProfile;
+}
 
 describe('auth store', () => {
   beforeEach(() => {
@@ -35,6 +51,7 @@ describe('auth store', () => {
 
   it('signIn returns true on success', async () => {
     vi.mocked(authService.signIn).mockResolvedValueOnce({ uid: 'u1' } as never);
+    vi.mocked(usersService.getOnce).mockResolvedValueOnce(profile({ uid: 'u1' }));
 
     const store = useAuthStore();
     const ok = await store.signIn('a@b.nl', 'goodpw');
@@ -222,5 +239,63 @@ describe('auth store', () => {
     expect(store.isAuthenticated).toBe(false);
     expect(store.role).toBeNull();
     expect(store.officeId).toBeNull();
+  });
+
+  describe('deleted profile (Auth account survives a Verwijderen)', () => {
+    it('signIn with no /users doc signs straight back out with the removed message', async () => {
+      vi.mocked(authService.signIn).mockResolvedValueOnce({ uid: 'gone', email: 'x@y.nl' } as never);
+
+      const store = useAuthStore();
+      const ok = await store.signIn('x@y.nl', 'pw');
+
+      expect(ok).toBe(false);
+      expect(authService.signOut).toHaveBeenCalled();
+      expect(store.isAuthenticated).toBe(false);
+      expect(store.error).toMatch(/verwijderd/);
+    });
+
+    it('a page-load hydrate with no doc signs out and leaves a reason for the login page', async () => {
+      const store = useAuthStore();
+      await store.hydrate({ uid: 'gone', email: 'x@y.nl' } as never, { revokeIfMissing: true });
+
+      expect(store.isAuthenticated).toBe(false);
+      expect(store.consumeSignedOutReason()).toMatch(/verwijderd/);
+      expect(store.consumeSignedOutReason()).toBeNull();
+    });
+
+    it('the onAuthStateChanged hydrate mid-signup/invite does NOT sign the new account out', async () => {
+      const store = useAuthStore();
+      await store.hydrate({ uid: 'new', email: 'n@y.nl' } as never);
+
+      expect(authService.signOut).not.toHaveBeenCalled();
+      expect(store.isAuthenticated).toBe(true);
+      expect(store.role).toBeNull();
+    });
+
+    it('signs out live when the doc disappears mid-session, but not on a never-existed null', async () => {
+      let emit: (p: UserProfile | null) => void = () => {};
+      vi.mocked(usersService.subscribeOwn).mockImplementationOnce(((_uid: string, cb: typeof emit) => {
+        emit = cb;
+        return () => {};
+      }) as never);
+      vi.mocked(usersService.getOnce).mockResolvedValueOnce(profile());
+
+      const store = useAuthStore();
+      await store.hydrate({ uid: 'u1', email: 'a@b.nl' } as never);
+      expect(store.isAuthenticated).toBe(true);
+
+      emit(null);
+      await vi.waitFor(() => expect(store.isAuthenticated).toBe(false));
+      expect(store.signedOutReason).toMatch(/verwijderd/);
+    });
+
+    it('signIn of a deactivated account now fails with a reason instead of returning true', async () => {
+      vi.mocked(authService.signIn).mockResolvedValueOnce({ uid: 'u1', email: 'a@b.nl' } as never);
+      vi.mocked(usersService.getOnce).mockResolvedValueOnce(profile({ isActive: false }));
+
+      const store = useAuthStore();
+      expect(await store.signIn('a@b.nl', 'pw')).toBe(false);
+      expect(store.error).toMatch(/gedeactiveerd/);
+    });
   });
 });
