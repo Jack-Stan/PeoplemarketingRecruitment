@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { useAuth } from '@/composables/useAuth';
+import WelcomeTutorial from '@/components/WelcomeTutorial.vue';
 import { brand } from '@/assets/brand';
 import logoUrl from '@/assets/logo.svg';
 import { officesService } from '@/services/offices.service';
@@ -135,7 +136,7 @@ watch(
           </option>
         </select>
       </div>
-      <nav class="flex-1 space-y-1 px-3 py-7">
+      <nav data-tour="nav" class="flex-1 space-y-1 px-3 py-7">
         <p class="px-4 pb-3 text-[10px] font-bold uppercase tracking-[0.2em] text-white/35">
           Werkruimte
         </p>
@@ -186,7 +187,7 @@ watch(
             to="/settings?tab=faq"
             class="block px-4 py-2.5 text-sm text-white/80 hover:bg-white/5 hover:text-white"
             @click="isAccountMenuOpen = false"
-            >FAQ</RouterLink
+            >Handleiding &amp; FAQ</RouterLink
           >
           <button
             class="block w-full border-t border-white/10 px-4 py-2.5 text-left text-sm text-white/80 hover:bg-white/5 hover:text-white"
@@ -196,6 +197,7 @@ watch(
           </button>
         </div>
         <button
+          data-tour="account"
           class="flex w-full items-center gap-3 px-2 py-3 text-left"
           title="Account"
           @click="isAccountMenuOpen = !isAccountMenuOpen"
@@ -216,6 +218,7 @@ watch(
         <img :src="logoUrl" :alt="brand.logo.alt" class="h-6 w-auto" />
         <div ref="mobileMenuRef" class="relative">
           <button
+            data-tour="nav account"
             class="flex items-center gap-2 border border-white/20 px-3 py-1.5 text-xs font-semibold text-white"
             @click="isMobileMenuOpen = !isMobileMenuOpen"
           >
@@ -272,6 +275,11 @@ watch(
                 class="block px-4 py-2.5 text-sm text-neutral-ink hover:bg-[#faf9f7]"
                 >Instellingen</RouterLink
               >
+              <RouterLink
+                to="/settings?tab=faq"
+                class="block px-4 py-2.5 text-sm text-neutral-ink hover:bg-[#faf9f7]"
+                >Handleiding &amp; FAQ</RouterLink
+              >
               <button
                 class="block w-full px-4 py-2.5 text-left text-sm text-neutral-ink hover:bg-[#faf9f7]"
                 @click="signOut"
@@ -284,5 +292,6 @@ watch(
       </nav>
       <main class="p-5 sm:p-8"><slot /></main>
     </div>
+    <WelcomeTutorial />
   </div>
 </template>

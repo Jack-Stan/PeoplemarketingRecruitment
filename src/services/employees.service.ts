@@ -56,7 +56,7 @@ export const employeesService = {
     const ref = doc(db, 'offices', officeId, 'employees', uid);
     const existing = await getDoc(ref);
     if (existing.exists()) {
-      throw new Error('That account is already on this office roster.');
+      throw new Error('Deze persoon staat al op het rooster van dit kantoor.');
     }
     await setDoc(ref, {
       ...payload,

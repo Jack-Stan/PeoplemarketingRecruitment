@@ -176,6 +176,7 @@ onBeforeUnmount(() => {
       </div>
       <button
         v-if="canManage"
+        data-tour="add-lead"
         class="bg-primary-pink px-4 py-2.5 text-sm font-bold text-white"
         @click="openCreate"
       >
@@ -184,7 +185,7 @@ onBeforeUnmount(() => {
     </section>
 
     <!-- Funnel — client transcript: "zoveel leads deze week", same bar primitive as the staffing overview. -->
-    <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+    <section data-tour="funnel" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
       <article class="border border-black/5 bg-white p-5">
         <p class="text-xs uppercase tracking-[0.16em] text-neutral-mute">Nieuw</p>
         <p class="mt-3 text-3xl font-bold">{{ store.funnelCounts.new }}</p>
@@ -297,7 +298,7 @@ onBeforeUnmount(() => {
       </div>
     </section>
 
-    <div class="flex gap-1 overflow-x-auto border-b border-black/10 pb-px">
+    <div data-tour="stage-tabs" class="flex gap-1 overflow-x-auto border-b border-black/10 pb-px">
       <button
         class="whitespace-nowrap border-b-2 px-4 py-3 text-xs font-bold"
         :class="
@@ -324,7 +325,7 @@ onBeforeUnmount(() => {
       </button>
     </div>
 
-    <section class="overflow-x-auto border border-black/5 bg-white">
+    <section data-tour="lead-table" class="overflow-x-auto border border-black/5 bg-white">
       <table class="table-stack w-full text-left text-sm sm:min-w-[700px]">
         <thead
           class="border-b border-black/5 bg-[#faf9f7] text-[10px] uppercase tracking-[0.16em] text-neutral-mute"

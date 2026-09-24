@@ -42,7 +42,7 @@ onBeforeUnmount(() => store.unsubscribe());
       </p>
     </section>
 
-    <section class="overflow-x-auto border border-black/5 bg-white">
+    <section data-tour="audit-table" class="overflow-x-auto border border-black/5 bg-white">
       <table class="table-stack w-full text-left text-sm sm:min-w-[700px]">
         <thead
           class="border-b border-black/5 bg-[#faf9f7] text-[10px] uppercase tracking-[0.16em] text-neutral-mute"

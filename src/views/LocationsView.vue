@@ -24,6 +24,7 @@ polylineProto._onTouch = function (this: unknown, e: L.LeafletEvent) {
 import { useAuth } from '@/composables/useAuth';
 import { useActiveOffice } from '@/composables/useActiveOffice';
 import { useAuditLogStore } from '@/stores/auditLog';
+import { useConfirmStore } from '@/stores/confirm';
 import { useLocationsStore } from '@/stores/locations';
 import { useUiStore } from '@/stores/ui';
 import {
@@ -45,6 +46,7 @@ const auth = useAuth();
 const store = useLocationsStore();
 const auditLog = useAuditLogStore();
 const ui = useUiStore();
+const confirm = useConfirmStore();
 const { officeId } = useActiveOffice();
 
 /**
@@ -469,6 +471,11 @@ async function quickSetStatus(l: Location, status: LocationStatus): Promise<void
   );
 }
 async function removeLocation(l: Location): Promise<void> {
+  const sure = await confirm.ask(
+    `${l.name} verwijderen? De locatie en haar bezoeken verdwijnen van de kaart.`,
+    { title: 'Locatie verwijderen', danger: true },
+  );
+  if (!sure) return;
   const ok = await store.remove(officeId.value, l.locationId);
   ui.push(
     ok ? 'Locatie verwijderd.' : store.error ?? 'Er ging iets mis.',
@@ -519,7 +526,11 @@ onBeforeUnmount(() => {
         <h2 class="mt-1 text-3xl font-bold tracking-tight">Locaties</h2>
       </div>
       <!-- One row of three on a phone (short labels); full labels from `sm`. -->
-      <div v-if="canManage" class="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
+      <div
+        v-if="canManage"
+        data-tour="draw-tools"
+        class="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap"
+      >
         <button
           class="border border-primary-pink px-2 py-2.5 text-sm font-bold text-primary-pink sm:px-4"
           :class="{ 'bg-primary-pink text-white': mode === 'point' }"
@@ -623,6 +634,7 @@ onBeforeUnmount(() => {
       <div class="relative flex-1">
         <div
           ref="mapEl"
+          data-tour="map"
           class="isolate h-[60vh] min-h-[320px] border border-black/5 bg-[#eee] lg:h-[520px]"
         ></div>
         <div
@@ -722,7 +734,7 @@ onBeforeUnmount(() => {
       </aside>
     </div>
 
-    <section class="overflow-x-auto border border-black/5 bg-white">
+    <section data-tour="location-table" class="overflow-x-auto border border-black/5 bg-white">
       <table class="table-stack w-full text-left text-sm sm:min-w-[760px]">
         <thead
           class="border-b border-black/5 bg-[#faf9f7] text-[10px] uppercase tracking-[0.16em] text-neutral-mute"
@@ -768,10 +780,18 @@ onBeforeUnmount(() => {
                 {{ LOCATION_STATUS_LABELS[l.status] }}
               </span>
             </td>
-            <td v-if="canSeeCoverage" class="px-5 py-4 text-xs text-neutral-mute" data-label="Keer bezocht">
+            <td
+              v-if="canSeeCoverage"
+              class="px-5 py-4 text-xs text-neutral-mute"
+              data-label="Keer bezocht"
+            >
               {{ l.timesVisited }}x
             </td>
-            <td v-if="canSeeCoverage" class="px-5 py-4 text-xs text-neutral-mute" data-label="Laatst bezocht">
+            <td
+              v-if="canSeeCoverage"
+              class="px-5 py-4 text-xs text-neutral-mute"
+              data-label="Laatst bezocht"
+            >
               {{ formatDate(l.lastVisitedAt) }}
             </td>
             <td class="px-5 py-4 text-right" data-label="">

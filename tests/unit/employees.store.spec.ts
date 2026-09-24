@@ -105,7 +105,7 @@ describe('employees store', () => {
 
   it('create surfaces the service error and returns false', async () => {
     vi.mocked(employeesService.create).mockRejectedValueOnce(
-      new Error('That account is already on this office roster.'),
+      new Error('Deze persoon staat al op het rooster van dit kantoor.'),
     );
 
     const store = useEmployeesStore();
@@ -123,7 +123,7 @@ describe('employees store', () => {
     });
 
     expect(ok).toBe(false);
-    expect(store.error).toMatch(/already on this office roster/i);
+    expect(store.error).toMatch(/staat al op het rooster/i);
   });
 
   it('setActive soft-disables via the service', async () => {

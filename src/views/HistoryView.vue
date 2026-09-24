@@ -111,13 +111,16 @@ onBeforeUnmount(() => shiftsStore.unsubscribe());
       <h2 class="mt-1 text-3xl font-bold tracking-tight">Geschiedenis</h2>
     </section>
 
-    <section v-if="!isMember && teamLeaderTrend.length" class="border border-black/5 bg-white p-4 sm:p-6">
+    <section
+      v-if="!isMember && teamLeaderTrend.length"
+      class="border border-black/5 bg-white p-4 sm:p-6"
+    >
       <div>
         <h3 class="text-lg font-bold">Teamleiders per maand</h3>
         <p class="mt-1 text-xs text-neutral-mute">Waar win of verlies je teamleiders?</p>
       </div>
       <div
-        class="mt-8 flex h-40 items-end justify-between gap-1.5 overflow-x-auto sm:gap-3 border-b border-black/10 px-2"
+        class="mt-8 flex h-40 items-end justify-between gap-1.5 overflow-x-auto border-b border-black/10 px-2 sm:gap-3"
       >
         <div
           v-for="row in teamLeaderTrend"
@@ -146,7 +149,7 @@ onBeforeUnmount(() => shiftsStore.unsubscribe());
       </div>
     </section>
 
-    <section class="overflow-x-auto border border-black/5 bg-white">
+    <section data-tour="history-table" class="overflow-x-auto border border-black/5 bg-white">
       <table class="table-stack w-full text-left text-sm sm:min-w-[650px]">
         <thead
           class="border-b border-black/5 bg-[#faf9f7] text-[10px] uppercase tracking-[0.16em] text-neutral-mute"
@@ -163,7 +166,9 @@ onBeforeUnmount(() => shiftsStore.unsubscribe());
             <td class="px-5 py-4 font-bold capitalize">{{ row.label }}</td>
             <td class="px-5 py-4" data-label="Shifts">{{ row.total }}</td>
             <td class="px-5 py-4" data-label="Goedgekeurd">{{ row.approved }}</td>
-            <td v-if="!isMember" class="px-5 py-4" data-label="Teamleiders">{{ row.teamLeaders }}</td>
+            <td v-if="!isMember" class="px-5 py-4" data-label="Teamleiders">
+              {{ row.teamLeaders }}
+            </td>
           </tr>
         </tbody>
       </table>
