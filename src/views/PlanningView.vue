@@ -230,7 +230,12 @@ function openCreate(date?: string): void {
   isFormOpen.value = true;
 }
 
+// Busy guards: without them a double-tap creates two shifts / fires two rejects.
+const creating = ref(false);
+const rejecting = ref(false);
+
 async function submitForm(): Promise<void> {
+  if (creating.value) return;
   if (!form.value.assignedEmployeeId) {
     formError.value = 'Kies een medewerker.';
     return;
@@ -252,7 +257,13 @@ async function submitForm(): Promise<void> {
   }
   if (!auth.user.value) return;
   formError.value = null;
-  const ok = await shiftsStore.create(officeId.value, auth.user.value.uid, form.value);
+  creating.value = true;
+  let ok: boolean;
+  try {
+    ok = await shiftsStore.create(officeId.value, auth.user.value.uid, form.value);
+  } finally {
+    creating.value = false;
+  }
   if (ok) {
     ui.push('Shift aangemaakt.', 'success');
     void auditLog.record(
@@ -309,15 +320,21 @@ function openReject(shift: Shift): void {
 }
 
 async function confirmReject(): Promise<void> {
-  if (!rejectingId.value || !auth.user.value) return;
+  if (rejecting.value || !rejectingId.value || !auth.user.value) return;
   const reason = rejectReason.value.trim() || 'Geen reden opgegeven';
-  const ok = await shiftsStore.reject(
-    officeId.value,
-    rejectingId.value,
-    reason,
-    auth.user.value.uid,
-    Date.now(),
-  );
+  rejecting.value = true;
+  let ok: boolean;
+  try {
+    ok = await shiftsStore.reject(
+      officeId.value,
+      rejectingId.value,
+      reason,
+      auth.user.value.uid,
+      Date.now(),
+    );
+  } finally {
+    rejecting.value = false;
+  }
   ui.push(
     ok ? 'Shift afgewezen.' : shiftsStore.error ?? 'Er ging iets mis.',
     ok ? 'success' : 'error',
@@ -784,7 +801,11 @@ onBeforeUnmount(() => {
             >
               Annuleren
             </button>
-            <button type="submit" class="bg-primary-pink px-4 py-2 text-sm font-bold text-white">
+            <button
+              type="submit"
+              class="bg-primary-pink px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+              :disabled="creating"
+            >
               Shift aanmaken
             </button>
           </div>
@@ -811,7 +832,11 @@ onBeforeUnmount(() => {
           >
             Annuleren
           </button>
-          <button class="bg-red-600 px-4 py-2 text-sm font-bold text-white" @click="confirmReject">
+          <button
+            class="bg-red-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+            :disabled="rejecting"
+            @click="confirmReject"
+          >
             Afwijzen
           </button>
         </div>
