@@ -99,6 +99,8 @@ async function mountWithParkOpen() {
 
 describe('LocationsView visits listener', () => {
   beforeEach(() => {
+    // jsdom has no matchMedia; selectLocation uses it to scroll the panel into view on phones.
+    window.matchMedia = vi.fn(() => ({ matches: true }) as MediaQueryList);
     setActivePinia(createPinia());
     visitUnsubs.length = 0;
     for (const k of Object.keys(emitters)) delete emitters[k];
