@@ -1061,6 +1061,46 @@ describe('users (self-service update — selfProfileUpdateOnly)', () => {
     );
   });
 
+  // 2026-09-24 — tutorialSeenAt is the one new self-writable field. It must
+  // not become a way to smuggle anything else past the pins above.
+  it('a member can stamp their own tutorialSeenAt', async () => {
+    const self = await selfCtx();
+    await assertSucceeds(
+      self.firestore().doc('users/self-1').update({ tutorialSeenAt: Date.now() }),
+    );
+  });
+
+  it('a still-pending account (role null) can stamp its own tutorialSeenAt', async () => {
+    const pending = await ctxFor('pending-self', { role: null, primaryOfficeId: null });
+    await assertSucceeds(
+      pending.firestore().doc('users/pending-self').update({ tutorialSeenAt: Date.now() }),
+    );
+  });
+
+  it('tutorialSeenAt must be a number', async () => {
+    const self = await selfCtx();
+    const db = self.firestore();
+    await assertFails(db.doc('users/self-1').update({ tutorialSeenAt: 'yes' }));
+    await assertFails(db.doc('users/self-1').update({ tutorialSeenAt: { role: 'Administrator' } }));
+  });
+
+  for (const [field, patch] of forbidden) {
+    it(`a tutorialSeenAt write cannot carry a change to ${field}`, async () => {
+      const self = await selfCtx();
+      await assertFails(
+        self.firestore().doc('users/self-1').update({ tutorialSeenAt: Date.now(), ...patch }),
+      );
+    });
+  }
+
+  it('nobody can stamp tutorialSeenAt on someone else', async () => {
+    await ctxFor('other-1', { role: 'TeamMember', primaryOfficeId: OFFICE_ID });
+    const self = await selfCtx();
+    await assertFails(
+      self.firestore().doc('users/other-1').update({ tutorialSeenAt: Date.now() }),
+    );
+  });
+
   // 2026-09-07 review A6 — the last admin standing can't lock the org out.
   it('an Administrator cannot demote themselves', async () => {
     const admin = await ctxFor('admin-1', { role: 'Administrator', primaryOfficeId: OFFICE_ID });

@@ -24,6 +24,7 @@ vi.mock('@/services/users.service', () => ({
     subscribeOwn: vi.fn(() => () => {}),
     subscribeAll: vi.fn(() => () => {}),
     assignRole: vi.fn(),
+    markOwnTutorialSeen: vi.fn().mockResolvedValue(undefined),
   },
 }));
 

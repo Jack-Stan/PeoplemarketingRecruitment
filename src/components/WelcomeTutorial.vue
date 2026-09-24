@@ -33,7 +33,12 @@ let targetEl: HTMLElement | null = null;
 watch(
   [() => auth.user.value?.uid, () => auth.role.value],
   ([uid, role]) => {
-    if (uid && role && !tutorial.hasSeen(uid)) tutorial.open();
+    if (uid && role && !tutorial.hasSeen(uid)) {
+      // Mark seen on open, not only on Klaar/✕: closing the tab mid-tour
+      // otherwise re-offered it every visit. Reopen via Handleiding & FAQ.
+      tutorial.markSeen(uid);
+      tutorial.open();
+    }
   },
   { immediate: true },
 );

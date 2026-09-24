@@ -87,6 +87,12 @@ export interface UserProfile {
    * because docs created before this field existed simply don't have it.
    */
   functie?: Functie | null;
+  /**
+   * When the account first saw the welcome rondleiding (ms epoch). Self-set
+   * only (usersService.markOwnTutorialSeen); lets "don't show it again"
+   * follow the user across devices. Absent on older docs.
+   */
+  tutorialSeenAt?: number | null;
   isTeamLeader: boolean;
   isActive: boolean;
   /**

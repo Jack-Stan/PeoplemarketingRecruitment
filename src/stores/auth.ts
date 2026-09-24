@@ -110,6 +110,8 @@ export const useAuthStore = defineStore('auth', () => {
   const displayName = ref<string | null>(null);
   /** Career-ladder functie from the `/users/{uid}` doc — see types/user.ts. */
   const functie = ref<Functie | null>(null);
+  /** From the `/users/{uid}` doc — see types/user.ts tutorialSeenAt. */
+  const tutorialSeenAt = ref<number | null>(null);
   const isLoading = ref<boolean>(false);
   const error = ref<string | null>(null);
   /**
@@ -393,6 +395,7 @@ export const useAuthStore = defineStore('auth', () => {
     isTeamLeader.value = false;
     displayName.value = null;
     functie.value = null;
+    tutorialSeenAt.value = null;
     error.value = null;
   }
 
@@ -403,6 +406,7 @@ export const useAuthStore = defineStore('auth', () => {
       isTeamLeader: boolean;
       displayName?: string | null;
       functie?: Functie | null;
+      tutorialSeenAt?: number | null;
     } | null,
   ): void {
     role.value = profile?.role ?? null;
@@ -410,6 +414,7 @@ export const useAuthStore = defineStore('auth', () => {
     isTeamLeader.value = Boolean(profile?.isTeamLeader);
     displayName.value = profile?.displayName ?? null;
     functie.value = profile?.functie ?? null;
+    tutorialSeenAt.value = profile?.tutorialSeenAt ?? null;
   }
 
   /**
@@ -575,6 +580,7 @@ export const useAuthStore = defineStore('auth', () => {
     isTeamLeader,
     displayName,
     functie,
+    tutorialSeenAt,
     isLoading,
     error,
     profileLoadFailed,

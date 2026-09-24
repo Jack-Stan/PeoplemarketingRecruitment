@@ -16,6 +16,7 @@ import { tourForUser, tourStops } from '@/content/tour';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { routes } from '@/router/routes';
+import { usersService } from '@/services/users.service';
 import { useAuthStore } from '@/stores/auth';
 import type { Role } from '@/types/user';
 
@@ -91,6 +92,36 @@ describe('WelcomeTutorial', () => {
     const again = mount(WelcomeTutorial);
     await flushPromises();
     expect(again.text()).toBe('');
+  });
+
+  it('marks itself seen the moment it opens, so closing the tab mid-tour does not re-offer it', async () => {
+    signIn('TeamMember');
+    const w = mount(WelcomeTutorial);
+    await flushPromises();
+    expect(w.text()).toContain('eerste keer hier?');
+    expect(localStorage.getItem('pm_tutorial_seen_u1')).toBe('1');
+
+    // Simulate the tab closing with the tour still open: no Klaar, no ✕.
+    w.unmount();
+    useTutorial().close();
+    const again = mount(WelcomeTutorial);
+    await flushPromises();
+    expect(again.text()).toBe('');
+  });
+
+  it('stays closed on a fresh device when the profile already says seen', async () => {
+    signIn('TeamMember');
+    useAuthStore().tutorialSeenAt = 1_790_000_000_000;
+    const w = mount(WelcomeTutorial);
+    await flushPromises();
+    expect(w.text()).toBe('');
+  });
+
+  it('records "seen" on the profile when it opens, so it follows the account', async () => {
+    signIn('TeamMember');
+    mount(WelcomeTutorial);
+    await flushPromises();
+    expect(usersService.markOwnTutorialSeen).toHaveBeenCalledWith('u1');
   });
 
   it('does not open for an account still waiting for a role', async () => {

@@ -1,10 +1,15 @@
 import { ref } from 'vue';
 
+import { usersService } from '@/services/users.service';
+import { useAuthStore } from '@/stores/auth';
+
 /**
- * First-login rondleiding state. "Seen" is kept per uid in localStorage, not
- * on the /users doc: that would need a new self-writable field in
- * firestore.rules for a purely cosmetic flag. Trade-off: a new browser or
- * cleared storage offers the tour once more — harmless, it's skippable.
+ * First-login rondleiding state. "Seen" lives in two places:
+ *   - `tutorialSeenAt` on the caller's own /users doc — the source of truth,
+ *     so it follows the account across devices and cleared storage;
+ *   - localStorage per uid — instant, and covers the moment before the
+ *     profile write lands (or if it's rejected/offline).
+ * Either one set means "seen".
  */
 const SEEN_KEY_PREFIX = 'pm_tutorial_seen_';
 
@@ -13,6 +18,8 @@ const SEEN_KEY_PREFIX = 'pm_tutorial_seen_';
 const isOpen = ref(false);
 
 function hasSeen(uid: string): boolean {
+  const auth = useAuthStore();
+  if (auth.user?.uid === uid && auth.tutorialSeenAt) return true;
   try {
     return localStorage.getItem(SEEN_KEY_PREFIX + uid) === '1';
   } catch {
@@ -25,8 +32,12 @@ function markSeen(uid: string): void {
   try {
     localStorage.setItem(SEEN_KEY_PREFIX + uid, '1');
   } catch {
-    /* ignore — worst case the tour is offered again next visit */
+    /* ignore — the profile write below still records it */
   }
+  const auth = useAuthStore();
+  if (auth.user?.uid === uid && auth.tutorialSeenAt) return; // already stored
+  // Fire-and-forget: cosmetic, must never surface an error or block the UI.
+  void usersService.markOwnTutorialSeen(uid).catch(() => undefined);
 }
 
 export function useTutorial() {

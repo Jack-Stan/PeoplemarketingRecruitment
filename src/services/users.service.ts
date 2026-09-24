@@ -131,6 +131,14 @@ export const usersService = {
    * equal `request.auth.token.email_verified` — the caller can't self-attest
    * an arbitrary value.
    */
+  /** Self-service: stamp that the caller has seen the welcome rondleiding. */
+  async markOwnTutorialSeen(uid: string): Promise<void> {
+    await updateDoc(doc(db, 'users', uid), {
+      tutorialSeenAt: Date.now(),
+      updatedAt: serverTimestamp(),
+    });
+  },
+
   async syncOwnEmailVerified(uid: string, verified: boolean): Promise<void> {
     await updateDoc(doc(db, 'users', uid), {
       emailVerified: verified,

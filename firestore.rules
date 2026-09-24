@@ -102,7 +102,7 @@ service cloud.firestore {
         return request.resource.data.keys().hasOnly([
           'uid', 'email', 'displayName', 'role', 'primaryOfficeId', 'desiredOfficeId',
           'functie', 'isTeamLeader', 'isActive', 'phone', 'emailVerified',
-          'createdAt', 'updatedAt',
+          'tutorialSeenAt', 'createdAt', 'updatedAt',
         ]);
       }
       allow create: if isAdmin()
@@ -146,7 +146,11 @@ service cloud.firestore {
           // never change it. get(..., null) so docs from before the field
           // existed (missing on both sides) still pass.
           && request.resource.data.get('functie', null) == resource.data.get('functie', null)
-          && request.resource.data.emailVerified == request.auth.token.email_verified;
+          && request.resource.data.emailVerified == request.auth.token.email_verified
+          // Cosmetic "seen the rondleiding" stamp (2026-09-24) — self-set,
+          // but only ever a number (or absent), nothing else rides along.
+          && (request.resource.data.get('tutorialSeenAt', null) == null
+              || request.resource.data.tutorialSeenAt is number);
       }
       // functie: admin-only, must be one of the career-ladder values or null
       // (see types/user.ts FUNCTIES — keep the two lists in sync). Scoped to
