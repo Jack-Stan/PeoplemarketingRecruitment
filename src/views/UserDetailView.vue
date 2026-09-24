@@ -139,20 +139,20 @@ onBeforeUnmount(() => store.unsubscribe());
                 {{ user.emailVerified ? 'Geverifieerd' : 'Niet geverifieerd' }}
               </span>
             </div>
-            <div class="mt-3 flex gap-2">
+            <div class="mt-3 flex flex-wrap gap-2">
               <button
-                class="grid h-9 w-9 place-items-center border border-black/10 hover:border-primary-pink hover:text-primary-pink"
+                class="inline-flex h-9 items-center gap-1.5 border px-3 text-xs font-semibold border-black/10 hover:border-primary-pink hover:text-primary-pink"
                 title="E-mailadres kopiëren"
                 @click="copy(user.email, 'E-mailadres')"
               >
-                <span aria-hidden="true">⧉</span>
+                <span aria-hidden="true">⧉</span>Kopiëren
               </button>
               <a
                 :href="`mailto:${user.email}`"
-                class="grid h-9 w-9 place-items-center border border-black/10 hover:border-primary-pink hover:text-primary-pink"
+                class="inline-flex h-9 items-center gap-1.5 border px-3 text-xs font-semibold border-black/10 hover:border-primary-pink hover:text-primary-pink text-neutral-ink hover:no-underline"
                 title="Mailen"
               >
-                <span aria-hidden="true">✉</span>
+                <span aria-hidden="true">✉</span>Mailen
               </a>
             </div>
           </div>
@@ -162,29 +162,29 @@ onBeforeUnmount(() => store.unsubscribe());
               Telefoon
             </p>
             <p class="mt-1.5 text-base">{{ user.phone || 'Niet ingesteld' }}</p>
-            <div class="mt-3 flex gap-2">
+            <div class="mt-3 flex flex-wrap gap-2">
               <template v-if="user.phone">
                 <button
-                  class="grid h-9 w-9 place-items-center border border-black/10 hover:border-primary-pink hover:text-primary-pink"
+                  class="inline-flex h-9 items-center gap-1.5 border px-3 text-xs font-semibold border-black/10 hover:border-primary-pink hover:text-primary-pink"
                   title="Telefoonnummer kopiëren"
                   @click="copy(user.phone, 'Telefoonnummer')"
                 >
-                  <span aria-hidden="true">⧉</span>
+                  <span aria-hidden="true">⧉</span>Kopiëren
                 </button>
                 <a
                   :href="`tel:${user.phone}`"
-                  class="grid h-9 w-9 place-items-center bg-primary-pink text-white"
+                  class="inline-flex h-9 items-center gap-1.5 bg-primary-pink px-3 text-xs font-semibold text-white hover:no-underline"
                   title="Bellen"
                 >
-                  <span aria-hidden="true">☎</span>
+                  <span aria-hidden="true">☎</span>Bellen
                 </a>
               </template>
               <button
-                class="grid h-9 w-9 place-items-center border border-black/10 hover:border-primary-pink hover:text-primary-pink"
+                class="inline-flex h-9 items-center gap-1.5 border px-3 text-xs font-semibold border-black/10 hover:border-primary-pink hover:text-primary-pink"
                 :title="user.phone ? 'Telefoonnummer bewerken' : 'Telefoonnummer toevoegen'"
                 @click="startEditPhone"
               >
-                <span aria-hidden="true">{{ user.phone ? '✎' : '+' }}</span>
+                <span aria-hidden="true">{{ user.phone ? '✎' : '+' }}</span>{{ user.phone ? 'Bewerken' : 'Toevoegen' }}
               </button>
             </div>
           </div>
@@ -253,29 +253,29 @@ onBeforeUnmount(() => store.unsubscribe());
             <dd class="mt-1.5 text-base">{{ user.functie || 'Niet toegewezen' }}</dd>
           </div>
         </dl>
-        <div class="mt-5 flex gap-2 border-t border-black/5 pt-5">
+        <div class="mt-5 flex flex-wrap gap-2 border-t border-black/5 pt-5">
           <button
-            class="grid h-9 w-9 place-items-center border border-black/10 hover:border-primary-pink hover:text-primary-pink"
+            class="inline-flex h-9 items-center gap-1.5 border px-3 text-xs font-semibold border-black/10 hover:border-primary-pink hover:text-primary-pink"
             :title="user.role === null ? 'Rol toewijzen' : 'Rol bewerken'"
             @click="isEditingRole = true"
           >
-            <span aria-hidden="true">⚙</span>
+            <span aria-hidden="true">⚙</span>{{ user.role === null ? 'Rol toewijzen' : 'Rol bewerken' }}
           </button>
           <button
             v-if="!isSelf(user) && user.role !== null"
-            class="grid h-9 w-9 place-items-center border border-black/10 text-neutral-mute hover:border-primary-pink hover:text-primary-pink"
+            class="inline-flex h-9 items-center gap-1.5 border px-3 text-xs font-semibold border-black/10 text-neutral-mute hover:border-primary-pink hover:text-primary-pink"
             :title="isUserActive(user) ? 'Deactiveren' : 'Heractiveren'"
             @click="toggleActive(user)"
           >
-            <span aria-hidden="true">⏻</span>
+            <span aria-hidden="true">⏻</span>{{ isUserActive(user) ? 'Deactiveren' : 'Heractiveren' }}
           </button>
           <button
             v-if="!isSelf(user)"
-            class="grid h-9 w-9 place-items-center border border-black/10 text-neutral-mute hover:border-semantic-danger hover:text-semantic-danger"
+            class="inline-flex h-9 items-center gap-1.5 border px-3 text-xs font-semibold border-black/10 text-neutral-mute hover:border-semantic-danger hover:text-semantic-danger"
             title="Verwijderen"
             @click="onDelete"
           >
-            <span aria-hidden="true">✕</span>
+            <span aria-hidden="true">✕</span>Verwijderen
           </button>
         </div>
       </section>
