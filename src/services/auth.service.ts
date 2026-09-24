@@ -168,9 +168,16 @@ export const authService = {
    * just because the user clicked the verification link in another tab.
    * `reload()` re-fetches the Auth record so Settings can show current
    * status without asking them to sign out/in.
+   *
+   * `reload()` does NOT refresh the ID token, though, and firestore.rules
+   * checks self-updates against `request.auth.token.email_verified`. With a
+   * stale token the mirror write is denied, and later (once the token does
+   * refresh) every self-update fails on stored `false` ≠ claim `true`. So
+   * once Auth says verified, force a token refresh before anyone writes.
    */
   async refreshEmailVerified(user: User): Promise<boolean> {
     await reload(user);
+    if (user.emailVerified) await user.getIdToken(true);
     return user.emailVerified;
   },
 
