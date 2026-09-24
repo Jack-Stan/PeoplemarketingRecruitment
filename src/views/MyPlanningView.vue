@@ -170,10 +170,22 @@ async function removeDraft(shift: Shift): Promise<void> {
   }
 }
 
+// Busy guards: a fast double-tap otherwise fires two writes (two availability
+// docs for one day, since isMarked only sees the first once its snapshot lands).
+const submittingWeek = ref(false);
+const togglingDates = ref(new Set<string>());
+
 async function submitWeek(): Promise<void> {
+  if (submittingWeek.value) return;
   // Captured before the call — the snapshot empties draftIds once it lands.
   const submittedCount = draftCount.value;
-  const ok = await shiftsStore.submitWeek(officeId.value, Date.now());
+  submittingWeek.value = true;
+  let ok: boolean;
+  try {
+    ok = await shiftsStore.submitWeek(officeId.value, Date.now());
+  } finally {
+    submittingWeek.value = false;
+  }
   ui.push(
     ok ? 'Je week is ingediend ter goedkeuring.' : shiftsStore.error ?? 'Er ging iets mis.',
     ok ? 'success' : 'error',
@@ -197,17 +209,24 @@ function subscribe(): void {
 }
 
 async function toggleAvailable(date: string): Promise<void> {
+  if (togglingDates.value.has(date)) return;
   const existing = availabilityStore.isMarked(uid.value, date);
-  const ok = existing
-    ? await availabilityStore.unmark(officeId.value, existing.availabilityId)
-    : await availabilityStore.mark(officeId.value, {
-        employeeId: uid.value,
-        // Denormalised permanently onto the shift — use the /users profile name,
-        // never Auth's displayName (null for every invite-completed account).
-        employeeName: auth.actorLabel.value,
-        employeeIsTeamLeader: auth.isTeamLeader.value,
-        date,
-      });
+  togglingDates.value.add(date);
+  let ok: boolean;
+  try {
+    ok = existing
+      ? await availabilityStore.unmark(officeId.value, existing.availabilityId)
+      : await availabilityStore.mark(officeId.value, {
+          employeeId: uid.value,
+          // Denormalised permanently onto the shift — use the /users profile name,
+          // never Auth's displayName (null for every invite-completed account).
+          employeeName: auth.actorLabel.value,
+          employeeIsTeamLeader: auth.isTeamLeader.value,
+          date,
+        });
+  } finally {
+    togglingDates.value.delete(date);
+  }
   if (!ok) {
     ui.push(availabilityStore.error ?? 'Er ging iets mis.', 'error');
     return;
@@ -281,6 +300,7 @@ onBeforeUnmount(() => {
                 ? 'border-emerald-600/30 bg-emerald-100 text-emerald-700'
                 : 'border-black/10 text-neutral-mute hover:border-primary-pink/40 hover:text-primary-pink'
             "
+            :disabled="togglingDates.has(day.iso)"
             @click="toggleAvailable(day.iso)"
           >
             {{ availabilityStore.isMarked(uid, day.iso) ? '✓ Beschikbaar' : 'Beschikbaar?' }}
@@ -320,7 +340,8 @@ onBeforeUnmount(() => {
           {{ draftCount }} concept-shift{{ draftCount === 1 ? '' : 's' }} klaar om in te dienen.
         </p>
         <button
-          class="bg-neutral-ink px-4 py-2 text-xs font-bold text-white hover:bg-black"
+          class="bg-neutral-ink px-4 py-2 text-xs font-bold text-white hover:bg-black disabled:opacity-60"
+          :disabled="submittingWeek"
           @click="submitWeek"
         >
           Week indienen
