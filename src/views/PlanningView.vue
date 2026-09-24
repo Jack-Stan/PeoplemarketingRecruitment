@@ -591,7 +591,7 @@ onBeforeUnmount(() => {
             <div
               v-for="(cell, i) in monthCells"
               :key="cell ? cell.iso : `blank-${i}`"
-              class="flex min-h-24 flex-col gap-1 border p-2 text-left"
+              class="group flex min-h-24 flex-col gap-1 border p-2 text-left"
               :class="[
                 cell ? 'cursor-pointer hover:border-primary-pink/50' : 'border-transparent',
                 cell?.isToday
@@ -600,18 +600,31 @@ onBeforeUnmount(() => {
                     ? 'border-black/10 bg-[#faf9f7]'
                     : 'border-black/10 bg-white',
               ]"
-              @click="cell && openDayFromMonth(cell.iso)"
+              :title="cell ? 'Nieuwe shift op deze dag' : undefined"
+              @click="cell && openCreate(cell.iso)"
             >
               <template v-if="cell">
-                <span
-                  class="text-xs font-bold"
-                  :class="cell.isToday ? 'text-primary-pink' : 'text-neutral-ink'"
-                  >{{ cell.dayNumber }}</span
-                >
+                <span class="flex items-center justify-between">
+                  <span
+                    class="text-xs font-bold"
+                    :class="cell.isToday ? 'text-primary-pink' : 'text-neutral-ink'"
+                    >{{ cell.dayNumber }}</span
+                  >
+                  <span
+                    aria-hidden="true"
+                    class="text-sm font-bold text-primary-pink opacity-0 group-hover:opacity-100"
+                    >+</span
+                  >
+                </span>
                 <div v-if="cell.shiftCount" class="mt-auto space-y-1">
-                  <p class="text-[11px] font-semibold text-neutral-mute">
-                    {{ cell.shiftCount }} shift{{ cell.shiftCount === 1 ? '' : 's' }}
-                  </p>
+                  <!-- Tapping the day now adds a shift; this is the way to see
+                       the day's existing shifts in the list. -->
+                  <button
+                    class="text-[11px] font-semibold text-neutral-mute underline decoration-dotted underline-offset-2 hover:text-primary-pink"
+                    @click.stop="openDayFromMonth(cell.iso)"
+                  >
+                    {{ cell.shiftCount }} shift{{ cell.shiftCount === 1 ? '' : 's' }} bekijken
+                  </button>
                   <div class="flex flex-wrap gap-1">
                     <span
                       v-if="cell.tlCount"
