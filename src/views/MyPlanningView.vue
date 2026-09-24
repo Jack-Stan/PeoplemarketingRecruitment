@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 
 import { useAuth } from '@/composables/useAuth';
+import { useAuditLogStore } from '@/stores/auditLog';
 import { useAvailabilityStore } from '@/stores/availability';
 import { useShiftsStore } from '@/stores/shifts';
 import { useUiStore } from '@/stores/ui';
@@ -24,6 +25,7 @@ import { parseLocalISODate, toLocalISODate, todayLocalISO, weekStartFor } from '
 const auth = useAuth();
 const shiftsStore = useShiftsStore();
 const availabilityStore = useAvailabilityStore();
+const auditLog = useAuditLogStore();
 const ui = useUiStore();
 
 const officeId = computed(() => auth.officeId.value ?? '');
@@ -142,6 +144,11 @@ async function submitForm(): Promise<void> {
   const ok = await shiftsStore.create(officeId.value, uid.value, form.value);
   if (ok) {
     ui.push('Shift toegevoegd aan je week.', 'success');
+    void auditLog.record(
+      officeId.value,
+      'shift_created',
+      `${form.value.employeeName} · ${form.value.date} (${form.value.type})`,
+    );
     isFormOpen.value = false;
   } else {
     formError.value = shiftsStore.error;
@@ -154,14 +161,31 @@ async function removeDraft(shift: Shift): Promise<void> {
     ok ? 'Concept verwijderd.' : shiftsStore.error ?? 'Er ging iets mis.',
     ok ? 'success' : 'error',
   );
+  if (ok) {
+    void auditLog.record(
+      officeId.value,
+      'shift_deleted',
+      `${shift.employeeName} · ${shift.date} (${shift.type})`,
+    );
+  }
 }
 
 async function submitWeek(): Promise<void> {
+  // Captured before the call — the snapshot empties draftIds once it lands.
+  const submittedCount = draftCount.value;
   const ok = await shiftsStore.submitWeek(officeId.value, Date.now());
   ui.push(
     ok ? 'Je week is ingediend ter goedkeuring.' : shiftsStore.error ?? 'Er ging iets mis.',
     ok ? 'success' : 'error',
   );
+  if (ok) {
+    void auditLog.record(
+      officeId.value,
+      'shift_submitted',
+      `${auth.actorLabel.value} · week ${currentWeekStart.value}`,
+      `${submittedCount} shifts`,
+    );
+  }
 }
 
 function subscribe(): void {
@@ -184,7 +208,16 @@ async function toggleAvailable(date: string): Promise<void> {
         employeeIsTeamLeader: auth.isTeamLeader.value,
         date,
       });
-  if (!ok) ui.push(availabilityStore.error ?? 'Er ging iets mis.', 'error');
+  if (!ok) {
+    ui.push(availabilityStore.error ?? 'Er ging iets mis.', 'error');
+    return;
+  }
+  void auditLog.record(
+    officeId.value,
+    'availability_changed',
+    `${auth.actorLabel.value} · ${date}`,
+    existing ? 'niet beschikbaar' : 'beschikbaar',
+  );
 }
 
 onMounted(subscribe);

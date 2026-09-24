@@ -255,6 +255,11 @@ async function submitForm(): Promise<void> {
   const ok = await shiftsStore.create(officeId.value, auth.user.value.uid, form.value);
   if (ok) {
     ui.push('Shift aangemaakt.', 'success');
+    void auditLog.record(
+      officeId.value,
+      'shift_created',
+      `${form.value.employeeName} · ${form.value.date} (${form.value.type})`,
+    );
     isFormOpen.value = false;
   } else {
     formError.value = shiftsStore.error;
@@ -267,6 +272,13 @@ async function submitShift(shift: Shift): Promise<void> {
     ok ? 'Ingediend ter goedkeuring.' : shiftsStore.error ?? 'Er ging iets mis.',
     ok ? 'success' : 'error',
   );
+  if (ok) {
+    void auditLog.record(
+      officeId.value,
+      'shift_submitted',
+      `${shift.employeeName} · ${shift.date} (${shift.type})`,
+    );
+  }
 }
 
 async function approveShift(shift: Shift): Promise<void> {
@@ -328,6 +340,13 @@ async function deleteDraft(shift: Shift): Promise<void> {
     ok ? 'Concept verwijderd.' : shiftsStore.error ?? 'Er ging iets mis.',
     ok ? 'success' : 'error',
   );
+  if (ok) {
+    void auditLog.record(
+      officeId.value,
+      'shift_deleted',
+      `${shift.employeeName} · ${shift.date} (${shift.type})`,
+    );
+  }
 }
 
 // Re-subscribes whenever the active office changes — an Administrator

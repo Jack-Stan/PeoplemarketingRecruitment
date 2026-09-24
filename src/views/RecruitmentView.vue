@@ -88,6 +88,9 @@ async function submitForm(): Promise<void> {
   });
   if (ok) {
     ui.push('Lead toegevoegd.', 'success');
+    if (auth.user.value) {
+      void auditLog.record(officeId.value, 'recruitment_lead_created', form.value.name);
+    }
     isFormOpen.value = false;
   } else {
     formError.value = store.error;
@@ -122,14 +125,12 @@ async function moveStreetStatus(
     ok ? 'success' : 'error',
   );
   if (ok && lead && auth.user.value) {
-    auditLog.log(officeId.value, {
-      actorUid: auth.user.value.uid,
-      actorEmail: auth.user.value.email ?? '',
-      action: 'recruitment_street_status_changed',
-      targetLabel: lead.name,
-      details: `${from ? STREET_LEAD_STATUS_LABELS[from] : '—'} → ${streetStatus ? STREET_LEAD_STATUS_LABELS[streetStatus] : '—'}`,
-      createdAtMs: Date.now(),
-    });
+    void auditLog.record(
+      officeId.value,
+      'recruitment_street_status_changed',
+      lead.name,
+      `${from ? STREET_LEAD_STATUS_LABELS[from] : '—'} → ${streetStatus ? STREET_LEAD_STATUS_LABELS[streetStatus] : '—'}`,
+    );
   }
 }
 

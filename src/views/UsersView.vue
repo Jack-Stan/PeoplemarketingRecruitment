@@ -7,6 +7,7 @@ import { useActiveOffice } from '@/composables/useActiveOffice';
 import { useOfficeNames } from '@/composables/useOfficeNames';
 import { useUserActions } from '@/composables/useUserActions';
 import { isValidEmail } from '@/utils/validators';
+import { useAuditLogStore } from '@/stores/auditLog';
 import { useUsersStore } from '@/stores/users';
 import { useUiStore } from '@/stores/ui';
 import { ROLE_LABELS, type UserProfile } from '@/types/user';
@@ -15,6 +16,7 @@ import UserRoleEditModal from '@/components/UserRoleEditModal.vue';
 const auth = useAuth();
 const router = useRouter();
 const store = useUsersStore();
+const auditLog = useAuditLogStore();
 const ui = useUiStore();
 
 // Multi-office: an Administrator assigns into whichever office they've
@@ -46,6 +48,17 @@ function toggleMenu(uid: string, event: MouseEvent): void {
 }
 function closeMenu(): void {
   openMenuUid.value = null;
+}
+/**
+ * Grab the row's user BEFORE closing: `menuUser` is computed off
+ * `openMenuUid`, so the old inline `closeMenu(); openEdit(menuUser)` read it
+ * after it had gone null — every kebab action threw on `null.uid` and the
+ * click did nothing.
+ */
+function runMenuAction(action: (u: UserProfile) => unknown): void {
+  const u = menuUser.value;
+  closeMenu();
+  if (u) void action(u);
 }
 function openRow(uid: string): void {
   router.push(`/users/${uid}`);
@@ -168,15 +181,18 @@ async function sendInvite(): Promise<void> {
     return;
   }
   inviting.value = true;
-  const ok = await auth.sendInvite(inviteEmail.value.trim(), ownOfficeId.value);
+  const email = inviteEmail.value.trim();
+  const officeId = ownOfficeId.value;
+  const ok = await auth.sendInvite(email, officeId);
   inviting.value = false;
   ui.push(
-    ok
-      ? `Uitnodiging verstuurd naar ${inviteEmail.value.trim()}.`
-      : auth.error.value ?? 'Kon de uitnodiging niet versturen.',
+    ok ? `Uitnodiging verstuurd naar ${email}.` : auth.error.value ?? 'Kon de uitnodiging niet versturen.',
     ok ? 'success' : 'error',
   );
-  if (ok) inviteEmail.value = '';
+  if (ok) {
+    void auditLog.record(officeId, 'user_invited', email);
+    inviteEmail.value = '';
+  }
 }
 
 onMounted(async () => {
@@ -358,29 +374,20 @@ onUnmounted(() => store.unsubscribe());
         >
           <button
             class="block w-full px-4 py-2 text-xs font-semibold hover:bg-[#faf9f7]"
-            @click="
-              closeMenu();
-              openEdit(menuUser);
-            "
+            @click="runMenuAction(openEdit)"
           >
             {{ menuUser.role === null ? 'Rol toewijzen' : 'Bewerken' }}
           </button>
           <button
             v-if="menuUser.role !== null"
             class="block w-full px-4 py-2 text-xs font-semibold hover:bg-[#faf9f7]"
-            @click="
-              closeMenu();
-              toggleActive(menuUser);
-            "
+            @click="runMenuAction(toggleActive)"
           >
             {{ isUserActive(menuUser) ? 'Deactiveren' : 'Heractiveren' }}
           </button>
           <button
             class="block w-full px-4 py-2 text-xs font-semibold text-semantic-danger hover:bg-[#faf9f7]"
-            @click="
-              closeMenu();
-              removeUser(menuUser);
-            "
+            @click="runMenuAction(removeUser)"
           >
             Verwijderen
           </button>

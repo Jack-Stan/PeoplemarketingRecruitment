@@ -5,6 +5,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { useActiveOffice } from '@/composables/useActiveOffice';
 import { useOfficeNames } from '@/composables/useOfficeNames';
 import { useUserActions } from '@/composables/useUserActions';
+import { useAuditLogStore } from '@/stores/auditLog';
 import { useUsersStore } from '@/stores/users';
 import { useUiStore } from '@/stores/ui';
 import { ROLE_LABELS } from '@/types/user';
@@ -13,6 +14,7 @@ import UserRoleEditModal from '@/components/UserRoleEditModal.vue';
 const route = useRoute();
 const router = useRouter();
 const store = useUsersStore();
+const auditLog = useAuditLogStore();
 const ui = useUiStore();
 
 const { officeId: ownOfficeId } = useActiveOffice();
@@ -37,14 +39,25 @@ function startEditPhone(): void {
 
 async function savePhone(): Promise<void> {
   if (!user.value) return;
+  const u = user.value;
+  const phone = phoneDraft.value.trim() || null;
   savingPhone.value = true;
-  const ok = await store.setPhone(user.value.uid, phoneDraft.value.trim() || null);
+  const ok = await store.setPhone(u.uid, phone);
   savingPhone.value = false;
   ui.push(
     ok ? 'Telefoonnummer opgeslagen.' : store.error ?? 'Er ging iets mis.',
     ok ? 'success' : 'error',
   );
-  if (ok) isEditingPhone.value = false;
+  if (ok) {
+    // Same office fallback as useUserActions' auditOfficeFor.
+    void auditLog.record(
+      u.primaryOfficeId ?? ownOfficeId.value ?? '',
+      'user_updated',
+      u.displayName || u.email,
+      phone ? 'telefoon gewijzigd' : 'telefoon verwijderd',
+    );
+    isEditingPhone.value = false;
+  }
 }
 
 async function copy(value: string, label: string): Promise<void> {

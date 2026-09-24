@@ -162,10 +162,10 @@ async function submitForm(): Promise<void> {
 
   if (ok) {
     ui.push(editingId.value ? 'Medewerker bijgewerkt.' : 'Medewerker toegevoegd.', 'success');
-    if (!editingId.value && auth.user.value) {
+    if (auth.user.value) {
       void auditLog.record(
         officeId.value,
-        'employee_created',
+        editingId.value ? 'employee_updated' : 'employee_created',
         `${form.value.firstName} ${form.value.lastName}`,
       );
     }

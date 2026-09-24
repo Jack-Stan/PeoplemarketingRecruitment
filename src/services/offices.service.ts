@@ -11,7 +11,11 @@ export const officesService = {
    */
   async listActive(): Promise<Office[]> {
     const snapshot = await getDocs(query(collection(db, 'offices'), where('isActive', '==', true)));
-    return snapshot.docs.map((d) => ({ officeId: d.id, ...d.data() }) as Office);
+    // Doc id wins: the `gent` doc also stores an `officeId: 'Gent'` field, and
+    // spreading data last let that override the id — pickers then submitted
+    // "Gent", which never matches primaryOfficeId "gent" (UsersView flagged
+    // those signups as "ander kantoor").
+    return snapshot.docs.map((d) => ({ ...d.data(), officeId: d.id }) as Office);
   },
 };
 

@@ -23,6 +23,7 @@ polylineProto._onTouch = function (this: unknown, e: L.LeafletEvent) {
 
 import { useAuth } from '@/composables/useAuth';
 import { useActiveOffice } from '@/composables/useActiveOffice';
+import { useAuditLogStore } from '@/stores/auditLog';
 import { useLocationsStore } from '@/stores/locations';
 import { useUiStore } from '@/stores/ui';
 import {
@@ -42,6 +43,7 @@ const STATUS_COLORS: Record<LocationStatus, string> = {
 
 const auth = useAuth();
 const store = useLocationsStore();
+const auditLog = useAuditLogStore();
 const ui = useUiStore();
 const { officeId } = useActiveOffice();
 
@@ -322,8 +324,12 @@ async function saveReshape(): Promise<void> {
   if (!reshapeTargetId.value || !reshapeLayer) return;
   const boundary = layerPoints(reshapeLayer);
   const centroid = boundaryCentroid(boundary);
+  const target = store.locations.find((l) => l.locationId === reshapeTargetId.value);
   const ok = await store.update(officeId.value, reshapeTargetId.value, { boundary, ...centroid });
   ui.push(ok ? 'Zone bijgewerkt.' : store.error ?? 'Er ging iets mis.', ok ? 'success' : 'error');
+  if (ok && target) {
+    void auditLog.record(officeId.value, 'location_updated', target.name, 'zone hertekend');
+  }
   cancelReshape();
 }
 function cancelReshape(): void {
@@ -393,6 +399,11 @@ async function submitForm(): Promise<void> {
     : await store.create(officeId.value, form.value);
   if (ok) {
     ui.push(editingId.value ? 'Locatie bijgewerkt.' : 'Locatie toegevoegd.', 'success');
+    void auditLog.record(
+      officeId.value,
+      editingId.value ? 'location_updated' : 'location_created',
+      form.value.name.trim(),
+    );
     isFormOpen.value = false;
   } else {
     formError.value = store.error;
@@ -400,7 +411,16 @@ async function submitForm(): Promise<void> {
 }
 async function quickSetStatus(l: Location, status: LocationStatus): Promise<void> {
   const ok = await store.update(officeId.value, l.locationId, { status });
-  if (!ok) ui.push(store.error ?? 'Er ging iets mis.', 'error');
+  if (!ok) {
+    ui.push(store.error ?? 'Er ging iets mis.', 'error');
+    return;
+  }
+  void auditLog.record(
+    officeId.value,
+    'location_updated',
+    l.name,
+    `status: ${LOCATION_STATUS_LABELS[status]}`,
+  );
 }
 async function removeLocation(l: Location): Promise<void> {
   const ok = await store.remove(officeId.value, l.locationId);
@@ -408,7 +428,10 @@ async function removeLocation(l: Location): Promise<void> {
     ok ? 'Locatie verwijderd.' : store.error ?? 'Er ging iets mis.',
     ok ? 'success' : 'error',
   );
-  if (ok) closePanel();
+  if (ok) {
+    void auditLog.record(officeId.value, 'location_deleted', l.name);
+    closePanel();
+  }
 }
 
 // --- Log visit -------------------------------------------------------
@@ -426,6 +449,7 @@ async function logVisit(l: Location): Promise<void> {
     ok ? `Bezoek aan ${l.name} gelogd.` : store.error ?? 'Er ging iets mis.',
     ok ? 'success' : 'error',
   );
+  if (ok) void auditLog.record(officeId.value, 'location_visited', l.name);
 }
 
 watch(

@@ -10,6 +10,8 @@
  * claims at all, mirroring exactly what a real signed-in user looks like.
  */
 import { readFileSync } from 'node:fs';
+
+import { AUDIT_ACTION_LABELS, MEMBER_AUDIT_ACTIONS } from '../../src/types/auditLog';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   assertFails,
@@ -797,6 +799,41 @@ describe('auditLog (append-only, attributed)', () => {
     const manager = await ctxFor('mgr-1', { role: 'TeamManager', primaryOfficeId: OFFICE_ID });
     await assertFails(
       manager.firestore().doc(`offices/${OFFICE_ID}/auditLog/entry-2`).set(entry('admin-1')),
+    );
+  });
+
+  // 2026-09-24 — street-status entries were silently rejected because the
+  // rules allowlist had drifted from AuditAction.
+  it('every AuditAction in the app is accepted from staff', async () => {
+    const manager = await ctxFor('mgr-1', { role: 'TeamManager', primaryOfficeId: OFFICE_ID });
+    const db = manager.firestore();
+    for (const action of Object.keys(AUDIT_ACTION_LABELS)) {
+      await assertSucceeds(
+        db.doc(`offices/${OFFICE_ID}/auditLog/all-${action}`).set({ ...entry('mgr-1'), action }),
+      );
+    }
+  });
+
+  it('a TeamMember may log exactly the member actions for their own office', async () => {
+    const member = await ctxFor('mem-1', { role: 'TeamMember', primaryOfficeId: OFFICE_ID });
+    const db = member.firestore();
+    for (const action of MEMBER_AUDIT_ACTIONS) {
+      await assertSucceeds(
+        db.doc(`offices/${OFFICE_ID}/auditLog/mem-${action}`).set({ ...entry('mem-1'), action }),
+      );
+    }
+    await assertFails(
+      db.doc(`offices/${OFFICE_ID}/auditLog/mem-forbidden`).set({
+        ...entry('mem-1'),
+        action: 'user_deleted',
+      }),
+    );
+    await assertFails(
+      db.doc(`offices/${OTHER_OFFICE_ID}/auditLog/mem-other`).set({
+        ...entry('mem-1'),
+        action: 'shift_created',
+        officeId: OTHER_OFFICE_ID,
+      }),
     );
   });
 

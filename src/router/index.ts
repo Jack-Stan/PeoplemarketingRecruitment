@@ -55,7 +55,35 @@ export function createAppRouter() {
     return true;
   });
 
+  // Stale tab after a deploy: every view is a lazy chunk with a hashed name,
+  // Netlify drops the old hashes, and the SPA catch-all in netlify.toml
+  // answers the missing file with index.html — so the import fails and the
+  // nav link silently does nothing. Hard-load the target instead, which
+  // fetches the new index.html and its chunks. The sessionStorage stamp
+  // stops a reload loop if the chunk is genuinely broken.
+  router.onError((err, to) => {
+    const msg = String((err as Error)?.message ?? err);
+    const isChunkError =
+      /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|MIME type/i.test(
+        msg,
+      );
+    if (!isChunkError) return;
+    const key = 'pm_chunk_reload';
+    try {
+      if (sessionStorage.getItem(key) === to.fullPath) return;
+      sessionStorage.setItem(key, to.fullPath);
+    } catch {
+      // Storage blocked — reload anyway; worst case is one extra load.
+    }
+    window.location.assign(to.fullPath);
+  });
+
   router.afterEach((to) => {
+    try {
+      sessionStorage.removeItem('pm_chunk_reload');
+    } catch {
+      // Storage blocked — nothing to clear.
+    }
     const base = 'People Marketing CRM';
     document.title = to.meta.title ? `${to.meta.title} · ${base}` : base;
   });
