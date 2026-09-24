@@ -48,6 +48,19 @@ import { useAuthStore } from '@/stores/auth';
 import { useOfficeContextStore } from '@/stores/officeContext';
 import type { User } from 'firebase/auth';
 
+// jsdom has no matchMedia; selectLocation uses it to scroll the panel into
+// view on phones. Report a desktop width so the scroll path is skipped.
+window.matchMedia ??= ((query: string) => ({
+  matches: true,
+  media: query,
+  onchange: null,
+  addListener: () => {},
+  removeListener: () => {},
+  addEventListener: () => {},
+  removeEventListener: () => {},
+  dispatchEvent: () => false,
+})) as typeof window.matchMedia;
+
 const PARK = {
   locationId: 'loc-1',
   officeId: 'o1',
