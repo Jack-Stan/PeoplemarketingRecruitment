@@ -128,10 +128,20 @@ function selectLocation(l: Location): void {
 function closePanel(): void {
   selectedId.value = null;
 }
-watch(selectedId, (id) => {
-  store.unsubscribeVisits();
-  if (id && canSeeCoverage.value) store.subscribeVisits(officeId.value, id);
-});
+// Keyed on the location actually shown, not the raw `selectedId`: when an
+// admin switches office or someone else deletes the open location, `selected`
+// goes null while `selectedId` stays set — keying on the id alone left the
+// visits listener running on a location nobody can see anymore.
+watch(
+  () => [officeId.value, selected.value?.locationId ?? null, canSeeCoverage.value] as const,
+  ([office, id, canSee]) => {
+    store.unsubscribeVisits();
+    if (office && id && canSee) store.subscribeVisits(office, id);
+  },
+);
+// Another office's list doesn't contain the open location; don't let it
+// re-open by id if the same id ever shows up there.
+watch(officeId, () => closePanel());
 
 // --- Map ---------------------------------------------------------------
 const mapEl = ref<HTMLElement | null>(null);
