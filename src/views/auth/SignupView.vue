@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import logoUrl from '@/assets/logo.svg';
 import { useAuth } from '@/composables/useAuth';
 import { officesService } from '@/services/offices.service';
 import { useUiStore } from '@/stores/ui';
@@ -48,65 +49,77 @@ onMounted(async () => {
 </script>
 
 <template>
-  <main class="flex min-h-screen items-center justify-center bg-neutral-surface px-4">
-    <section class="w-full max-w-sm rounded-lg bg-neutral-white p-8 shadow-md">
-      <header class="mb-6 text-center">
-        <h1 class="text-2xl font-bold text-neutral-ink">People Marketing</h1>
-        <p class="mt-1 text-sm text-neutral-mute">Maak je account aan</p>
+  <!-- Same branded card as LoginView. Phone: top-aligned with vertical
+       padding so the form scrolls instead of hiding behind the keyboard. -->
+  <main
+    class="relative flex min-h-screen items-start justify-center bg-neutral-black px-4 py-8 sm:items-center"
+    style="
+      background-image: radial-gradient(circle at 100% 0%, rgba(230, 0, 126, 0.3), transparent 45%),
+        radial-gradient(circle at 0% 100%, rgba(255, 61, 138, 0.2), transparent 45%);
+    "
+  >
+    <section class="relative w-full max-w-sm overflow-hidden rounded-lg bg-neutral-white shadow-md">
+      <header class="flex flex-col items-center rounded-t-lg bg-neutral-black px-6 py-6 text-center">
+        <img :src="logoUrl" alt="People Marketing" class="h-10 w-auto sm:h-12" />
+        <p class="mt-3 text-sm text-white/70">Maak je account aan</p>
       </header>
 
-      <form class="space-y-4" @submit.prevent="onSubmit">
-        <BaseInput
-          v-model="displayName"
-          label="Naam"
-          type="text"
-          autocomplete="name"
-          required
-          placeholder="Je naam"
-        />
-        <BaseInput
-          v-model="email"
-          label="E-mail"
-          type="email"
-          autocomplete="email"
-          required
-          placeholder="jij@peoplemarketing.nl"
-        />
-        <BaseInput
-          v-model="password"
-          label="Wachtwoord"
-          type="password"
-          autocomplete="new-password"
-          required
-        />
-        <div class="flex flex-col gap-1">
-          <label for="signup-office" class="text-sm font-medium text-neutral-ink">
-            Kantoor<span class="text-semantic-danger">*</span>
-          </label>
-          <select
-            id="signup-office"
-            v-model="officeId"
+      <div class="border-t-2 border-primary-pink p-5 sm:p-8">
+        <form class="space-y-4" @submit.prevent="onSubmit">
+          <BaseInput
+            v-model="displayName"
+            label="Naam"
+            type="text"
+            autocomplete="name"
             required
-            class="block w-full rounded-md border border-neutral-line bg-neutral-white px-3 py-2 text-neutral-ink focus:border-primary-pink focus:outline-none focus:ring-1 focus:ring-primary-pink"
+            placeholder="Voornaam Achternaam"
+          />
+          <BaseInput
+            v-model="email"
+            label="E-mail"
+            type="email"
+            autocomplete="email"
+            required
+            placeholder="naam@voorbeeld.be"
+          />
+          <BaseInput
+            v-model="password"
+            label="Wachtwoord"
+            type="password"
+            autocomplete="new-password"
+            required
+            placeholder="Minstens 6 tekens"
+            :error="password && password.length < 6 ? 'Minstens 6 tekens' : ''"
+          />
+          <div class="flex flex-col gap-1">
+            <label for="signup-office" class="text-sm font-medium text-neutral-ink">
+              Kantoor<span class="text-semantic-danger">*</span>
+            </label>
+            <select
+              id="signup-office"
+              v-model="officeId"
+              required
+              class="block w-full rounded-md border border-neutral-line bg-neutral-white px-3 py-2 text-neutral-ink focus:border-primary-pink focus:outline-none focus:ring-1 focus:ring-primary-pink"
+            >
+              <option v-if="!offices.length" value="" disabled>Kantoren laden…</option>
+              <option v-for="o in offices" :key="o.officeId" :value="o.officeId">{{ o.name }}</option>
+            </select>
+          </div>
+          <BaseButton
+            type="submit"
+            block
+            :loading="submitting"
+            :disabled="!displayName || !email || password.length < 6 || !officeId"
           >
-            <option v-if="!offices.length" value="" disabled>Kantoren laden…</option>
-            <option v-for="o in offices" :key="o.officeId" :value="o.officeId">{{ o.name }}</option>
-          </select>
-        </div>
-        <BaseButton
-          type="submit"
-          block
-          :loading="submitting"
-          :disabled="!displayName || !email || !password || !officeId"
-        >
-          Account aanmaken
-        </BaseButton>
-      </form>
+            Account aanmaken
+          </BaseButton>
+        </form>
 
-      <p class="mt-6 text-center text-xs text-neutral-mute">
-        Heb je al een account?
-        <RouterLink to="/login" class="font-semibold text-primary-pink">Aanmelden</RouterLink>
-      </p>
+        <p class="mt-6 text-center text-xs text-neutral-mute">
+          Heb je al een account?
+          <RouterLink to="/login" class="font-semibold text-primary-pink">Aanmelden</RouterLink>
+        </p>
+      </div>
     </section>
   </main>
 </template>
