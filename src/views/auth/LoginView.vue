@@ -72,8 +72,10 @@ async function onSendReset(): Promise<void> {
 </script>
 
 <template>
+  <!-- Phone: top-aligned with vertical padding so the fields stay above the
+       keyboard instead of being centred behind it (same as SignupView). -->
   <main
-    class="relative flex min-h-screen items-center justify-center bg-neutral-black px-4"
+    class="relative flex min-h-screen items-start justify-center bg-neutral-black px-4 py-8 sm:items-center"
     style="
       background-image: radial-gradient(circle at 100% 0%, rgba(230, 0, 126, 0.3), transparent 45%),
         radial-gradient(circle at 0% 100%, rgba(255, 61, 138, 0.2), transparent 45%);
@@ -81,12 +83,12 @@ async function onSendReset(): Promise<void> {
   >
     <section class="relative w-full max-w-sm overflow-hidden rounded-lg bg-neutral-white shadow-md">
       <header
-        class="flex flex-col items-center rounded-t-lg bg-neutral-black px-8 py-8 text-center"
+        class="flex flex-col items-center rounded-t-lg bg-neutral-black p-6 text-center sm:p-8"
       >
-        <img :src="logoUrl" alt="People Marketing" class="h-12 w-auto" />
+        <img :src="logoUrl" alt="People Marketing" class="h-10 w-auto sm:h-12" />
       </header>
 
-      <div class="border-t-2 border-primary-pink p-8">
+      <div class="border-t-2 border-primary-pink p-5 sm:p-8">
         <form v-if="!isResetMode" class="space-y-4" @submit.prevent="onSubmit">
           <BaseInput
             v-model="email"
@@ -111,7 +113,7 @@ async function onSendReset(): Promise<void> {
             <input
               v-model="rememberMe"
               type="checkbox"
-              class="h-5 w-5 rounded border-2 border-neutral-ink text-primary-pink focus:ring-primary-pink"
+              class="size-5 rounded border-2 border-neutral-ink text-primary-pink focus:ring-primary-pink"
             />
             Aangemeld blijven
           </label>
