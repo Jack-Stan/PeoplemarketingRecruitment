@@ -22,8 +22,11 @@ const retrying = ref(false);
 
 async function retry(): Promise<void> {
   retrying.value = true;
-  await auth.retryProfileLoad();
-  retrying.value = false;
+  try {
+    await auth.retryProfileLoad();
+  } finally {
+    retrying.value = false;
+  }
   if (!auth.profileLoadFailed.value) await router.replace('/');
 }
 
