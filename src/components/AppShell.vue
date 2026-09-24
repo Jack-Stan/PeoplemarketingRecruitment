@@ -229,6 +229,24 @@ watch(
             v-if="isMobileMenuOpen"
             class="absolute right-0 z-30 mt-2 w-56 border border-black/10 bg-white py-1 shadow-lg"
           >
+            <!-- Same admin office switcher as the sidebar; the sidebar is hidden below lg. -->
+            <div v-if="isAdmin && offices.length > 1" class="border-b border-black/5 px-4 pb-3 pt-2">
+              <label
+                for="mobile-office-select"
+                class="block text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute"
+                >Kantoor</label
+              >
+              <select
+                id="mobile-office-select"
+                :value="officeContext.activeOfficeId"
+                class="mt-1 w-full py-1.5 text-sm text-neutral-ink focus:border-primary-pink focus:ring-primary-pink"
+                @change="officeContext.setActiveOffice(($event.target as HTMLSelectElement).value)"
+              >
+                <option v-for="o in offices" :key="o.officeId" :value="o.officeId">
+                  {{ o.name }}
+                </option>
+              </select>
+            </div>
             <p
               class="px-4 pb-1 pt-2 text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-mute"
             >

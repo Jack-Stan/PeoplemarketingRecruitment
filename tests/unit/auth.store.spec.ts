@@ -289,6 +289,89 @@ describe('auth store', () => {
       expect(store.signedOutReason).toMatch(/verwijderd/);
     });
 
+    // 2026-09-24 audit — main.ts's onAuthStateChanged hydrate (no revoke) and
+    // signIn's hydrate (revokeIfMissing) race for the same sign-in. If the
+    // listener's finished first, signIn's early-returned on the idempotency
+    // guard and the deleted account landed on /pending-approval.
+    it('signIn still revokes a deleted account when the listener hydrate finished first', async () => {
+      const store = useAuthStore();
+      const fbUser = { uid: 'gone', email: 'x@y.nl' } as never;
+      vi.mocked(authService.signIn).mockImplementationOnce(async () => {
+        await store.hydrate(fbUser); // listener fires and settles before signIn resumes
+        return fbUser;
+      });
+
+      expect(await store.signIn('x@y.nl', 'pw')).toBe(false);
+      expect(authService.signOut).toHaveBeenCalled();
+      expect(store.isAuthenticated).toBe(false);
+      expect(store.error).toMatch(/verwijderd/);
+    });
+
+    it('signIn still revokes when the listener hydrate is mid-flight, and leaves no live listener', async () => {
+      const store = useAuthStore();
+      const fbUser = { uid: 'gone', email: 'x@y.nl' } as never;
+      const unsub = vi.fn();
+      vi.mocked(usersService.subscribeOwn).mockReturnValue(unsub as never);
+      let releaseGetOnce: (p: UserProfile | null) => void = () => {};
+      vi.mocked(usersService.getOnce).mockImplementationOnce(
+        () => new Promise((resolve) => { releaseGetOnce = resolve; }),
+      );
+      let listenerRun: Promise<void> = Promise.resolve();
+      vi.mocked(authService.signIn).mockImplementationOnce(async () => {
+        listenerRun = store.hydrate(fbUser); // listener starts, parked on getOnce
+        return fbUser;
+      });
+
+      const signInRun = store.signIn('x@y.nl', 'pw');
+      await vi.waitFor(() => expect(usersService.getOnce).toHaveBeenCalledTimes(1));
+      releaseGetOnce(null);
+      const [ok] = await Promise.all([signInRun, listenerRun]);
+
+      expect(ok).toBe(false);
+      expect(store.error).toMatch(/verwijderd/);
+      expect(store.isAuthenticated).toBe(false);
+      // One getOnce for both calls: the second waited instead of racing.
+      expect(usersService.getOnce).toHaveBeenCalledTimes(1);
+      // Any listener that was attached has been torn down again.
+      expect(unsub.mock.calls.length).toBe(vi.mocked(usersService.subscribeOwn).mock.calls.length);
+      vi.mocked(usersService.subscribeOwn).mockImplementation((() => () => {}) as never);
+    });
+
+    it('the listener hydrate losing the race does not revoke a new signup', async () => {
+      const store = useAuthStore();
+      const fbUser = { uid: 'new', email: 'n@y.nl' } as never;
+      await Promise.all([store.hydrate(fbUser), store.hydrate(fbUser)]);
+
+      expect(authService.signOut).not.toHaveBeenCalled();
+      expect(store.isAuthenticated).toBe(true);
+    });
+
+    it('a deleted account clears the parked pending profile instead of re-creating from it', async () => {
+      localStorage.setItem(
+        'pm_pending_office',
+        JSON.stringify({ officeId: 'gent', displayName: 'Old', phone: null }),
+      );
+      let emit: (p: UserProfile | null) => void = () => {};
+      vi.mocked(usersService.subscribeOwn).mockImplementationOnce(((_uid: string, cb: typeof emit) => {
+        emit = cb;
+        return () => {};
+      }) as never);
+      vi.mocked(usersService.getOnce).mockResolvedValueOnce(profile());
+
+      const store = useAuthStore();
+      await store.hydrate({ uid: 'u1', email: 'a@b.nl' } as never);
+      // A doc exists, so the parked key is stale and must be gone already.
+      expect(localStorage.getItem('pm_pending_office')).toBeNull();
+
+      emit(null); // admin deletes the profile mid-session
+      await vi.waitFor(() => expect(store.isAuthenticated).toBe(false));
+
+      // Next page load: no doc, and nothing left to resurrect it from.
+      await store.hydrate({ uid: 'u1', email: 'a@b.nl' } as never, { revokeIfMissing: true });
+      expect(usersService.createProfile).not.toHaveBeenCalled();
+      expect(store.consumeSignedOutReason()).toMatch(/verwijderd/);
+    });
+
     it('signIn of a deactivated account now fails with a reason instead of returning true', async () => {
       vi.mocked(authService.signIn).mockResolvedValueOnce({ uid: 'u1', email: 'a@b.nl' } as never);
       vi.mocked(usersService.getOnce).mockResolvedValueOnce(profile({ isActive: false }));

@@ -2,6 +2,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   onSnapshot,
   query,
   serverTimestamp,
@@ -86,14 +87,35 @@ export const availabilityService = {
   },
 
   /** Deterministic id (employeeId_date) — a duplicate mark() call (double-click, two tabs)
-   * overwrites the same doc instead of creating a second row for the same day. */
+   * targets the same doc instead of creating a second row for the same day.
+   *
+   * On an existing doc `setDoc` is an UPDATE, which firestore.rules denies
+   * (availability is presence-based: marking = create, unmarking = delete).
+   * The store's isMarked guard only covers rows already in memory, so a mark
+   * from a second tab or a stale snapshot hit that denial. The rule is right;
+   * so on permission-denied, re-read the doc: if it exists the day is already
+   * marked, which is what the caller wanted. A pre-write getDoc can't replace
+   * this — a plain member may not read a doc that doesn't exist yet (the read
+   * rule checks resource.data.employeeId), so it would deny every first mark. */
   async create(officeId: string, payload: AvailabilityCreatePayload): Promise<string> {
     const id = `${payload.employeeId}_${payload.date}`;
-    await setDoc(doc(availabilityCollection(officeId), id), {
-      ...payload,
-      weekStart: weekStartFor(payload.date),
-      createdAt: serverTimestamp(),
-    });
+    const ref = doc(availabilityCollection(officeId), id);
+    try {
+      await setDoc(ref, {
+        ...payload,
+        weekStart: weekStartFor(payload.date),
+        createdAt: serverTimestamp(),
+      });
+    } catch (err) {
+      if ((err as { code?: string } | null)?.code !== 'permission-denied') throw err;
+      let exists = false;
+      try {
+        exists = (await getDoc(ref)).exists();
+      } catch {
+        // Can't confirm it's already there — report the original denial.
+      }
+      if (!exists) throw err;
+    }
     return id;
   },
 

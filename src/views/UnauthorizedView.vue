@@ -22,9 +22,17 @@ const retrying = ref(false);
 
 async function retry(): Promise<void> {
   retrying.value = true;
-  await auth.retryProfileLoad();
-  retrying.value = false;
+  try {
+    await auth.retryProfileLoad();
+  } finally {
+    retrying.value = false;
+  }
   if (!auth.profileLoadFailed.value) await router.replace('/');
+}
+
+async function signOut(): Promise<void> {
+  await auth.signOut();
+  await router.replace({ name: 'login' });
 }
 </script>
 
@@ -44,7 +52,7 @@ async function retry(): Promise<void> {
         </p>
         <div class="mt-6 flex justify-center gap-3">
           <BaseButton :loading="retrying" @click="retry">Opnieuw proberen</BaseButton>
-          <button class="px-4 py-2 text-sm font-semibold text-neutral-mute" @click="auth.signOut()">
+          <button class="px-4 py-2 text-sm font-semibold text-neutral-mute" @click="signOut">
             Uitloggen
           </button>
         </div>

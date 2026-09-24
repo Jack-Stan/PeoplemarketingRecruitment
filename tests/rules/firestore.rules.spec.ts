@@ -11,7 +11,7 @@
  */
 import { readFileSync } from 'node:fs';
 
-import { AUDIT_ACTION_LABELS, MEMBER_AUDIT_ACTIONS } from '../../src/types/auditLog';
+import { AUDIT_ACTION_LABELS, LEADER_AUDIT_ACTIONS, MEMBER_AUDIT_ACTIONS } from '../../src/types/auditLog';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   assertFails,
@@ -440,6 +440,22 @@ describe('locations (isCoverageViewer: staff OR a teamleader-flagged member)', (
     );
   });
 
+  // 2026-09-24 audit — a phone clock a little ahead of the server must not
+  // fail the counter leg (and with it the whole logVisit batch). Same +5 min
+  // slack as the visit create.
+  it('a TeamMember counter bump tolerates a client clock slightly ahead', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`offices/${OFFICE_ID}/locations/loc-skew`).set(zone);
+    });
+    const member = await ctxFor('emp-member', { role: 'TeamMember', primaryOfficeId: OFFICE_ID });
+    await assertSucceeds(
+      member.firestore().doc(`offices/${OFFICE_ID}/locations/loc-skew`).update({
+        timesVisited: 1,
+        lastVisitedAt: Date.now() + 60_000,
+      }),
+    );
+  });
+
   it('a TeamMember cannot backdate a visit log entry', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await ctx.firestore().doc(`offices/${OFFICE_ID}/locations/loc-log`).set(zone);
@@ -833,6 +849,31 @@ describe('auditLog (append-only, attributed)', () => {
         ...entry('mem-1'),
         action: 'shift_created',
         officeId: OTHER_OFFICE_ID,
+      }),
+    );
+  });
+
+  // 2026-09-24 audit — team leaders may manage locations (isCoverageViewer)
+  // but their location_* audit rows were rejected by the member allowlist.
+  it('a teamleader-flagged TeamMember may log the location actions, a plain member may not', async () => {
+    const lead = await ctxFor('emp-lead', {
+      role: 'TeamMember',
+      primaryOfficeId: OFFICE_ID,
+      isTeamLeader: true,
+    });
+    const member = await ctxFor('mem-1', { role: 'TeamMember', primaryOfficeId: OFFICE_ID });
+    for (const action of LEADER_AUDIT_ACTIONS) {
+      await assertSucceeds(
+        lead.firestore().doc(`offices/${OFFICE_ID}/auditLog/tl-${action}`).set({ ...entry('emp-lead'), action }),
+      );
+      await assertFails(
+        member.firestore().doc(`offices/${OFFICE_ID}/auditLog/mem-${action}`).set({ ...entry('mem-1'), action }),
+      );
+    }
+    await assertFails(
+      lead.firestore().doc(`offices/${OFFICE_ID}/auditLog/tl-forbidden`).set({
+        ...entry('emp-lead'),
+        action: 'role_assigned',
       }),
     );
   });

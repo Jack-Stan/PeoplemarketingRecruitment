@@ -46,6 +46,19 @@ describe('chaptersForRole', () => {
     expect(manager.steps.some((s) => s.text.includes('"Goedkeuren"'))).toBe(false);
   });
 
+  it('only tells a Beheerder about deleting drafts in Planning', () => {
+    const steps = (role: Role) =>
+      chaptersForRole(role).find((c) => c.id === 'planning')!.steps.map((s) => s.text);
+    expect(steps('TeamManager').some((t) => t.includes('"Verwijderen"'))).toBe(false);
+    expect(steps('TeamManager').some((t) => t.includes('"Indienen"'))).toBe(true);
+    expect(steps('Administrator').some((t) => t.includes('"Verwijderen"'))).toBe(true);
+  });
+
+  it('no longer claims a draft is deleted without confirmation', () => {
+    for (const c of tutorialChapters.filter((c) => ['planning', 'my-planning'].includes(c.id)))
+      for (const s of c.steps) expect(s.text, c.id).not.toContain('zonder bevestiging');
+  });
+
   it('drops chapters left without steps', () => {
     for (const role of ['Administrator', 'TeamManager', 'TeamMember'] as Role[])
       for (const c of chaptersForRole(role)) expect(c.steps.length).toBeGreaterThan(0);

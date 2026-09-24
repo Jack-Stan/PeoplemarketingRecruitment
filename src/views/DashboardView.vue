@@ -157,7 +157,9 @@ watch(
 // new listener (Planning stuck on "Laden…", Medewerkers empty after nav).
 onBeforeUnmount(() => {
   shiftsStore.unsubscribe();
-  if (!isMember.value) recruitmentStore.unsubscribe();
+  // Unconditional: the role can change while mounted, and unsubscribe is a
+  // no-op when nothing is subscribed.
+  recruitmentStore.unsubscribe();
 });
 </script>
 

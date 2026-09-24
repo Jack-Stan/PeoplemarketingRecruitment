@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import type { Router } from 'vue-router';
 
-import { createAppRouter } from '@/router';
+import { createAppRouter, isStaleChunkError } from '@/router';
 import { useAuthStore } from '@/stores/auth';
 import { Roles } from '@/types/user';
 
@@ -184,5 +184,22 @@ describe('router guard', () => {
       expect(route.name).toBe('login');
       expect(route.query.redirect).toBeUndefined();
     });
+  });
+});
+
+describe('isStaleChunkError', () => {
+  it.each([
+    'Failed to fetch dynamically imported module: https://x/assets/LocationsView-abc.js',
+    'Importing a module script failed.',
+    'error loading dynamically imported module',
+    'Unable to preload CSS for /assets/LocationsView-abc.css',
+    "Expected a JavaScript module script but the server responded with a MIME type of 'text/html'",
+  ])('treats "%s" as a stale chunk', (message) => {
+    expect(isStaleChunkError(new Error(message))).toBe(true);
+  });
+
+  it('ignores ordinary navigation errors', () => {
+    expect(isStaleChunkError(new Error('Cannot read properties of undefined'))).toBe(false);
+    expect(isStaleChunkError('Navigation cancelled')).toBe(false);
   });
 });

@@ -41,6 +41,18 @@ export const MEMBER_AUDIT_ACTIONS: readonly AuditAction[] = [
   'location_visited',
 ];
 
+/**
+ * Extra actions a TeamMember with the isTeamLeader flag may log: the
+ * location management firestore.rules lets them do (isCoverageViewer).
+ * Mirrors the isCoverageViewer branch of the auditLog create rule — keep
+ * the two in sync.
+ */
+export const LEADER_AUDIT_ACTIONS: readonly AuditAction[] = [
+  'location_created',
+  'location_updated',
+  'location_deleted',
+];
+
 export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   shift_approved: 'Shift goedgekeurd',
   shift_rejected: 'Shift afgewezen',

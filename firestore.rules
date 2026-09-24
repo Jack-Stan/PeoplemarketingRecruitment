@@ -359,9 +359,16 @@ service cloud.firestore {
         // else. The old allowlist was also missing
         // recruitment_street_status_changed, so those writes were silently
         // rejected.
+        // A TeamMember with the isTeamLeader flag may also log the location
+        // management they're allowed to do (create/delete/update gate on
+        // isCoverageViewer below) — LEADER_AUDIT_ACTIONS in types/auditLog.ts.
+        // Without this their zone edits succeeded and the audit row was
+        // silently rejected.
         allow create: if (isStaffOf(officeId)
             || (isMember() && sameOffice(officeId)
-                && request.resource.data.action in ['shift_created', 'shift_deleted', 'shift_submitted', 'availability_changed', 'location_visited']))
+                && request.resource.data.action in ['shift_created', 'shift_deleted', 'shift_submitted', 'availability_changed', 'location_visited'])
+            || (isCoverageViewer(officeId)
+                && request.resource.data.action in ['location_created', 'location_updated', 'location_deleted']))
           && request.resource.data.keys().hasOnly([
             'actorUid', 'actorEmail', 'action', 'targetLabel', 'details',
             'createdAtMs', 'officeId', 'createdAt',
@@ -414,9 +421,12 @@ service cloud.firestore {
             // far-future value and pin their location to the top of every
             // "recently visited" sort forever. It's client-clock stamped
             // (locationsService.logVisit passes payload.visitedAt), so
-            // only the future is fenced off, not the past.
+            // only the future is fenced off, not the past. Same +5 minute
+            // clock slack as the visits/{visitId} create below (2026-09-24
+            // audit): with zero slack a phone clock slightly ahead of the
+            // server failed the whole logVisit batch, visit row included.
             && request.resource.data.lastVisitedAt is number
-            && request.resource.data.lastVisitedAt <= request.time.toMillis();
+            && request.resource.data.lastVisitedAt <= request.time.toMillis() + 300000;
         }
         allow update: if isCoverageViewer(officeId)
           || (isMember() && sameOffice(officeId) && onlyVisitCounterChanged());

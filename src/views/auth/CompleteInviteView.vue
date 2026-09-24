@@ -84,6 +84,7 @@ async function onSubmit(): Promise<void> {
   if (!canSubmit.value) {
     if (!passwordsMatch.value) ui.push('Wachtwoorden komen niet overeen.', 'error');
     else if (!desiredOfficeId.value) ui.push('Kies eerst een kantoor.', 'error');
+    else ui.push('Vul alle velden correct in.', 'error');
     return;
   }
   submitting.value = true;
@@ -179,7 +180,7 @@ async function onSubmit(): Promise<void> {
             required
             :error="confirmPassword && !passwordsMatch ? 'Komt niet overeen' : ''"
           />
-          <BaseButton type="submit" block :loading="submitting" :disabled="!canSubmit">
+          <BaseButton type="submit" block :loading="submitting">
             Account aanmaken
           </BaseButton>
         </form>

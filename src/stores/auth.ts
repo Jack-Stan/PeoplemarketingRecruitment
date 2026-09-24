@@ -131,6 +131,21 @@ export const useAuthStore = defineStore('auth', () => {
    * survives `clear()` and can re-apply the old role/officeId afterwards.
    */
   let hydratedUid: string | null = null;
+  /**
+   * Whether the hydrated uid's `/users` doc has been seen to exist (initial
+   * getOnce or the live subscription). Store-level, not local to one
+   * hydrate() call, so a second concurrent hydrate that short-circuits on
+   * `hydratedUid` can still run the deleted-account check against it.
+   */
+  let hasProfileDoc = false;
+  /**
+   * The hydrate currently running, per uid. signIn's hydrate (revokeIfMissing)
+   * and main.ts's onAuthStateChanged hydrate (no revoke) fire for the same
+   * sign-in; whichever starts second waits for the first and then applies its
+   * own revoke check, instead of either racing it or early-returning past it
+   * (2026-09-24 audit: the listener winning let a deleted account sign in).
+   */
+  let hydrateInFlight: { uid: string; promise: Promise<void> } | null = null;
 
   const isAuthenticated = computed(() => user.value !== null);
   /**
@@ -388,6 +403,7 @@ export const useAuthStore = defineStore('auth', () => {
     unsubProfile?.();
     unsubProfile = null;
     hydratedUid = null;
+    hasProfileDoc = false;
     profileLoadFailed.value = false;
     user.value = null;
     role.value = null;
@@ -430,12 +446,42 @@ export const useAuthStore = defineStore('auth', () => {
     { revokeIfMissing = false }: { revokeIfMissing?: boolean } = {},
   ): Promise<void> {
     // Idempotent per uid: main.ts's onAuthStateChanged and signIn/signUp/
-    // completeInvite all hydrate the same sign-in, often concurrently. Once a
-    // uid has a live subscription there is nothing to redo, and re-running
-    // would tear down and rebuild the listener for no reason.
-    if (fbUser && hydratedUid === fbUser.uid && unsubProfile) return;
+    // completeInvite all hydrate the same sign-in, often concurrently. A
+    // second call for the same uid waits for the running one rather than
+    // tearing it down, and once a uid has a live subscription there is
+    // nothing to redo — except the deleted-account check, which only the
+    // revokeIfMissing caller may run and must run whichever call won.
+    if (fbUser && hydrateInFlight?.uid === fbUser.uid) {
+      await hydrateInFlight.promise;
+      // The first hydrate signed them out (deactivated/deleted/expired) —
+      // nothing left to hydrate, and signIn reads that off `user`.
+      if (hydratedUid !== fbUser.uid) return;
+    }
+    if (fbUser && hydratedUid === fbUser.uid && unsubProfile) {
+      if (revokeIfMissing && !hasProfileDoc && !profileLoadFailed.value) {
+        await signOutWithReason(ACCOUNT_REMOVED_MESSAGE);
+      }
+      return;
+    }
+    if (!fbUser) {
+      clear();
+      return;
+    }
+    const run = doHydrate(fbUser, revokeIfMissing);
+    const entry = { uid: fbUser.uid, promise: run };
+    hydrateInFlight = entry;
+    try {
+      await run;
+    } finally {
+      if (hydrateInFlight === entry) hydrateInFlight = null;
+    }
+  }
+
+  async function doHydrate(fbUser: User, revokeIfMissing: boolean): Promise<void> {
+    // Fresh hydrate = clean slate, as before the de-dup split: clear() is the
+    // only place profileLoadFailed resets (else /unauthorized's retry can
+    // never succeed) and it drops the previous uid's role/office/listener.
     clear();
-    if (!fbUser) return;
     if (isSessionExpired()) {
       localStorage.removeItem(LOGIN_AT_KEY);
       localStorage.removeItem(REMEMBER_KEY);
@@ -474,6 +520,10 @@ export const useAuthStore = defineStore('auth', () => {
         await signOutWithReason(ACCOUNT_REMOVED_MESSAGE);
         return;
       }
+      // A doc exists, so any parked pending profile is stale. Drop it now so a
+      // later admin delete can't be undone by retryPendingProfile re-creating
+      // the account as a fresh pending signup from this device.
+      if (profile) forgetPendingProfile();
       applyProfile(profile);
       // Self-heal the emailVerified mirror if it drifted (e.g. verified in a
       // past session, tab closed before Settings ever synced it) — fire and
@@ -492,17 +542,20 @@ export const useAuthStore = defineStore('auth', () => {
     // ownership, so exactly one subscription is ever live per session.
     unsubProfile?.();
     hydratedUid = fbUser.uid;
-    let hadProfile = profile !== null;
+    hasProfileDoc = profile !== null;
     unsubProfile = usersService.subscribeOwn(
       fbUser.uid,
       (profile) => {
         // Doc existed and is now gone: deleted by an admin mid-session. A
         // null that was never preceded by a doc is just signup still writing.
-        if (!profile && hadProfile) {
+        if (!profile && hasProfileDoc) {
           void signOutWithReason(ACCOUNT_REMOVED_MESSAGE);
           return;
         }
-        if (profile) hadProfile = true;
+        if (profile) {
+          hasProfileDoc = true;
+          forgetPendingProfile();
+        }
         // An admin can deactivate someone mid-session — enforce it live,
         // not just at next sign-in, same as the "last admin" guard on
         // UsersView is meant to prevent an account nobody can act on again.
@@ -554,6 +607,9 @@ export const useAuthStore = defineStore('auth', () => {
   async function signOutWithReason(reason: string): Promise<void> {
     localStorage.removeItem(LOGIN_AT_KEY);
     localStorage.removeItem(REMEMBER_KEY);
+    // Deleted account: a parked pending profile must not resurrect it as a
+    // new pending signup on the next load (see retryPendingProfile).
+    if (reason === ACCOUNT_REMOVED_MESSAGE) forgetPendingProfile();
     await authService.signOut();
     clear();
     signedOutReason.value = reason;

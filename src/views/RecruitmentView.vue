@@ -97,10 +97,24 @@ async function submitForm(): Promise<void> {
   }
 }
 
-async function moveStage(leadId: string, stage: LeadStage): Promise<void> {
+/**
+ * The quick-edit selects are one-way `:value` bindings: on a failed write the
+ * lead never changes, so Vue never re-renders and the select would keep
+ * showing the rejected option. Put it back by hand.
+ */
+function revertSelect(select: HTMLSelectElement | undefined, value: string): void {
+  if (select) select.value = value;
+}
+
+async function moveStage(
+  leadId: string,
+  stage: LeadStage,
+  select?: HTMLSelectElement,
+): Promise<void> {
   const lead = store.leads.find((l) => l.leadId === leadId);
   const fromStage = lead?.stage;
   const ok = await store.setStage(officeId.value, leadId, stage);
+  if (!ok) revertSelect(select, fromStage ?? '');
   ui.push(ok ? 'Fase bijgewerkt.' : store.error ?? 'Er ging iets mis.', ok ? 'success' : 'error');
   if (ok && lead && auth.user.value) {
     void auditLog.record(
@@ -116,10 +130,12 @@ async function moveStage(leadId: string, stage: LeadStage): Promise<void> {
 async function moveStreetStatus(
   leadId: string,
   streetStatus: StreetLeadStatus | null,
+  select?: HTMLSelectElement,
 ): Promise<void> {
   const lead = store.leads.find((l) => l.leadId === leadId);
   const from = lead?.streetStatus;
   const ok = await store.setStreetStatus(officeId.value, leadId, streetStatus);
+  if (!ok) revertSelect(select, from ?? '');
   ui.push(
     ok ? 'Straatstatus bijgewerkt.' : store.error ?? 'Er ging iets mis.',
     ok ? 'success' : 'error',
@@ -378,6 +394,7 @@ onBeforeUnmount(() => {
                   moveStreetStatus(
                     lead.leadId,
                     (($event.target as HTMLSelectElement).value || null) as StreetLeadStatus | null,
+                    $event.target as HTMLSelectElement,
                   )
                 "
               >
@@ -412,7 +429,11 @@ onBeforeUnmount(() => {
                 :value="lead.stage"
                 class="border-black/10 bg-[#faf9f7] text-xs"
                 @change="
-                  moveStage(lead.leadId, ($event.target as HTMLSelectElement).value as LeadStage)
+                  moveStage(
+                    lead.leadId,
+                    ($event.target as HTMLSelectElement).value as LeadStage,
+                    $event.target as HTMLSelectElement,
+                  )
                 "
               >
                 <option v-for="stage in LEAD_STAGES" :key="stage" :value="stage">

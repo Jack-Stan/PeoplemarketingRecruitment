@@ -39,13 +39,18 @@ export const useAuditLogStore = defineStore('auditLog', () => {
    * Fire-and-forget on purpose: the action being logged (approving a shift,
    * assigning a role, ...) has already succeeded by the time this is called.
    * A failed audit write is bad, but rolling back — or even surfacing an
-   * error for — the real action over it would be worse.
+   * error for — the real action over it would be worse. It still leaves a
+   * console trace: silent rejections are how the location_* and
+   * recruitment_street_status_changed rule gaps went unnoticed for weeks.
    */
   async function log(officeId: string, payload: AuditLogCreatePayload): Promise<void> {
     try {
       await auditLogService.log(officeId, payload);
-    } catch {
-      // Swallowed — see above.
+    } catch (err) {
+      // Not rethrown — see above.
+      const code = (err as { code?: string } | null)?.code ?? 'unknown';
+      // eslint-disable-next-line no-console -- the only trace of a dropped audit row.
+      console.warn(`[auditLog] "${payload.action}" not logged: ${code}`);
     }
   }
 
