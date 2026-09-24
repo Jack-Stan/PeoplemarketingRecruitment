@@ -242,12 +242,37 @@ onMounted(async () => {
   map.on('click', onMapClick);
   map.on('draw:created', ((e: L.DrawEvents.Created) => onAreaDrawn(e)) as L.LeafletEventHandlerFn);
   map.on('draw:drawvertex', () => (vertexCount.value = drawnVertices()));
+  if (L.Browser.mobile) enableTwoFingerPan(map);
   renderLocations();
 });
 onBeforeUnmount(() => {
+  clearTimeout(hintTimer);
   map?.remove();
   map = null;
 });
+
+/**
+ * On a phone the map fills most of the screen and a one-finger drag panned it,
+ * so the page couldn't be scrolled past it. With `dragging` off Leaflet drops
+ * `leaflet-touch-drag` and the container falls back to `touch-action: pan-x
+ * pan-y`: one finger scrolls the page, and two fingers still pan + pinch-zoom
+ * via TouchZoom (it follows the pinch centre). Taps (pins, draw vertices) and
+ * reshape-marker drags are unaffected. UA-based, so touch laptops keep drag.
+ */
+const showPanHint = ref(false);
+let hintTimer: ReturnType<typeof setTimeout> | undefined;
+function enableTwoFingerPan(m: L.Map): void {
+  m.dragging.disable();
+  m.getContainer().addEventListener(
+    'touchmove',
+    (e) => {
+      showPanHint.value = e.touches.length === 1;
+      clearTimeout(hintTimer);
+      if (showPanHint.value) hintTimer = setTimeout(() => (showPanHint.value = false), 1500);
+    },
+    { passive: true },
+  );
+}
 // Data snapshots and row selection redraw in place; only a filter change refits.
 watch(filtered, () => renderLocations());
 watch(selectedId, () => renderLocations());
@@ -595,10 +620,18 @@ onBeforeUnmount(() => {
     <div class="flex flex-col gap-4 lg:flex-row">
       <!-- `isolate`: Leaflet's panes/controls use z-index 400–1000, which
            otherwise paint over the z-30 add/edit modal (hides the name field). -->
-      <div
-        ref="mapEl"
-        class="isolate h-[60vh] min-h-[320px] flex-1 border border-black/5 bg-[#eee] lg:h-[520px]"
-      ></div>
+      <div class="relative flex-1">
+        <div
+          ref="mapEl"
+          class="isolate h-[60vh] min-h-[320px] border border-black/5 bg-[#eee] lg:h-[520px]"
+        ></div>
+        <div
+          v-if="showPanHint"
+          class="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/40 p-6 text-center text-sm font-bold text-white"
+        >
+          Gebruik twee vingers om de kaart te verplaatsen
+        </div>
+      </div>
 
       <!-- Detail panel: opens on clicking a pin/zone on the map, or a row below. -->
       <aside
