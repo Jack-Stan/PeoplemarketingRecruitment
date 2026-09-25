@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { watch } from 'vue';
 import { RouterView, useRouter } from 'vue-router';
+import { recheckRouteOnRoleChange } from '@/router';
 import { useAuthStore } from '@/stores/auth';
 import BaseToast from '@/components/ui/BaseToast.vue';
 import ConfirmDialogHost from '@/components/ui/ConfirmDialogHost.vue';
@@ -17,6 +18,8 @@ watch(
     if (reason && router.currentRoute.value.name !== 'login') void router.replace({ name: 'login' });
   },
 );
+// Same gap for a role change — see recheckRouteOnRoleChange.
+recheckRouteOnRoleChange(router);
 </script>
 
 <template>

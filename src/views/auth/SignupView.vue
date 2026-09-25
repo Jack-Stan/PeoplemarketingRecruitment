@@ -4,8 +4,10 @@ import { useRouter } from 'vue-router';
 
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import RecaptchaCheckbox from '@/components/ui/RecaptchaCheckbox.vue';
 import logoUrl from '@/assets/logo.svg';
 import { useAuth } from '@/composables/useAuth';
+import { notificationsService } from '@/services/notifications.service';
 import { officesService } from '@/services/offices.service';
 import { useUiStore } from '@/stores/ui';
 import type { Office } from '@/types/office';
@@ -20,6 +22,9 @@ const password = ref('');
 const officeId = ref('');
 const offices = ref<Office[]>([]);
 const submitting = ref(false);
+const needsCaptcha = notificationsService.needsCaptcha();
+const captchaToken = ref('');
+const captcha = ref<InstanceType<typeof RecaptchaCheckbox> | null>(null);
 
 async function onSubmit(): Promise<void> {
   submitting.value = true;
@@ -31,9 +36,17 @@ async function onSubmit(): Promise<void> {
   );
   submitting.value = false;
   if (ok) {
+    // Fire-and-forget: never rejects, and the admin nav badge covers a lost mail.
+    void notificationsService.notifyPendingSignup({
+      name: displayName.value.trim(),
+      email: email.value.trim(),
+      officeName: offices.value.find((o) => o.officeId === officeId.value)?.name ?? officeId.value,
+      captchaToken: captchaToken.value,
+    });
     ui.push('Account aangemaakt — wachten op goedkeuring door een beheerder.', 'success');
     await router.replace('/pending-approval');
   } else {
+    captcha.value?.reset(); // tokens are single-use
     ui.push(auth.error.value ?? 'Aanmelden mislukt', 'error');
   }
 }
@@ -59,7 +72,7 @@ onMounted(async () => {
     "
   >
     <section class="relative w-full max-w-sm overflow-hidden rounded-lg bg-neutral-white shadow-md">
-      <header class="flex flex-col items-center rounded-t-lg bg-neutral-black px-6 py-6 text-center">
+      <header class="flex flex-col items-center rounded-t-lg bg-neutral-black p-6 text-center">
         <img :src="logoUrl" alt="People Marketing" class="h-10 w-auto sm:h-12" />
         <p class="mt-3 text-sm text-white/70">Maak je account aan</p>
       </header>
@@ -105,11 +118,18 @@ onMounted(async () => {
               <option v-for="o in offices" :key="o.officeId" :value="o.officeId">{{ o.name }}</option>
             </select>
           </div>
+          <RecaptchaCheckbox v-if="needsCaptcha" ref="captcha" v-model="captchaToken" />
           <BaseButton
             type="submit"
             block
             :loading="submitting"
-            :disabled="!displayName || !email || password.length < 6 || !officeId"
+            :disabled="
+              !displayName ||
+              !email ||
+              password.length < 6 ||
+              !officeId ||
+              (needsCaptcha && !captchaToken)
+            "
           >
             Account aanmaken
           </BaseButton>

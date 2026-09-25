@@ -4,6 +4,7 @@ import { RouterLink } from 'vue-router';
 
 import { useAuth } from '@/composables/useAuth';
 import { useActiveOffice } from '@/composables/useActiveOffice';
+import { usePendingSignups } from '@/composables/usePendingSignups';
 import { useRecruitmentStore } from '@/stores/recruitment';
 import { useShiftsStore } from '@/stores/shifts';
 import { addDaysISO, parseLocalISODate, todayLocalISO, weekStartFor } from '@/utils/date';
@@ -151,6 +152,9 @@ watch(
   },
   { immediate: true },
 );
+/** Admin-only (0 for everyone else) — accounts waiting for a role. */
+const { pendingCount: pendingSignupCount } = usePendingSignups();
+
 // onBeforeUnmount, not onUnmounted: onUnmounted is post-flush, so on a
 // route change it runs AFTER the next view's setup has already
 // re-subscribed the same shared store — and this cleanup then killed that
@@ -217,9 +221,21 @@ onBeforeUnmount(() => {
         to="/planning"
         class="inline-flex items-center justify-center bg-primary-pink px-4 py-2.5 text-sm font-bold text-white hover:bg-primary-pink-alt"
       >
-        Planning openen <span class="ml-3">→</span></RouterLink
+        Planning openen <span class="ml-3">→</span>
+</RouterLink
       >
     </section>
+    <RouterLink
+      v-if="pendingSignupCount"
+      :to="{ path: '/users', query: { filter: 'pending' } }"
+      class="flex items-center justify-between gap-3 border-l-4 border-primary-pink bg-white p-4 text-sm hover:bg-[#faf9f7]"
+    >
+      <span>
+        <strong>{{ pendingSignupCount }}</strong>
+        {{ pendingSignupCount === 1 ? 'account wacht' : 'accounts wachten' }} op goedkeuring
+      </span>
+      <span class="font-semibold text-primary-pink">Bekijken →</span>
+    </RouterLink>
     <section data-tour="dashboard-cards" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <article class="min-h-32 border border-black/5 bg-neutral-ink p-5 text-white">
         <p class="text-xs font-bold uppercase tracking-[0.16em] opacity-60">Vandaag ingepland</p>
@@ -252,7 +268,9 @@ onBeforeUnmount(() => {
             <p class="mt-1 text-xs text-neutral-mute">Ingeplande medewerkers per dag</p>
           </div>
           <RouterLink to="/planning" class="shrink-0 text-xs font-bold text-primary-pink"
-            >Naar planning →</RouterLink
+            >
+Naar planning →
+</RouterLink
           >
         </div>
         <div
@@ -283,7 +301,9 @@ onBeforeUnmount(() => {
             <p class="mt-1 text-xs text-neutral-mute">Huidige funnel</p>
           </div>
           <RouterLink to="/recruitment" class="shrink-0 text-xs font-bold text-primary-pink"
-            >Open pipeline →</RouterLink
+            >
+Open pipeline →
+</RouterLink
           >
         </div>
         <div class="mt-7 space-y-4">

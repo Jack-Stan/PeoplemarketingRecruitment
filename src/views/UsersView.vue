@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 
 import { useAuth } from '@/composables/useAuth';
 import { useActiveOffice } from '@/composables/useActiveOffice';
@@ -8,15 +8,21 @@ import { useOfficeNames } from '@/composables/useOfficeNames';
 import { useUserActions } from '@/composables/useUserActions';
 import { isValidEmail } from '@/utils/validators';
 import { useAuditLogStore } from '@/stores/auditLog';
+import { useConfirmStore } from '@/stores/confirm';
+import { useInvitesStore } from '@/stores/invites';
 import { useUsersStore } from '@/stores/users';
 import { useUiStore } from '@/stores/ui';
 import { ROLE_LABELS, type UserProfile } from '@/types/user';
+import type { Invite } from '@/types/invite';
 import UserRoleEditModal from '@/components/UserRoleEditModal.vue';
 
 const auth = useAuth();
 const router = useRouter();
+const route = useRoute();
 const store = useUsersStore();
 const auditLog = useAuditLogStore();
+const invites = useInvitesStore();
+const confirm = useConfirmStore();
 const ui = useUiStore();
 
 // Multi-office: an Administrator assigns into whichever office they've
@@ -68,7 +74,8 @@ const inviteEmail = ref('');
 const inviting = ref(false);
 const search = ref('');
 const filterOffice = ref('');
-const filterRole = ref('');
+// Dashboard's "accounts wachten op goedkeuring" notice links here with ?filter=pending.
+const filterRole = ref(route.query.filter === 'pending' ? 'pending' : '');
 const filterStatus = ref('');
 
 type SortKey = 'name' | 'role' | 'office' | 'teamleader' | 'status';
@@ -175,16 +182,9 @@ function closeEdit(): void {
   editingUid.value = null;
 }
 
-async function sendInvite(): Promise<void> {
-  if (!isValidEmail(inviteEmail.value) || !ownOfficeId.value) {
-    ui.push('Geef een geldig e-mailadres op.', 'error');
-    return;
-  }
-  inviting.value = true;
-  const email = inviteEmail.value.trim();
-  const officeId = ownOfficeId.value;
+/** Shared by the invite form and "Opnieuw versturen" on an open invite. */
+async function deliverInvite(email: string, officeId: string): Promise<boolean> {
   const ok = await auth.sendInvite(email, officeId);
-  inviting.value = false;
   ui.push(
     ok
       ? `Uitnodiging verstuurd naar ${email}.`
@@ -193,12 +193,55 @@ async function sendInvite(): Promise<void> {
   );
   if (ok) {
     void auditLog.record(officeId, 'user_invited', email);
-    inviteEmail.value = '';
+    const uid = auth.user.value?.uid;
+    if (uid) void invites.record(email, officeId, uid);
   }
+  return ok;
+}
+
+async function sendInvite(): Promise<void> {
+  if (!isValidEmail(inviteEmail.value) || !ownOfficeId.value) {
+    ui.push('Geef een geldig e-mailadres op.', 'error');
+    return;
+  }
+  inviting.value = true;
+  const ok = await deliverInvite(inviteEmail.value.trim(), ownOfficeId.value);
+  inviting.value = false;
+  if (ok) inviteEmail.value = '';
+}
+
+const resendingEmail = ref<string | null>(null);
+async function resendInvite(inv: Invite): Promise<void> {
+  resendingEmail.value = inv.email;
+  await deliverInvite(inv.email, inv.officeId);
+  resendingEmail.value = null;
+}
+
+/**
+ * Only drops it from this list — Firebase can't revoke an email link that has
+ * already been sent, so the old link keeps working until it expires. Said so
+ * in the confirm text rather than pretending it's a real cancel.
+ */
+async function removeInvite(inv: Invite): Promise<void> {
+  const ok = await confirm.ask(
+    `${inv.email} uit de lijst halen? De eerder verstuurde link blijft werken tot hij verloopt.`,
+    { title: 'Uitnodiging verwijderen', danger: true },
+  );
+  if (!ok) return;
+  if (!(await invites.remove(inv.email))) {
+    ui.push(invites.error ?? 'Kon de uitnodiging niet verwijderen.', 'error');
+  }
+}
+
+function formatInvitedAt(inv: Invite): string {
+  return inv.invitedAt
+    ? inv.invitedAt.toDate().toLocaleDateString('nl-BE', { day: 'numeric', month: 'short' })
+    : 'zojuist';
 }
 
 onMounted(async () => {
   store.subscribe();
+  invites.subscribe();
   try {
     await loadOfficeNames();
   } catch {
@@ -209,7 +252,10 @@ onMounted(async () => {
 // route change it runs AFTER the next view's setup has already
 // re-subscribed the same shared store — and this cleanup then killed that
 // new listener (Planning stuck on "Laden…", Medewerkers empty after nav).
-onBeforeUnmount(() => store.unsubscribe());
+onBeforeUnmount(() => {
+  store.unsubscribe();
+  invites.unsubscribe();
+});
 </script>
 
 <template>
@@ -248,6 +294,43 @@ onBeforeUnmount(() => store.unsubscribe());
           Uitnodiging versturen
         </button>
       </form>
+
+      <!-- Invited but never finished the link — see stores/invites.ts. -->
+      <div v-if="invites.openInvites.length" class="mt-5 border-t border-black/5 pt-4">
+        <h4 class="text-xs font-bold uppercase tracking-[0.16em] text-neutral-mute">
+          Openstaande uitnodigingen ({{ invites.openInvites.length }})
+        </h4>
+        <ul class="mt-2 divide-y divide-black/5">
+          <li
+            v-for="inv in invites.openInvites"
+            :key="inv.email"
+            class="flex flex-col gap-2 py-2.5 text-sm sm:flex-row sm:items-center"
+          >
+            <div class="min-w-0 flex-1">
+              <p class="truncate font-semibold">{{ inv.email }}</p>
+              <p class="text-xs text-neutral-mute">
+                {{ officeLabel(inv.officeId) }} · verstuurd {{ formatInvitedAt(inv) }} · nog niet
+                aangemeld
+              </p>
+            </div>
+            <div class="flex gap-2">
+              <button
+                class="border border-black/10 px-3 py-1.5 text-xs font-semibold hover:bg-[#faf9f7] disabled:opacity-50"
+                :disabled="resendingEmail === inv.email"
+                @click="resendInvite(inv)"
+              >
+                Opnieuw versturen
+              </button>
+              <button
+                class="px-3 py-1.5 text-xs font-semibold text-semantic-danger hover:bg-[#faf9f7]"
+                @click="removeInvite(inv)"
+              >
+                Verwijderen
+              </button>
+            </div>
+          </li>
+        </ul>
+      </div>
     </section>
 
     <div
@@ -351,7 +434,7 @@ onBeforeUnmount(() => store.unsubscribe());
             <td class="px-5 py-4" data-label="Status">
               <span class="inline-flex items-center gap-2 text-xs">
                 <i
-                  class="h-2 w-2 rounded-full"
+                  class="size-2 rounded-full"
                   :class="isUserActive(u) ? 'bg-emerald-500' : 'bg-neutral-300'"
                 ></i>
                 {{ isUserActive(u) ? 'Actief' : 'Inactief' }}
@@ -359,7 +442,7 @@ onBeforeUnmount(() => store.unsubscribe());
             </td>
             <td class="px-5 py-4 text-right" data-label="" @click.stop>
               <button
-                class="grid h-8 w-8 place-items-center rounded-full text-neutral-mute hover:bg-black/5 hover:text-neutral-ink"
+                class="grid size-8 place-items-center rounded-full text-neutral-mute hover:bg-black/5 hover:text-neutral-ink"
                 @click="toggleMenu(u.uid, $event)"
               >
                 ⋮

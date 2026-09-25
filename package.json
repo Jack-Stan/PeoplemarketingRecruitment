@@ -20,6 +20,7 @@
     "delete-user": "firebase emulators:exec --project peoplemarketing-c5bfd --only auth,firestore \"tsx scripts/deleteUser.ts\""
   },
   "dependencies": {
+    "@emailjs/browser": "^4.4.1",
     "firebase": "~10.12.0",
     "leaflet": "^1.9.4",
     "leaflet-draw": "^1.0.4",

@@ -10,6 +10,12 @@ interface ImportMetaEnv {
   readonly VITE_USE_EMULATORS?: string;
   /** Base URL for Firebase Auth action links — see config/firebase.ts getAppBaseUrl. */
   readonly VITE_APP_URL?: string;
+  /** Admin "pending approval" mail — see services/notifications.service.ts. */
+  readonly VITE_EMAILJS_SERVICE_ID?: string;
+  readonly VITE_EMAILJS_PENDING_TEMPLATE_ID?: string;
+  readonly VITE_EMAILJS_PUBLIC_KEY?: string;
+  /** reCAPTCHA v2 site key; its secret lives in the EmailJS template settings. */
+  readonly VITE_RECAPTCHA_SITE_KEY?: string;
 }
 
 interface ImportMeta {

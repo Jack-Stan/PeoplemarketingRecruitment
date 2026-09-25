@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { useAuth } from '@/composables/useAuth';
+import { usePendingSignups } from '@/composables/usePendingSignups';
 import WelcomeTutorial from '@/components/WelcomeTutorial.vue';
 import { brand } from '@/assets/brand';
 import logoUrl from '@/assets/logo.svg';
@@ -31,11 +32,12 @@ const links = computed(() => [
 ]);
 // Admin-only pages, grouped under their own "Beheer" section in the sidebar
 // instead of sitting flat in the workspace list with everything else.
+const { pendingCount } = usePendingSignups();
 const adminLinks = computed(() =>
   auth.hasRole('Administrator')
     ? [
-        { label: 'Gebruikers', to: '/users', icon: '☺' },
-        { label: 'Audit trail', to: '/audit', icon: '⎘' },
+        { label: 'Gebruikers', to: '/users', icon: '☺', badge: pendingCount.value },
+        { label: 'Audit trail', to: '/audit', icon: '⎘', badge: 0 },
       ]
     : [],
 );
@@ -150,8 +152,10 @@ watch(
               ? 'border-primary-pink bg-white/10 text-white'
               : 'border-transparent'
           "
-          ><span class="w-5 text-primary-pink">{{ link.icon }}</span
-          >{{ link.label }}</RouterLink
+          >
+<span class="w-5 text-primary-pink">{{ link.icon }}</span
+          >{{ link.label }}
+</RouterLink
         >
         <template v-if="adminLinks.length">
           <p class="px-4 pb-3 pt-6 text-[10px] font-bold uppercase tracking-[0.2em] text-white/35">
@@ -167,8 +171,16 @@ watch(
                 ? 'border-primary-pink bg-white/10 text-white'
                 : 'border-transparent'
             "
-            ><span class="w-5 text-primary-pink">{{ link.icon }}</span
-            >{{ link.label }}</RouterLink
+            >
+<span class="w-5 text-primary-pink">{{ link.icon }}</span
+            >{{ link.label }}
+<span
+              v-if="link.badge"
+              class="ml-auto grid min-w-5 place-items-center rounded-full bg-primary-pink px-1.5 text-[10px] font-bold text-white"
+              :title="`${link.badge} in afwachting van goedkeuring`"
+              >{{ link.badge }}</span
+            >
+</RouterLink
           >
         </template>
       </nav>
@@ -181,13 +193,17 @@ watch(
             to="/settings"
             class="block px-4 py-2.5 text-sm text-white/80 hover:bg-white/5 hover:text-white"
             @click="isAccountMenuOpen = false"
-            >Instellingen</RouterLink
+            >
+Instellingen
+</RouterLink
           >
           <RouterLink
             to="/settings?tab=faq"
             class="block px-4 py-2.5 text-sm text-white/80 hover:bg-white/5 hover:text-white"
             @click="isAccountMenuOpen = false"
-            >Handleiding &amp; FAQ</RouterLink
+            >
+Handleiding &amp; FAQ
+</RouterLink
           >
           <button
             class="block w-full border-t border-white/10 px-4 py-2.5 text-left text-sm text-white/80 hover:bg-white/5 hover:text-white"
@@ -203,7 +219,7 @@ watch(
           @click="isAccountMenuOpen = !isAccountMenuOpen"
         >
           <span
-            class="grid h-9 w-9 place-items-center rounded-full bg-primary-pink text-xs font-bold"
+            class="grid size-9 place-items-center rounded-full bg-primary-pink text-xs font-bold"
             >{{ initials }}</span
           >
           <span class="min-w-0 flex-1 truncate text-xs">{{ accountLabel }}</span>
@@ -223,6 +239,11 @@ watch(
             @click="isMobileMenuOpen = !isMobileMenuOpen"
           >
             {{ allLinks.find((l) => isLinkActive(l.to))?.label ?? 'Menu' }}
+            <span
+              v-if="pendingCount"
+              class="size-2 rounded-full bg-primary-pink"
+              :title="`${pendingCount} in afwachting van goedkeuring`"
+            />
             <span class="text-white/50">{{ isMobileMenuOpen ? '▲' : '▼' }}</span>
           </button>
           <div
@@ -285,18 +306,27 @@ watch(
               >
                 <span class="w-4 text-primary-pink">{{ link.icon }}</span
                 >{{ link.label }}
+                <span
+                  v-if="link.badge"
+                  class="ml-auto grid min-w-5 place-items-center rounded-full bg-primary-pink px-1.5 text-[10px] font-bold text-white"
+                  >{{ link.badge }}</span
+                >
               </RouterLink>
             </template>
             <div class="border-t border-black/5 pt-1">
               <RouterLink
                 to="/settings"
                 class="block px-4 py-2.5 text-sm text-neutral-ink hover:bg-[#faf9f7]"
-                >Instellingen</RouterLink
+                >
+Instellingen
+</RouterLink
               >
               <RouterLink
                 to="/settings?tab=faq"
                 class="block px-4 py-2.5 text-sm text-neutral-ink hover:bg-[#faf9f7]"
-                >Handleiding &amp; FAQ</RouterLink
+                >
+Handleiding &amp; FAQ
+</RouterLink
               >
               <button
                 class="block w-full px-4 py-2.5 text-left text-sm text-neutral-ink hover:bg-[#faf9f7]"

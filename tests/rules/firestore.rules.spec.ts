@@ -11,6 +11,9 @@
  */
 import { readFileSync } from 'node:fs';
 
+import firebase from 'firebase/compat/app';
+import 'firebase/compat/firestore';
+
 import { AUDIT_ACTION_LABELS, LEADER_AUDIT_ACTIONS, MEMBER_AUDIT_ACTIONS } from '../../src/types/auditLog';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -1169,6 +1172,50 @@ describe('users (self-service update — selfProfileUpdateOnly)', () => {
     const admin = await ctxFor('admin-1', { role: 'Administrator', primaryOfficeId: OFFICE_ID });
     await assertSucceeds(
       admin.firestore().doc('users/admin-2').update({ role: 'TeamMember' }),
+    );
+  });
+});
+
+describe('invites (admin-only record of sent invite links)', () => {
+  const EMAIL = 'new.hire@example.com';
+  function payload(uid: string, over: Record<string, unknown> = {}) {
+    return { email: EMAIL, officeId: OFFICE_ID, invitedBy: uid, invitedAt: firebase.firestore.FieldValue.serverTimestamp(), ...over };
+  }
+
+  it('an admin can record, read and delete an invite', async () => {
+    const admin = await ctxFor('admin-1', { role: 'Administrator', primaryOfficeId: OFFICE_ID });
+    const ref = admin.firestore().doc(`invites/${EMAIL}`);
+    await assertSucceeds(ref.set(payload('admin-1')));
+    await assertSucceeds(ref.get());
+    await assertSucceeds(ref.delete());
+  });
+
+  it('a TeamManager can neither read nor write invites', async () => {
+    const mgr = await ctxFor('mgr-1', { role: 'TeamManager', primaryOfficeId: OFFICE_ID });
+    const ref = mgr.firestore().doc(`invites/${EMAIL}`);
+    await assertFails(ref.set(payload('mgr-1')));
+    await assertFails(ref.get());
+  });
+
+  it('an unauthenticated visitor cannot read invites', async () => {
+    const anon = testEnv.unauthenticatedContext();
+    await assertFails(anon.firestore().doc(`invites/${EMAIL}`).get());
+  });
+
+  it('rejects a doc id that is not the lowercased email', async () => {
+    const admin = await ctxFor('admin-1', { role: 'Administrator', primaryOfficeId: OFFICE_ID });
+    await assertFails(admin.firestore().doc('invites/someone-else@example.com').set(payload('admin-1')));
+  });
+
+  it('rejects an invite attributed to another admin', async () => {
+    const admin = await ctxFor('admin-1', { role: 'Administrator', primaryOfficeId: OFFICE_ID });
+    await assertFails(admin.firestore().doc(`invites/${EMAIL}`).set(payload('admin-2')));
+  });
+
+  it('rejects unknown fields', async () => {
+    const admin = await ctxFor('admin-1', { role: 'Administrator', primaryOfficeId: OFFICE_ID });
+    await assertFails(
+      admin.firestore().doc(`invites/${EMAIL}`).set(payload('admin-1', { role: 'Administrator' })),
     );
   });
 });

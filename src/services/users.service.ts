@@ -4,9 +4,11 @@ import {
   doc,
   getDoc,
   onSnapshot,
+  query,
   serverTimestamp,
   setDoc,
   updateDoc,
+  where,
   type Unsubscribe,
 } from 'firebase/firestore';
 
@@ -76,6 +78,19 @@ export const usersService = {
     return onSnapshot(
       collection(db, 'users'),
       (snapshot) => onChange(snapshot.docs.map((d) => ({ uid: d.id, ...d.data() }) as UserProfile)),
+      onError,
+    );
+  },
+
+  /**
+   * Admin-only: live count of accounts still waiting for a role (the AppShell
+   * nav badge + dashboard notice). Its own listener rather than the users
+   * store, because UsersView unsubscribes that shared store on unmount.
+   */
+  subscribePendingCount(onChange: (count: number) => void, onError: (err: unknown) => void): Unsubscribe {
+    return onSnapshot(
+      query(collection(db, 'users'), where('role', '==', null)),
+      (snapshot) => onChange(snapshot.size),
       onError,
     );
   },

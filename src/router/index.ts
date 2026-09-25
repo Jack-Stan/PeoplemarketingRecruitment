@@ -1,4 +1,5 @@
-import { createRouter, createWebHistory } from 'vue-router';
+import { watch, type WatchStopHandle } from 'vue';
+import { createRouter, createWebHistory, type Router } from 'vue-router';
 
 import { routes } from './routes';
 import { useAuthStore } from '@/stores/auth';
@@ -19,6 +20,27 @@ export function isStaleChunkError(err: unknown): boolean {
   const msg = String((err as Error)?.message ?? err);
   return /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|Unable to preload CSS|MIME type/i.test(
     msg,
+  );
+}
+
+/**
+ * The auth store picks up a role change live (subscribeOwn), but the guard
+ * only runs on navigation — so an approved user sat on /pending-approval
+ * until a refresh, and a demoted one kept a page they're no longer allowed
+ * on. Re-runs the guard on the current route whenever role (or the
+ * profile-unreadable flag) changes. Protected routes only: login/signup do
+ * their own post-hydrate navigation and must not be raced. Call once from
+ * App.vue's setup (needs an active pinia).
+ */
+export function recheckRouteOnRoleChange(router: Router): WatchStopHandle {
+  const auth = useAuthStore();
+  return watch(
+    () => [auth.role, auth.profileLoadFailed],
+    () => {
+      const current = router.currentRoute.value;
+      if (!auth.isAuthenticated || !current.meta.requiresAuth) return;
+      void router.replace({ path: current.fullPath, force: true });
+    },
   );
 }
 

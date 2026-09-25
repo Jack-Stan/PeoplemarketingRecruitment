@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import type { Router } from 'vue-router';
 
-import { createAppRouter, isStaleChunkError } from '@/router';
+import { flushPromises } from '@vue/test-utils';
+
+import { createAppRouter, isStaleChunkError, recheckRouteOnRoleChange } from '@/router';
 import { useAuthStore } from '@/stores/auth';
 import { Roles } from '@/types/user';
 
@@ -201,5 +203,48 @@ describe('isStaleChunkError', () => {
   it('ignores ordinary navigation errors', () => {
     expect(isStaleChunkError(new Error('Cannot read properties of undefined'))).toBe(false);
     expect(isStaleChunkError('Navigation cancelled')).toBe(false);
+  });
+});
+
+describe('recheckRouteOnRoleChange', () => {
+  let router: Router;
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    router = createAppRouter();
+  });
+
+  it('moves a pending user off /pending-approval the moment an admin approves them', async () => {
+    const auth = useAuthStore();
+    auth.user = { uid: 'u1' } as never;
+    expect((await navigate(router, '/dashboard')).name).toBe('pending-approval');
+    const stop = recheckRouteOnRoleChange(router);
+    auth.role = Roles.TeamMember;
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe('dashboard');
+    stop();
+  });
+
+  it('bounces a user off a page their new role no longer allows', async () => {
+    const auth = useAuthStore();
+    auth.user = { uid: 'u1' } as never;
+    auth.role = Roles.Administrator;
+    expect((await navigate(router, '/users')).name).toBe('users');
+    const stop = recheckRouteOnRoleChange(router);
+    auth.role = Roles.TeamMember;
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe('unauthorized');
+    stop();
+  });
+
+  it('leaves public pages (login/signup) alone so their own navigation is not raced', async () => {
+    const auth = useAuthStore();
+    expect((await navigate(router, '/signup')).name).toBe('signup');
+    const stop = recheckRouteOnRoleChange(router);
+    auth.user = { uid: 'u1' } as never;
+    auth.role = Roles.TeamMember;
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe('signup');
+    stop();
   });
 });

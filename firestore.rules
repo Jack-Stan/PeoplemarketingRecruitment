@@ -187,6 +187,23 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Sent invites (UsersView "Openstaande uitnodigingen"). Firebase's
+    // email-link invite leaves no trace of its own, so the admin UI records
+    // one doc per address (doc id = lowercased email, so a re-send
+    // overwrites) and shows it until a /users doc with that email exists.
+    // Admin-only both ways — the invitee never reads or writes this.
+    match /invites/{inviteId} {
+      allow read, delete: if isAdmin();
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly(['email', 'officeId', 'invitedBy', 'invitedAt'])
+        && request.resource.data.email is string
+        && request.resource.data.email.lower() == inviteId
+        && request.resource.data.officeId is string
+        && request.resource.data.officeId.size() > 0
+        && request.resource.data.invitedBy == request.auth.uid
+        && request.resource.data.invitedAt == request.time;
+    }
+
     match /offices/{officeId} {
       // Public read: the office directory (name/timezone/isActive — nothing
       // sensitive) has to be browsable from SignupView by a visitor who

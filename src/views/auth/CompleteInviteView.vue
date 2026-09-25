@@ -4,8 +4,10 @@ import { useRoute, useRouter } from 'vue-router';
 
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import RecaptchaCheckbox from '@/components/ui/RecaptchaCheckbox.vue';
 import { useAuth } from '@/composables/useAuth';
 import { authService } from '@/services/auth.service';
+import { notificationsService } from '@/services/notifications.service';
 import { officesService } from '@/services/offices.service';
 import { isValidName } from '@/utils/validators';
 import { useUiStore } from '@/stores/ui';
@@ -34,6 +36,9 @@ const password = ref('');
 const confirmPassword = ref('');
 const isValidLink = ref(false);
 const submitting = ref(false);
+const needsCaptcha = notificationsService.needsCaptcha();
+const captchaToken = ref('');
+const captcha = ref<InstanceType<typeof RecaptchaCheckbox> | null>(null);
 
 /**
  * The office MUST be resolved before submitting. `completeInvite` sets the
@@ -54,7 +59,8 @@ const canSubmit = computed(
     isValidName(firstName.value) &&
     isValidName(lastName.value) &&
     password.value.length >= 6 &&
-    passwordsMatch.value,
+    passwordsMatch.value &&
+    (!needsCaptcha || !!captchaToken.value),
 );
 
 onMounted(async () => {
@@ -84,6 +90,7 @@ async function onSubmit(): Promise<void> {
   if (!canSubmit.value) {
     if (!passwordsMatch.value) ui.push('Wachtwoorden komen niet overeen.', 'error');
     else if (!desiredOfficeId.value) ui.push('Kies eerst een kantoor.', 'error');
+    else if (needsCaptcha && !captchaToken.value) ui.push('Vink eerst de robotcontrole aan.', 'error');
     else ui.push('Vul alle velden correct in.', 'error');
     return;
   }
@@ -99,9 +106,19 @@ async function onSubmit(): Promise<void> {
   );
   submitting.value = false;
   if (ok) {
+    // Fire-and-forget: never rejects, and the admin nav badge covers a lost mail.
+    void notificationsService.notifyPendingSignup({
+      name: displayName,
+      email: email.value.trim(),
+      officeName:
+        offices.value.find((o) => o.officeId === desiredOfficeId.value)?.name ??
+        desiredOfficeId.value,
+      captchaToken: captchaToken.value,
+    });
     ui.push('Account aangemaakt — wacht op goedkeuring door een beheerder.', 'success');
     await router.replace('/pending-approval');
   } else {
+    captcha.value?.reset(); // tokens are single-use
     ui.push(auth.error.value ?? 'Kon de uitnodiging niet voltooien.', 'error');
   }
 }
@@ -180,6 +197,7 @@ async function onSubmit(): Promise<void> {
             required
             :error="confirmPassword && !passwordsMatch ? 'Komt niet overeen' : ''"
           />
+          <RecaptchaCheckbox v-if="needsCaptcha" ref="captcha" v-model="captchaToken" />
           <BaseButton type="submit" block :loading="submitting">
             Account aanmaken
           </BaseButton>
