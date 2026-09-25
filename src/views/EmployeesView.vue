@@ -272,7 +272,7 @@ onBeforeUnmount(() => {
             <td class="px-5 py-4">
               <div class="flex items-center gap-3">
                 <span
-                  class="grid h-9 w-9 place-items-center rounded-full text-xs font-bold text-white"
+                  class="grid size-9 place-items-center rounded-full text-xs font-bold text-white"
                   :class="e.isTeamLeader ? 'bg-primary-pink' : 'bg-[#111]'"
                 >
                   {{ initialsOf(e) }}
@@ -294,7 +294,7 @@ onBeforeUnmount(() => {
             <td class="px-5 py-4" data-label="Status">
               <span class="inline-flex items-center gap-2 text-xs">
                 <i
-                  class="h-2 w-2 rounded-full"
+                  class="size-2 rounded-full"
                   :class="e.isActive ? 'bg-emerald-500' : 'bg-neutral-300'"
                 ></i>
                 {{ e.isActive ? 'Actief' : 'Inactief' }}

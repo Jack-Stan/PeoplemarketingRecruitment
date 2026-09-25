@@ -37,7 +37,7 @@ const inputId = props.id ?? `field-${Math.random().toString(36).slice(2, 9)}`;
       :placeholder="placeholder"
       :required="required"
       :autocomplete="autocomplete"
-      class="block w-full rounded-md border border-neutral-line bg-neutral-white px-3 py-2 text-neutral-ink placeholder-neutral-mute focus:border-primary-pink focus:outline-none focus:ring-1 focus:ring-primary-pink"
+      class="block w-full rounded-md border border-neutral-line bg-neutral-white px-3 py-2 text-neutral-ink placeholder:text-neutral-mute focus:border-primary-pink focus:outline-none focus:ring-1 focus:ring-primary-pink"
       :class="{
         'border-semantic-danger focus:border-semantic-danger focus:ring-semantic-danger': !!error,
       }"

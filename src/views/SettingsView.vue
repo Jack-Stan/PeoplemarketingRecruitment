@@ -402,7 +402,9 @@ function toggleFaq(i: number): void {
                 v-if="c.to && c.to !== route.path"
                 :to="c.to"
                 class="mt-3 inline-block text-xs font-semibold text-primary-pink hover:underline"
-                >Naar {{ c.title }} →</RouterLink
+                >
+Naar {{ c.title }} →
+</RouterLink
               >
             </div>
           </div>

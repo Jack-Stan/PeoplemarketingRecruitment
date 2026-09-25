@@ -58,7 +58,7 @@ const classes = computed(() => {
   <button :type="type" :disabled="disabled || loading" :class="classes">
     <span
       v-if="loading"
-      class="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+      class="mr-2 size-4 animate-spin rounded-full border-2 border-current border-t-transparent"
     />
     <slot />
   </button>

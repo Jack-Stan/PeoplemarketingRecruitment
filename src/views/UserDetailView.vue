@@ -93,13 +93,15 @@ onBeforeUnmount(() => store.unsubscribe());
 <template>
   <div class="mx-auto max-w-4xl space-y-6">
     <RouterLink to="/users" class="text-xs font-semibold text-neutral-mute hover:text-primary-pink"
-      >← Terug naar gebruikers</RouterLink
+      >
+← Terug naar gebruikers
+</RouterLink
     >
 
     <template v-if="user">
       <section class="flex items-center gap-4 border border-black/5 bg-white p-5">
         <span
-          class="grid h-14 w-14 shrink-0 place-items-center rounded-full text-lg font-bold text-white"
+          class="grid size-14 shrink-0 place-items-center rounded-full text-lg font-bold text-white"
           :class="user.isTeamLeader ? 'bg-primary-pink' : 'bg-[#111]'"
         >
           {{ (user.displayName || user.email).slice(0, 2).toUpperCase() }}
@@ -110,7 +112,7 @@ onBeforeUnmount(() => store.unsubscribe());
           </h2>
           <span class="inline-flex items-center gap-2 text-xs text-neutral-mute">
             <i
-              class="h-2 w-2 rounded-full"
+              class="size-2 rounded-full"
               :class="isUserActive(user) ? 'bg-emerald-500' : 'bg-neutral-300'"
             ></i>
             {{ isUserActive(user) ? 'Actief' : 'Inactief' }}
@@ -141,7 +143,7 @@ onBeforeUnmount(() => store.unsubscribe());
             </div>
             <div class="mt-3 flex flex-wrap gap-2">
               <button
-                class="inline-flex h-9 items-center gap-1.5 border px-3 text-xs font-semibold border-black/10 hover:border-primary-pink hover:text-primary-pink"
+                class="inline-flex h-9 items-center gap-1.5 border border-black/10 px-3 text-xs font-semibold hover:border-primary-pink hover:text-primary-pink"
                 title="E-mailadres kopiëren"
                 @click="copy(user.email, 'E-mailadres')"
               >
@@ -149,7 +151,7 @@ onBeforeUnmount(() => store.unsubscribe());
               </button>
               <a
                 :href="`mailto:${user.email}`"
-                class="inline-flex h-9 items-center gap-1.5 border px-3 text-xs font-semibold border-black/10 hover:border-primary-pink hover:text-primary-pink text-neutral-ink hover:no-underline"
+                class="inline-flex h-9 items-center gap-1.5 border border-black/10 px-3 text-xs font-semibold text-neutral-ink hover:border-primary-pink hover:text-primary-pink hover:no-underline"
                 title="Mailen"
               >
                 <span aria-hidden="true">✉</span>Mailen
@@ -165,7 +167,7 @@ onBeforeUnmount(() => store.unsubscribe());
             <div class="mt-3 flex flex-wrap gap-2">
               <template v-if="user.phone">
                 <button
-                  class="inline-flex h-9 items-center gap-1.5 border px-3 text-xs font-semibold border-black/10 hover:border-primary-pink hover:text-primary-pink"
+                  class="inline-flex h-9 items-center gap-1.5 border border-black/10 px-3 text-xs font-semibold hover:border-primary-pink hover:text-primary-pink"
                   title="Telefoonnummer kopiëren"
                   @click="copy(user.phone, 'Telefoonnummer')"
                 >
@@ -180,7 +182,7 @@ onBeforeUnmount(() => store.unsubscribe());
                 </a>
               </template>
               <button
-                class="inline-flex h-9 items-center gap-1.5 border px-3 text-xs font-semibold border-black/10 hover:border-primary-pink hover:text-primary-pink"
+                class="inline-flex h-9 items-center gap-1.5 border border-black/10 px-3 text-xs font-semibold hover:border-primary-pink hover:text-primary-pink"
                 :title="user.phone ? 'Telefoonnummer bewerken' : 'Telefoonnummer toevoegen'"
                 @click="startEditPhone"
               >
@@ -255,7 +257,7 @@ onBeforeUnmount(() => store.unsubscribe());
         </dl>
         <div class="mt-5 flex flex-wrap gap-2 border-t border-black/5 pt-5">
           <button
-            class="inline-flex h-9 items-center gap-1.5 border px-3 text-xs font-semibold border-black/10 hover:border-primary-pink hover:text-primary-pink"
+            class="inline-flex h-9 items-center gap-1.5 border border-black/10 px-3 text-xs font-semibold hover:border-primary-pink hover:text-primary-pink"
             :title="user.role === null ? 'Rol toewijzen' : 'Rol bewerken'"
             @click="isEditingRole = true"
           >
@@ -263,7 +265,7 @@ onBeforeUnmount(() => store.unsubscribe());
           </button>
           <button
             v-if="!isSelf(user) && user.role !== null"
-            class="inline-flex h-9 items-center gap-1.5 border px-3 text-xs font-semibold border-black/10 text-neutral-mute hover:border-primary-pink hover:text-primary-pink"
+            class="inline-flex h-9 items-center gap-1.5 border border-black/10 px-3 text-xs font-semibold text-neutral-mute hover:border-primary-pink hover:text-primary-pink"
             :title="isUserActive(user) ? 'Deactiveren' : 'Heractiveren'"
             @click="toggleActive(user)"
           >
@@ -271,7 +273,7 @@ onBeforeUnmount(() => store.unsubscribe());
           </button>
           <button
             v-if="!isSelf(user)"
-            class="inline-flex h-9 items-center gap-1.5 border px-3 text-xs font-semibold border-black/10 text-neutral-mute hover:border-semantic-danger hover:text-semantic-danger"
+            class="inline-flex h-9 items-center gap-1.5 border border-black/10 px-3 text-xs font-semibold text-neutral-mute hover:border-semantic-danger hover:text-semantic-danger"
             title="Verwijderen"
             @click="onDelete"
           >
@@ -294,7 +296,9 @@ onBeforeUnmount(() => store.unsubscribe());
     <p v-else class="border border-black/5 bg-white p-8 text-center text-sm text-neutral-mute">
       Gebruiker niet gevonden.
       <RouterLink to="/users" class="font-semibold text-primary-pink underline"
-        >Terug naar gebruikers</RouterLink
+        >
+Terug naar gebruikers
+</RouterLink
       >
     </p>
   </div>

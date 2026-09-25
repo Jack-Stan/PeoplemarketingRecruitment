@@ -689,7 +689,7 @@ onBeforeUnmount(() => {
           </select>
           <p v-else class="mt-1 inline-flex items-center gap-2 text-xs font-semibold">
             <i
-              class="h-2 w-2 rounded-full"
+              class="size-2 rounded-full"
               :style="{ backgroundColor: STATUS_COLORS[selected.status] }"
             ></i>
             {{ LOCATION_STATUS_LABELS[selected.status] }}
@@ -784,7 +784,7 @@ onBeforeUnmount(() => {
             <td class="px-5 py-4" data-label="Status">
               <span class="inline-flex items-center gap-2 text-xs font-semibold">
                 <i
-                  class="h-2 w-2 rounded-full"
+                  class="size-2 rounded-full"
                   :style="{ backgroundColor: STATUS_COLORS[l.status] }"
                 ></i>
                 {{ LOCATION_STATUS_LABELS[l.status] }}
